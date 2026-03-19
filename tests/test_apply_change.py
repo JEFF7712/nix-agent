@@ -38,3 +38,20 @@ def test_apply_change_workflow_calls_switch_when_allowed(
 
     mock_switch.assert_called_once_with("/etc/nixos#host")
     assert result.apply_result == "switched"
+
+
+@patch("nix_agent.server.classify_change")
+def test_apply_change_workflow_uses_switch_operation_for_policy(mock_classify: Mock):
+    mock_classify.return_value.policy_decision = "blocked"
+    mock_classify.return_value.approval_required = True
+    mock_classify.return_value.reason = "matched network policy rule"
+    mock_classify.return_value.risk_level = "high"
+    mock_classify.return_value.matched_rules = ["network-core"]
+
+    apply_change_workflow(
+        "update vpn", ["/etc/nixos/networking/vpn.nix"], "/etc/nixos#host"
+    )
+
+    mock_classify.assert_called_once_with(
+        ["/etc/nixos/networking/vpn.nix"], operation="switch"
+    )

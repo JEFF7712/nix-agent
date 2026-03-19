@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 
 from nix_agent.policy import PolicyDecision
 
+# Re-export the policy decision type so callers can import it from this module.
+
 
 @dataclass
 class OperationResult:
