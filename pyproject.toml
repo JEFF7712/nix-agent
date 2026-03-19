@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=65.5.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nix-agent"
+version = "0.1.0"
+description = "Minimal entry point scaffolding for the nix-agent project."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
