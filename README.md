@@ -28,9 +28,11 @@ Autonomous agent for managing your NixOS configuration through guided, MCP-drive
 - `apply_change(intent, changed_files, flake_uri)`: orchestrate approval checks, dry-activate, and a controlled `nixos-rebuild switch`, returning the `OperationResult` body.
 - `get_operation_result(operation_id)`: placeholder view when external tracking is required later.
 
-## Approval blacklist behavior
+## Approval policy behavior
 
-The Ops Agent blocks auto-apply (sets `approval_required`) whenever a `changed_files` list includes `ssh`, `network`, or `firewall` in the path: these change types return `policy_decision: blocked` with `reason: matched approval blacklist`. Allow-list safe touches proceed through dry-activate and switch without human approval.
+Approval decisions now come from the config-driven `POLICY_RULES` in `src/nix_agent/policy.py`. Each rule names a set of path patterns, specifies which operations it controls, and tags itself with a risk level. The sensitive categories (`auth-ssh`, `network-core`, `boot-identity`, `secrets-wiring`) always block create/patch/delete/switch operations and surface the matching rule IDs via `matched_rules`. The remaining `user-config` category is treated as low risk and does not require approval.
+
+Operation context matters: `classify_change` defaults to `patch`, matches only the supplied operation against each rule, and blocks the request whenever a sensitive rule applies for that operation. Anything outside the listed operations (create/patch/delete/switch) fails closed, marking `approval_required` as true and returning `policy_decision: blocked` so callers know the request needs review.
 
 ## Example requests
 

@@ -101,12 +101,17 @@ def build_server() -> FastMCP:
         name="classify_change",
         description="Check changed files for approval policy conflicts",
     )
-    def classify_change_tool(changed_files: list[str]) -> dict[str, bool | str]:
-        decision = classify_change(changed_files)
+    def classify_change_tool(
+        changed_files: list[str],
+        operation: str | None = None,
+    ) -> dict[str, object]:
+        decision = classify_change(changed_files, operation=operation)
         return {
             "policy_decision": decision.policy_decision,
             "approval_required": decision.approval_required,
             "reason": decision.reason,
+            "risk_level": decision.risk_level,
+            "matched_rules": decision.matched_rules,
         }
 
     @server.tool(
@@ -149,7 +154,7 @@ def build_server() -> FastMCP:
 def apply_change_workflow(
     intent: str, changed_files: list[str], flake_uri: str
 ) -> OperationResult:
-    decision = classify_change(changed_files)
+    decision = classify_change(changed_files, operation="switch")
     if decision.approval_required:
         return OperationResult(
             intent=intent,
