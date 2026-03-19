@@ -5,8 +5,9 @@ from fastmcp import FastMCP
 from fastmcp.tools.tool import Tool
 
 from nix_agent.inspect import read_target
+from nix_agent.managed_state import record_managed_root
 from nix_agent.models import OperationResult, PatchSet
-from nix_agent.patching import replace_file_contents
+from nix_agent.patching import apply_patch_set as apply_patch_set_mutation
 from nix_agent.policy import classify_change
 from nix_agent.system_apply import run_dry_activate, run_switch
 from nix_agent.validation import needs_nix_format
@@ -65,11 +66,20 @@ def build_server() -> FastMCP:
         name="apply_patch_set",
         description="Apply a small set of file replacements",
     )
-    def apply_patch_set(patch_set: PatchSet) -> dict[str, list[str]]:
-        changed_files: list[str] = []
-        for patch in patch_set.patches:
-            changed_files.extend(replace_file_contents(patch.path, patch.content))
-        return {"changed_files": changed_files}
+    def apply_patch_set(
+        patch_set: PatchSet, managed_state: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        return apply_patch_set_mutation(patch_set, managed_state=managed_state)
+
+    @server.tool(
+        name="record_managed_root",
+        description="Persist an approved managed root for future patches",
+    )
+    def record_managed_root_tool(
+        state_path: str | Path, root: dict[str, object]
+    ) -> dict[str, object]:
+        managed_state = record_managed_root(Path(state_path), root)
+        return {"managed_state": managed_state}
 
     @server.tool(
         name="run_formatters",
@@ -143,7 +153,7 @@ def build_server() -> FastMCP:
             "detail": "operation tracking is not available in v1",
         }
 
-    server._tools = {
+    server._tools = {  # type: ignore[attr-defined]
         component.name: component
         for component in server._local_provider._components.values()
         if isinstance(component, Tool)
