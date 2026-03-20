@@ -6,7 +6,7 @@ from fastmcp.tools.tool import Tool
 
 from nix_agent.inspect import read_target
 from nix_agent.models import OperationResult, PatchSet
-from nix_agent.patching import replace_file_contents
+from nix_agent.patching import apply_patch_set as apply_patch_set_mutation
 from nix_agent.policy import classify_change
 from nix_agent.system_apply import run_dry_activate, run_switch
 from nix_agent.validation import needs_nix_format
@@ -65,11 +65,8 @@ def build_server() -> FastMCP:
         name="apply_patch_set",
         description="Apply a small set of file replacements",
     )
-    def apply_patch_set(patch_set: PatchSet) -> dict[str, list[str]]:
-        changed_files: list[str] = []
-        for patch in patch_set.patches:
-            changed_files.extend(replace_file_contents(patch.path, patch.content))
-        return {"changed_files": changed_files}
+    def apply_patch_set(patch_set: PatchSet) -> dict[str, object]:
+        return apply_patch_set_mutation(patch_set)
 
     @server.tool(
         name="run_formatters",
@@ -101,12 +98,17 @@ def build_server() -> FastMCP:
         name="classify_change",
         description="Check changed files for approval policy conflicts",
     )
-    def classify_change_tool(changed_files: list[str]) -> dict[str, bool | str]:
-        decision = classify_change(changed_files)
+    def classify_change_tool(
+        changed_files: list[str],
+        operation: str | None = None,
+    ) -> dict[str, object]:
+        decision = classify_change(changed_files, operation=operation)
         return {
             "policy_decision": decision.policy_decision,
             "approval_required": decision.approval_required,
             "reason": decision.reason,
+            "risk_level": decision.risk_level,
+            "matched_rules": decision.matched_rules,
         }
 
     @server.tool(
@@ -138,7 +140,7 @@ def build_server() -> FastMCP:
             "detail": "operation tracking is not available in v1",
         }
 
-    server._tools = {
+    server._tools = {  # type: ignore[attr-defined]
         component.name: component
         for component in server._local_provider._components.values()
         if isinstance(component, Tool)
@@ -149,7 +151,7 @@ def build_server() -> FastMCP:
 def apply_change_workflow(
     intent: str, changed_files: list[str], flake_uri: str
 ) -> OperationResult:
-    decision = classify_change(changed_files)
+    decision = classify_change(changed_files, operation="switch")
     if decision.approval_required:
         return OperationResult(
             intent=intent,

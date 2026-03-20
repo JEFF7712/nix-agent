@@ -2,6 +2,12 @@ from dataclasses import dataclass, field
 
 from nix_agent.policy import PolicyDecision
 
+# Re-export the policy decision type so callers can import it from this module.
+
+
+OPERATION_PATCH = "patch"
+OPERATION_DELETE = "delete"
+
 
 @dataclass
 class OperationResult:
@@ -18,6 +24,10 @@ class OperationResult:
 class Patch:
     path: str
     content: str
+    expected_content: str | None = None
+    expected_sha256: str | None = None
+    operation: str = OPERATION_PATCH
+    reason: str | None = None
 
 
 @dataclass
@@ -30,4 +40,6 @@ __all__ = [
     "Patch",
     "PatchSet",
     "PolicyDecision",
+    "OPERATION_PATCH",
+    "OPERATION_DELETE",
 ]
