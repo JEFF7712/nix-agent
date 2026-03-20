@@ -2,7 +2,7 @@
 
 `nix-agent` is a local MCP server for trusted NixOS automation.
 
-It works alongside `mcp-nixos`:
+It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 - `nix-agent` handles local inspection, patching, validation, and switching
 - `mcp-nixos` handles package and option discovery
 
