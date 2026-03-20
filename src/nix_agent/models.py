@@ -12,6 +12,7 @@ OPERATION_DELETE = "delete"
 @dataclass
 class OperationResult:
     intent: str
+    status: str = "pending"
     changed_files: list[str] = field(default_factory=list)
     policy_decision: str = "allowed"
     approval_required: bool = False

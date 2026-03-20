@@ -1,7 +1,9 @@
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from nix_agent.models import Patch, PatchSet
 from nix_agent.server import build_server
+from nix_agent.system_apply import CommandResult
 
 
 def test_build_server_registers_expected_tools():
@@ -25,7 +27,7 @@ def test_classify_change_tool_contract():
 
     assert result["policy_decision"] == "blocked"
     assert result["approval_required"] is True
-    assert result["reason"] == "matched approval blacklist"
+    assert result["reason"] == "SSH/auth changes require approval"
     assert result["risk_level"] == "high"
     assert result["matched_rules"] == ["auth-ssh"]
 
@@ -48,3 +50,17 @@ def test_apply_patch_set_tool_returns_structured_result(tmp_path: Path):
     assert result["status"] == "applied"
     assert result["changed_files"] == [str(tmp_path / "unknown.conf")]
     assert set(result.keys()) == {"status", "changed_files"}
+
+
+@patch("nix_agent.server.run_dry_activate")
+def test_dry_activate_tool_returns_boolean_status(mock_dry: Mock):
+    server = build_server()
+    dry_tool = server._tools["dry_activate_system"].fn
+    mock_dry.return_value = CommandResult(ok=True, output="dry ok")
+
+    result = dry_tool(flake_uri="/etc/nixos#host")
+
+    assert result == {
+        "dry_activate_output": "dry ok",
+        "validation_ok": True,
+    }

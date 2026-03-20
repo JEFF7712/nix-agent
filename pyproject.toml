@@ -5,12 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nix-agent"
 version = "0.1.0"
-description = "Minimal entry point scaffolding for the nix-agent project."
+description = "MCP server for inspecting, patching, validating, and applying local NixOS configuration changes."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp",
 ]
+
+[project.scripts]
+nix-agent = "nix_agent.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

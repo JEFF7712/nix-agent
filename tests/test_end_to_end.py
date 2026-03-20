@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 from nix_agent.server import apply_change_workflow
+from nix_agent.system_apply import CommandResult
 
 
 @patch("nix_agent.server.run_switch")
@@ -12,7 +13,7 @@ def test_apply_change_workflow_switches_allowed_change(
     mock_classify.return_value.policy_decision = "allowed"
     mock_classify.return_value.approval_required = False
     mock_classify.return_value.reason = "no blacklist match"
-    mock_dry.return_value = "dry ok"
+    mock_dry.return_value = CommandResult(ok=True, output="dry ok")
     mock_switch.return_value = "switch ok"
 
     result = apply_change_workflow(
@@ -23,3 +24,4 @@ def test_apply_change_workflow_switches_allowed_change(
 
     assert result.approval_required is False
     assert result.apply_result == "switch ok"
+    assert result.status == "applied"

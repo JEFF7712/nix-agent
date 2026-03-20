@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nix-agent": {
+      "command": "nix-agent",
+      "args": []
+    }
+  }
+}
