@@ -37,7 +37,6 @@ def plan_change(goal: str) -> dict[str, bool | str]:
 def build_server() -> FastMCP:
     server = FastMCP("nix-agent")
 
-    @server.tool(name="inspect_state", description="Inspect a local target file")
     def inspect_state(
         path: str | Path | None = None,
         target: dict[str, str] | None = None,
@@ -54,24 +53,12 @@ def build_server() -> FastMCP:
 
         return read_target(candidate)
 
-    @server.tool(
-        name="plan_change",
-        description="Describe whether mcp-nixos should handle the goal first",
-    )
     def plan_change_tool(goal: str) -> dict[str, bool | str]:
         return plan_change(goal)
 
-    @server.tool(
-        name="apply_patch_set",
-        description="Apply a small set of file replacements",
-    )
     def apply_patch_set(patch_set: PatchSet) -> dict[str, object]:
         return apply_patch_set_mutation(patch_set)
 
-    @server.tool(
-        name="run_formatters",
-        description="Run configured formatters for touched files",
-    )
     def run_formatters(changed_files: list[str]) -> dict[str, str]:
         formatter_messages: list[str] = []
         for path in changed_files:
@@ -86,10 +73,6 @@ def build_server() -> FastMCP:
         output = "\n".join(formatter_messages) if formatter_messages else "no nix files"
         return {"formatter_output": output}
 
-    @server.tool(
-        name="dry_activate_system",
-        description="Run nixos-rebuild dry-activate for a flake",
-    )
     def dry_activate_system(flake_uri: str) -> dict[str, object]:
         output = run_dry_activate(flake_uri)
         return {
@@ -97,10 +80,6 @@ def build_server() -> FastMCP:
             "validation_ok": output.ok,
         }
 
-    @server.tool(
-        name="classify_change",
-        description="Check changed files for approval policy conflicts",
-    )
     def classify_change_tool(
         changed_files: list[str],
         operation: str | None = None,
@@ -114,10 +93,6 @@ def build_server() -> FastMCP:
             "matched_rules": decision.matched_rules,
         }
 
-    @server.tool(
-        name="apply_change",
-        description="Execute the apply change workflow locally",
-    )
     def apply_change_tool(
         intent: str, changed_files: list[str], flake_uri: str
     ) -> dict[str, object]:
@@ -133,10 +108,6 @@ def build_server() -> FastMCP:
             "rollback_target": result.rollback_target,
         }
 
-    @server.tool(
-        name="get_operation_result",
-        description="Return a placeholder view of a tracked operation",
-    )
     def get_operation_result_tool(operation_id: str) -> dict[str, str]:
         return {
             "operation_id": operation_id,
@@ -145,9 +116,62 @@ def build_server() -> FastMCP:
         }
 
     server._tools = {  # type: ignore[attr-defined]
-        component.name: component
-        for component in server._local_provider._components.values()
-        if isinstance(component, Tool)
+        "inspect_state": server.add_tool(
+            Tool.from_function(
+                inspect_state,
+                name="inspect_state",
+                description="Inspect a local target file",
+            )
+        ),
+        "plan_change": server.add_tool(
+            Tool.from_function(
+                plan_change_tool,
+                name="plan_change",
+                description="Describe whether mcp-nixos should handle the goal first",
+            )
+        ),
+        "apply_patch_set": server.add_tool(
+            Tool.from_function(
+                apply_patch_set,
+                name="apply_patch_set",
+                description="Apply a small set of file replacements",
+            )
+        ),
+        "run_formatters": server.add_tool(
+            Tool.from_function(
+                run_formatters,
+                name="run_formatters",
+                description="Run configured formatters for touched files",
+            )
+        ),
+        "dry_activate_system": server.add_tool(
+            Tool.from_function(
+                dry_activate_system,
+                name="dry_activate_system",
+                description="Run nixos-rebuild dry-activate for a flake",
+            )
+        ),
+        "classify_change": server.add_tool(
+            Tool.from_function(
+                classify_change_tool,
+                name="classify_change",
+                description="Check changed files for approval policy conflicts",
+            )
+        ),
+        "apply_change": server.add_tool(
+            Tool.from_function(
+                apply_change_tool,
+                name="apply_change",
+                description="Execute the apply change workflow locally",
+            )
+        ),
+        "get_operation_result": server.add_tool(
+            Tool.from_function(
+                get_operation_result_tool,
+                name="get_operation_result",
+                description="Return a placeholder view of a tracked operation",
+            )
+        ),
     }
     return server
 

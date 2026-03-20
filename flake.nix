@@ -13,7 +13,7 @@
         python = pkgs.python3;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.1.0";
+          version = "0.1.1";
           format = "pyproject";
           src = ./.;
           nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ];
