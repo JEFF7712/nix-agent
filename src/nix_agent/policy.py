@@ -20,67 +20,43 @@ class PolicyRule:
     reason: str
 
 
-SAFE_OPERATIONS = {"inspect"}
-
-
 POLICY_RULES = [
     PolicyRule(
         id="auth-ssh",
-        path_patterns=["ssh", "sshd_config", "authorized_keys"],
-        operations=["create", "patch", "delete", "switch"],
+        path_patterns=["ssh", "sshd_config", "authorized_keys", "ssh.nix"],
+        operations=["create", "patch", "switch"],
         risk_level="high",
         approval_required=True,
-        reason="SSH/auth-related changes must be reviewed",
+        reason="SSH/auth changes require approval",
     ),
     PolicyRule(
         id="network-core",
-        path_patterns=[
-            "network",
-            "interfaces",
-            "firewall",
-            "networking.nix",
-            "firewall.nix",
-        ],
-        operations=["create", "patch", "delete", "switch"],
+        path_patterns=["network", "interfaces", "firewall", "networking.nix"],
+        operations=["create", "patch", "switch"],
         risk_level="high",
         approval_required=True,
-        reason="Core networking rules require approval",
+        reason="Core networking changes require approval",
     ),
     PolicyRule(
-        id="boot-identity",
-        path_patterns=["boot", "hostname", "system-id"],
-        operations=["create", "patch", "delete"],
-        risk_level="medium",
-        approval_required=True,
-        reason="Boot and identity changes affect system stability",
-    ),
-    PolicyRule(
-        id="secrets-wiring",
-        path_patterns=["secrets", "vault", "credentials"],
-        operations=["create", "patch", "delete"],
+        id="hardware-configuration",
+        path_patterns=["hardware-configuration.nix"],
+        operations=["create", "patch", "switch"],
         risk_level="high",
         approval_required=True,
-        reason="Secrets wiring must always be reviewed",
-    ),
-    PolicyRule(
-        id="user-config",
-        path_patterns=["users", "accounts", "services", "profiles"],
-        operations=["create", "patch", "delete"],
-        risk_level="medium",
-        approval_required=False,
-        reason="User and app config has broader tolerance",
+        reason="Hardware configuration edits require approval",
     ),
 ]
+
+
+KNOWN_OPERATIONS = {"create", "patch", "delete", "switch", "inspect"}
 
 
 def classify_change(
     changed_files: list[str], operation: str | None = None
 ) -> PolicyDecision:
     effective_operation = operation or "patch"
-    known_operations = {op for rule in POLICY_RULES for op in rule.operations}
-    known_operations.update(SAFE_OPERATIONS)
 
-    if operation and operation not in known_operations:
+    if operation and operation not in KNOWN_OPERATIONS:
         return PolicyDecision(
             policy_decision="blocked",
             approval_required=True,
@@ -89,14 +65,21 @@ def classify_change(
             matched_rules=["unknown-operation"],
         )
 
+    if effective_operation == "delete":
+        return PolicyDecision(
+            policy_decision="blocked",
+            approval_required=True,
+            reason="delete operations always require approval",
+            risk_level="high",
+            matched_rules=["delete-operation"],
+        )
+
     matched_rules: list[str] = []
     highest_risk = "low"
     risk_order = {"low": 0, "medium": 1, "high": 2}
 
     for path in changed_files:
         for rule in POLICY_RULES:
-            if effective_operation not in rule.operations:
-                continue
             if not any(pattern in path for pattern in rule.path_patterns):
                 continue
             if rule.id not in matched_rules:
@@ -104,7 +87,7 @@ def classify_change(
             if risk_order[rule.risk_level] > risk_order[highest_risk]:
                 highest_risk = rule.risk_level
 
-    if matched_rules:
+    if matched_rules and effective_operation != "inspect":
         return PolicyDecision(
             policy_decision="blocked",
             approval_required=True,
