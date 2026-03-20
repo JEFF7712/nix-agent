@@ -65,6 +65,12 @@ See `examples/claude-code-mcp.json` and `examples/opencode-mcp.json`.
 
 Install or copy `skills/nix-agent/` into your agent's skill directory.
 
+Quick install:
+
+```bash
+./install-skill.sh opencode
+```
+
 The MCP exposes the tools. The skill teaches the correct workflow.
 
 ## Basic workflow
