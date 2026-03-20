@@ -65,6 +65,47 @@ The server exposes separate tools on purpose. The intended flow is:
 
 ## Quick start
 
+### Fastest install for Nix users
+
+If you just want the MCP server binary available on your NixOS machine, add this flake input and module:
+
+```nix
+{
+  inputs.nix-agent.url = "github:JEFF7712/nix-agent";
+
+  outputs = { nixpkgs, nix-agent, ... }: {
+    nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        nix-agent.nixosModules.default
+        ({ ... }: {
+          programs.nix-agent.enable = true;
+        })
+      ];
+    };
+  };
+}
+```
+
+Then rebuild:
+
+```bash
+sudo nixos-rebuild switch --flake .#my-host
+```
+
+After that, point your MCP host at:
+
+```json
+{
+  "mcpServers": {
+    "nix-agent": {
+      "command": "nix-agent",
+      "args": []
+    }
+  }
+}
+```
+
 ### 1. Install dependencies
 
 You need:
