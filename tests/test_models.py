@@ -6,6 +6,7 @@ def test_operation_result_defaults():
     assert result.intent == "inspect firewall"
     assert result.changed_files == []
     assert result.approval_required is False
+    assert result.status == "pending"
 
 
 def test_patch_defaults_to_patch_operation_without_trust_fields():

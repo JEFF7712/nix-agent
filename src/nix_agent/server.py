@@ -18,7 +18,7 @@ def _build_mcp_notes(goal: str) -> tuple[bool, str]:
         return True, (
             "Package lookup should be resolved via mcp-nixos before apply_change."
         )
-    if "option" in normalized:
+    if "option" in normalized or "setting" in normalized or "module knob" in normalized:
         return True, (
             "Option discovery should be resolved via mcp-nixos before apply_change."
         )
@@ -90,9 +90,12 @@ def build_server() -> FastMCP:
         name="dry_activate_system",
         description="Run nixos-rebuild dry-activate for a flake",
     )
-    def dry_activate_system(flake_uri: str) -> dict[str, str]:
+    def dry_activate_system(flake_uri: str) -> dict[str, object]:
         output = run_dry_activate(flake_uri)
-        return {"dry_activate_output": output}
+        return {
+            "dry_activate_output": output.output,
+            "validation_ok": output.ok,
+        }
 
     @server.tool(
         name="classify_change",
@@ -121,6 +124,7 @@ def build_server() -> FastMCP:
         result = apply_change_workflow(intent, changed_files, flake_uri)
         return {
             "intent": result.intent,
+            "status": result.status,
             "changed_files": result.changed_files,
             "policy_decision": result.policy_decision,
             "approval_required": result.approval_required,
@@ -155,6 +159,7 @@ def apply_change_workflow(
     if decision.approval_required:
         return OperationResult(
             intent=intent,
+            status="approval_required",
             changed_files=changed_files,
             policy_decision=decision.policy_decision,
             approval_required=True,
@@ -162,12 +167,23 @@ def apply_change_workflow(
         )
 
     validation = run_dry_activate(flake_uri)
+    if not validation.ok:
+        return OperationResult(
+            intent=intent,
+            status="validation_failed",
+            changed_files=changed_files,
+            policy_decision=decision.policy_decision,
+            approval_required=False,
+            validation_result=validation.output,
+        )
+
     switch_result = run_switch(flake_uri)
     return OperationResult(
         intent=intent,
+        status="applied",
         changed_files=changed_files,
         policy_decision=decision.policy_decision,
         approval_required=False,
-        validation_result=validation,
+        validation_result=validation.output,
         apply_result=switch_result,
     )

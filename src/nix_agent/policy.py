@@ -80,18 +80,23 @@ def classify_change(
 
     for path in changed_files:
         for rule in POLICY_RULES:
+            if effective_operation not in rule.operations:
+                continue
             if not any(pattern in path for pattern in rule.path_patterns):
                 continue
             if rule.id not in matched_rules:
                 matched_rules.append(rule.id)
             if risk_order[rule.risk_level] > risk_order[highest_risk]:
                 highest_risk = rule.risk_level
+                highest_reason = rule.reason
+
+    highest_reason = locals().get("highest_reason", "matched approval blacklist")
 
     if matched_rules and effective_operation != "inspect":
         return PolicyDecision(
             policy_decision="blocked",
             approval_required=True,
-            reason="matched approval blacklist",
+            reason=highest_reason,
             risk_level=highest_risk,
             matched_rules=matched_rules,
         )

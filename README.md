@@ -1,55 +1,151 @@
 # nix-agent
-Autonomous agent for managing your NixOS configuration through guided, MCP-driven workflows.
 
-## What the Ops Agent does
+`nix-agent` is a local MCP server for NixOS changes, plus a companion skill that teaches agents how to use it safely.
 
-- Inspect local system state and managed config files without mutating them.
-- Apply structured `PatchSet`s to deterministic targets, run file-appropriate formatters, and validate changes through `nixos-rebuild dry-activate` before triggering any switch.
-- Permit create/edit changes by default while requiring approval for deletes, then enforce approval decisions via the policy blacklist and `OperationResult` summaries.
+## What this repo ships
 
-## Partnering with `mcp-nixos`
+- An MCP server that exposes tools for local inspection, patching, formatting, policy checks, validation, and controlled `nixos-rebuild switch`.
+- A companion skill at `skills/nix-agent/SKILL.md` for Claude Code, OpenCode, or other skill-aware agents.
+- Example MCP host config snippets in `examples/`.
 
-`nix-agent` handles inspection, mutation, validation, and activation, while `mcp-nixos` remains the source of truth for package names, option lookups, and attribute discovery. `plan_change()` mirrors that boundary by emitting `requires_mcp_nixos` and notes whenever the goal mentions package installation or option discovery, signaling that the caller must run `mcp-nixos` first before invoking local mutations.
+## Product boundary
 
-## When to call `mcp-nixos` first
+`nix-agent` handles local machine inspection, file mutation, formatting, policy checks, dry activation, and switching.
 
-- Any goal that involves installing packages (`install`, `package`, etc.) should be paired with `mcp-nixos` to resolve the attribute path before the Ops Agent touches local files.
-- Option discovery requests (anything mentioning `option`, `setting`, or a NixOS module knob) also need `mcp-nixos` answers before `apply_patch_set` runs.
-- `plan_change()` embeds these heuristics in the `requires_mcp_nixos` flag and `notes`, so follow that guidance rather than guessing from the request alone.
+`mcp-nixos` remains the discovery side: package lookup, option lookup, and attribute discovery. Start with `plan_change()` and obey `requires_mcp_nixos` when it is `true`.
 
-## Available MCP tools
+## MCP tools
 
-- `inspect_state(path|target)`: read a single machine-local artifact for conversational inspection.
-- `plan_change(goal)`: identify the goal, emit `requires_mcp_nixos`, and describe why package/option lookups belong on the discovery server.
-- `apply_patch_set(patch_set)`: write each `Patch` (path + content) and report touched files. If approval is required, the command short-circuits before the dry-activate/switch steps.
-- `run_formatters(changed_files)`: invoke `nixpkgs-fmt` for `.nix` files touched by the patch set.
-- `dry_activate_system(flake_uri)`: run `nixos-rebuild dry-activate --flake` for validation output.
-- `classify_change(changed_files)`: enforce the approval blacklist (paths containing `ssh`, `network`, or `firewall`) and return a `policy_decision` with `approval_required`/`reason`.
-- `apply_change(intent, changed_files, flake_uri)`: orchestrate approval checks, dry-activate, and a controlled `nixos-rebuild switch`, returning the `OperationResult` body.
-- `get_operation_result(operation_id)`: placeholder view when external tracking is required later.
+- `inspect_state(path|target)` - read a local file.
+- `plan_change(goal)` - decide whether `mcp-nixos` should be used first.
+- `apply_patch_set(patch_set)` - write file replacements and report touched files.
+- `run_formatters(changed_files)` - run `nixpkgs-fmt` for touched `.nix` files.
+- `dry_activate_system(flake_uri)` - run `nixos-rebuild dry-activate --flake` and report success/failure.
+- `classify_change(changed_files, operation)` - evaluate approval policy.
+- `apply_change(intent, changed_files, flake_uri)` - classify for `switch`, dry-activate, then switch if validation succeeds.
+- `get_operation_result(operation_id)` - placeholder for future async tracking.
 
-## Approval policy behavior
+## Required workflow
 
-Approval decisions now come from the config-driven `POLICY_RULES` in `src/nix_agent/policy.py`. Each rule names a set of path patterns, specifies which operations it controls, and tags itself with a risk level. The sensitive categories (`auth-ssh`, `network-core`, `boot-identity`, `secrets-wiring`) always block create/patch/delete/switch operations and surface the matching rule IDs via `matched_rules`. The remaining `user-config` category is treated as low risk and does not require approval.
+The server exposes separate tools on purpose. The intended flow is:
 
-Operation context matters: `classify_change` defaults to `patch`, matches only the supplied operation against each rule, and blocks the request whenever a sensitive rule applies for that operation. Anything outside the listed operations (create/patch/delete/switch) fails closed, marking `approval_required` as true and returning `policy_decision: blocked` so callers know the request needs review.
+1. `plan_change(goal)`
+2. If `requires_mcp_nixos` is `true`, query `mcp-nixos`
+3. `apply_patch_set(patch_set)`
+4. If `apply_patch_set()` returns `status="approval_required"`, stop and ask for approval
+5. `run_formatters(changed_files)`
+6. `classify_change(changed_files)`
+7. If approval is not required, `apply_change(intent, changed_files, flake_uri)`
 
-## Example requests
+`apply_change()` does not run formatters for you.
 
-- "Install ripgrep": consult `mcp-nixos` for the attribute, then patch your NixOS config, run formatters/validation, and switch.
-- "Inspect the firewall rules": call `inspect_state` on the relevant files without altering anything.
-- "Add a cava module to Waybar": use `plan_change` to confirm no extra discovery is needed, apply a patch to the Waybar config, format/validate, and activate.
+## Policy behavior
 
-## Safety & scope
+- Deletes always require approval.
+- Matching high-risk paths like SSH, networking, and hardware configuration require approval for covered operations.
+- Rules are defined in `src/nix_agent/policy.py`.
+- `classify_change()` respects operation-specific rule matching.
 
-- Secret payloads remain out of scope for v1; the agent can edit references or metadata, but it must never write actual secret blobs or credentials to disk.
-- Everything runs through patch-and-policy tooling, so the Ops Agent never executes arbitrary shell commands outside the controlled tools above.
-- Blacklisted paths require approval, and deletes always run through that approval gate.
-- NixOS provides the primary validation and rollback safety via `nixos-rebuild dry-activate` and controlled switches, so failures never leave the system in an unknown state.
+## Safety and limits
 
-## Documentation checklist
+- `apply_change()` stops before `switch` if dry activation fails.
+- Secret payload editing is out of scope.
+- File writes are intentionally unrestricted in this version because the operator may manage files outside a fixed root. Use this MCP only in trusted agent environments.
+- This repo does not replace `mcp-nixos`; it complements it.
 
-- Cover each MCP tool plus its purpose.
-- Reiterate the safety model and approval blacklist behavior.
-- Provide concrete example requests that match the implementation.
-- Explain when `mcp-nixos` must be called before local actions.
+## Quick start
+
+### 1. Install dependencies
+
+You need:
+
+- Python 3.11+
+- `fastmcp`
+- `nixpkgs-fmt`
+- `sudo`
+- `nixos-rebuild`
+
+With the dev shell:
+
+```bash
+nix develop
+```
+
+Or with Python directly:
+
+```bash
+python -m pip install -e .
+```
+
+### 2. Run the MCP server
+
+```bash
+nix-agent
+```
+
+Or:
+
+```bash
+python -m nix_agent
+```
+
+The server uses stdio transport by default.
+
+### 3. Connect your MCP host
+
+See `examples/claude-code-mcp.json` and `examples/opencode-mcp.json`.
+
+### 4. Install the companion skill
+
+Copy `skills/nix-agent/` into your agent's skill directory, or adapt the contents into your agent's project instructions.
+
+### 5. Add it to NixOS with the flake module
+
+Import the module from this flake and enable it:
+
+```nix
+{
+  imports = [ inputs.nix-agent.nixosModules.default ];
+
+  programs.nix-agent.enable = true;
+}
+```
+
+That adds the `nix-agent` command to `environment.systemPackages`.
+
+### 6. Run it directly from the flake
+
+```bash
+nix run .#default
+```
+
+## Companion skill
+
+The skill exists to teach workflow, not tool discovery. MCP makes tools visible; the skill teaches:
+
+- when to call `mcp-nixos` first
+- the required tool order
+- when to stop on approval-required responses
+- that `apply_change()` assumes formatting already happened
+- what not to do with secrets and unsafe assumptions
+
+## Verification
+
+Run the test suite:
+
+```bash
+pytest
+```
+
+CI also runs `pytest` on push and pull request via `.github/workflows/ci.yml`.
+
+## Files to start with
+
+- `src/nix_agent/server.py`
+- `src/nix_agent/policy.py`
+- `src/nix_agent/system_apply.py`
+- `skills/nix-agent/SKILL.md`
+- `examples/claude-code-mcp.json`
+- `examples/opencode-mcp.json`
+- `nix/module.nix`
+- `.github/workflows/ci.yml`

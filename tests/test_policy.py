@@ -35,3 +35,17 @@ def test_inspect_operation_ignores_blacklist():
 
     assert decision.approval_required is False
     assert decision.policy_decision == "allowed"
+
+
+def test_policy_rules_only_apply_to_matching_operations():
+    decision = classify_change(["/etc/nixos/ssh.nix"], operation="delete")
+
+    assert decision.approval_required is True
+    assert decision.matched_rules == ["delete-operation"]
+
+
+def test_policy_reason_surfaces_matching_rule_reason():
+    decision = classify_change(["/etc/nixos/networking.nix"], operation="patch")
+
+    assert decision.approval_required is True
+    assert decision.reason == "Core networking changes require approval"

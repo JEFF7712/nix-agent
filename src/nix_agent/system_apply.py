@@ -1,7 +1,14 @@
+from dataclasses import dataclass
 import subprocess
 
 
-def run_dry_activate(flake_uri: str) -> str:
+@dataclass(frozen=True)
+class CommandResult:
+    ok: bool
+    output: str
+
+
+def run_dry_activate(flake_uri: str) -> CommandResult:
     try:
         result = subprocess.run(
             ["sudo", "nixos-rebuild", "dry-activate", "--flake", flake_uri],
@@ -9,9 +16,9 @@ def run_dry_activate(flake_uri: str) -> str:
             capture_output=True,
             text=True,
         )
-        return result.stdout
+        return CommandResult(ok=True, output=result.stdout)
     except subprocess.CalledProcessError as exc:
-        return (exc.stderr or "").strip()
+        return CommandResult(ok=False, output=(exc.stderr or "").strip())
 
 
 def run_switch(flake_uri: str) -> str:

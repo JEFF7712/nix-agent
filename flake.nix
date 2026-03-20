@@ -1,5 +1,5 @@
 {
-  description = "Scaffolding for nix-agent";
+  description = "MCP server and companion skill for local NixOS changes";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -10,18 +10,38 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        python = pkgs.python311;
+        python = pkgs.python3;
+        nix-agent-package = pkgs.python3Packages.buildPythonApplication {
+          pname = "nix-agent";
+          version = "0.1.0";
+          format = "pyproject";
+          src = ./.;
+          nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ];
+          propagatedBuildInputs = with pkgs.python3Packages; [ fastmcp ];
+        };
       in {
+        packages.default = nix-agent-package;
+
+        checks.default = nix-agent-package;
+
+        apps.default = {
+          type = "app";
+          program = "${nix-agent-package}/bin/nix-agent";
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = [
             python
-            pkgs.python311Packages.pytest
+            pkgs.python3Packages.pytest
             pkgs.nixpkgs-fmt
           ];
           shellHook = ''
-export PYTHONNOUSERSITE=0
-python -m pip install --break-system-packages --force-reinstall --upgrade --editable . pytest
-'';
+            export PYTHONNOUSERSITE=0
+            python -m pip install --break-system-packages --force-reinstall --upgrade --editable . pytest
+          '';
         };
-      });
+      })
+    // {
+      nixosModules.default = import ./nix/module.nix { inherit self; };
+    };
 }
