@@ -27,6 +27,7 @@
         apps.default = {
           type = "app";
           program = "${nix-agent-package}/bin/nix-agent";
+          meta.description = "Run the nix-agent stdio MCP server";
         };
 
         devShells.default = pkgs.mkShell {

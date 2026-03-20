@@ -6,6 +6,7 @@ def test_flake_exports_package_app_and_nixos_module():
 
     assert "packages.default" in flake_text
     assert "apps.default" in flake_text
+    assert "meta.description" in flake_text
     assert "nixosModules.default" in flake_text
     assert "checks.default" in flake_text
 
