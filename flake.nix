@@ -10,14 +10,19 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        lib = pkgs.lib;
         python = pkgs.python3;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.1.1";
+          version = "0.1.2";
           format = "pyproject";
           src = ./.;
-          nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ];
+          nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ] ++ [ pkgs.makeWrapper ];
           propagatedBuildInputs = with pkgs.python3Packages; [ fastmcp ];
+          postFixup = ''
+            wrapProgram "$out/bin/nix-agent" \
+              --prefix PATH : "${lib.makeBinPath [ pkgs.nixpkgs-fmt ]}"
+          '';
         };
       in {
         packages.default = nix-agent-package;
