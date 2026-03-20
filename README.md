@@ -2,6 +2,8 @@
 
 `nix-agent` is a local MCP server for NixOS changes, plus a companion skill that teaches agents how to use it safely.
 
+This project is intended for trusted local automation on a NixOS machine. It is not a generic remote deployment service and it does not replace `mcp-nixos`.
+
 ## What this repo ships
 
 - An MCP server that exposes tools for local inspection, patching, formatting, policy checks, validation, and controlled `nixos-rebuild switch`.
@@ -13,6 +15,14 @@
 `nix-agent` handles local machine inspection, file mutation, formatting, policy checks, dry activation, and switching.
 
 `mcp-nixos` remains the discovery side: package lookup, option lookup, and attribute discovery. Start with `plan_change()` and obey `requires_mcp_nixos` when it is `true`.
+
+## Who this is for
+
+- You run NixOS locally and want an MCP server that can inspect and mutate your machine-local configuration.
+- You already use an MCP-capable agent host such as Claude Code or OpenCode.
+- You are comfortable granting the agent access to `sudo`, `nixos-rebuild`, and unrestricted local file writes in a trusted environment.
+
+This is probably not the right tool if you want untrusted multi-user access, remote orchestration, or secret material management.
 
 ## MCP tools
 
@@ -59,6 +69,7 @@ The server exposes separate tools on purpose. The intended flow is:
 
 You need:
 
+- NixOS
 - Python 3.11+
 - `fastmcp`
 - `nixpkgs-fmt`
@@ -77,6 +88,8 @@ Or with Python directly:
 python -m pip install -e .
 ```
 
+The Python install path creates the `nix-agent` console script defined in `pyproject.toml`.
+
 ### 2. Run the MCP server
 
 ```bash
@@ -93,11 +106,26 @@ The server uses stdio transport by default.
 
 ### 3. Connect your MCP host
 
-See `examples/claude-code-mcp.json` and `examples/opencode-mcp.json`.
+Minimal host config:
+
+```json
+{
+  "mcpServers": {
+    "nix-agent": {
+      "command": "nix-agent",
+      "args": []
+    }
+  }
+}
+```
+
+Ready-to-copy examples live in `examples/claude-code-mcp.json` and `examples/opencode-mcp.json`.
 
 ### 4. Install the companion skill
 
 Copy `skills/nix-agent/` into your agent's skill directory, or adapt the contents into your agent's project instructions.
+
+The MCP server exposes tools. The skill teaches the correct workflow for using them safely.
 
 ### 5. Add it to NixOS with the flake module
 
@@ -105,6 +133,8 @@ Import the module from this flake and enable it:
 
 ```nix
 {
+  inputs.nix-agent.url = "github:JEFF7712/nix-agent";
+
   imports = [ inputs.nix-agent.nixosModules.default ];
 
   programs.nix-agent.enable = true;
@@ -119,6 +149,31 @@ That adds the `nix-agent` command to `environment.systemPackages`.
 nix run .#default
 ```
 
+If you consume this repo as a flake input from another configuration, you can also run:
+
+```bash
+nix run github:JEFF7712/nix-agent#default
+```
+
+## First-use example
+
+Typical request flow for a package install:
+
+1. The user asks the agent to install a package such as `ripgrep`.
+2. The agent calls `plan_change("install ripgrep")`.
+3. `nix-agent` returns `requires_mcp_nixos=true`.
+4. The agent queries `mcp-nixos` for the correct package attribute.
+5. The agent builds a `PatchSet` and calls `apply_patch_set(...)`.
+6. The agent calls `run_formatters(changed_files)`.
+7. The agent calls `classify_change(changed_files)`.
+8. If approval is not required, the agent calls `apply_change(intent, changed_files, flake_uri)`.
+
+Typical request flow for a local config edit that does not need discovery:
+
+1. The user asks the agent to edit an existing NixOS file.
+2. The agent calls `plan_change(...)` and sees `requires_mcp_nixos=false`.
+3. The agent applies the patch, formats, classifies, and then applies the change.
+
 ## Companion skill
 
 The skill exists to teach workflow, not tool discovery. MCP makes tools visible; the skill teaches:
@@ -129,15 +184,36 @@ The skill exists to teach workflow, not tool discovery. MCP makes tools visible;
 - that `apply_change()` assumes formatting already happened
 - what not to do with secrets and unsafe assumptions
 
+If you skip the skill, the MCP is still usable, but the agent has less guidance about tool order and the `mcp-nixos` boundary.
+
+## Known limitations in v1
+
+- `get_operation_result(operation_id)` is only a placeholder for future async tracking.
+- File writes are unrestricted by design in this release.
+- Secret payloads are out of scope.
+- Approval decisions are path-based and intentionally simple.
+- `nix flake check` validates the current system by default; use `--all-systems` if you need broader flake validation.
+
 ## Verification
 
-Run the test suite:
+Run the full local verification used for this repo:
 
 ```bash
 pytest
+nix build .#default
+nix flake check
 ```
 
 CI also runs `pytest` on push and pull request via `.github/workflows/ci.yml`.
+
+## Release checklist
+
+- `git status` is clean
+- `pytest` passes
+- `nix build .#default` passes
+- `nix flake check` passes
+- MCP host config has been tested with the installed `nix-agent` binary
+- Companion skill is installed or documented for the target agent host
 
 ## Files to start with
 
