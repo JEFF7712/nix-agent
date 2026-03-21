@@ -95,6 +95,7 @@ nix flake check
 - v1 assumes a trusted local environment
 - file writes are intentionally unrestricted in this release
 - `get_operation_result()` is only a placeholder in v1
+- fully non-interactive apply requires privileged automation; see `docs/privileged-automation.md`
 
 ## More detail
 
