@@ -8,7 +8,7 @@ from nix_agent.inspect import read_target
 from nix_agent.models import OperationResult, PatchSet
 from nix_agent.patching import apply_patch_set as apply_patch_set_mutation
 from nix_agent.policy import classify_change
-from nix_agent.system_apply import run_dry_activate, run_switch
+from nix_agent.system_apply import get_current_profile, run_dry_activate, run_switch
 from nix_agent.validation import needs_nix_format
 
 
@@ -25,13 +25,32 @@ def _build_mcp_notes(goal: str) -> tuple[bool, str]:
     return False, "No mcp-nixos boundary detected for this plan."
 
 
-def plan_change(goal: str) -> dict[str, bool | str]:
+def _classify_goal_scope(goal: str) -> str:
+    normalized = goal.strip().lower()
+    hm_keywords = ("home-manager", "home manager", "user service", "xdg", "home.", "services.stasis", "programs.")
+    sys_keywords = ("nixos", "system", "kernel", "boot", "hardware", "networking", "firewall", "services.")
+    if any(kw in normalized for kw in hm_keywords):
+        return "home-manager"
+    if any(kw in normalized for kw in sys_keywords):
+        return "system"
+    return "unknown"
+
+
+def plan_change(goal: str, changed_files: list[str] | None = None) -> dict[str, object]:
     requires, notes = _build_mcp_notes(goal)
-    return {
+    result: dict[str, object] = {
         "goal": goal,
         "requires_mcp_nixos": requires,
+        "change_scope": _classify_goal_scope(goal),
         "notes": notes,
     }
+    if changed_files is not None:
+        decision = classify_change(changed_files)
+        result["policy_decision"] = decision.policy_decision
+        result["approval_required"] = decision.approval_required
+        result["risk_level"] = decision.risk_level
+        result["matched_rules"] = decision.matched_rules
+    return result
 
 
 def build_server() -> FastMCP:
@@ -53,8 +72,8 @@ def build_server() -> FastMCP:
 
         return read_target(candidate)
 
-    def plan_change_tool(goal: str) -> dict[str, bool | str]:
-        return plan_change(goal)
+    def plan_change_tool(goal: str, changed_files: list[str] | None = None) -> dict[str, object]:
+        return plan_change(goal, changed_files=changed_files)
 
     def apply_patch_set(patch_set: PatchSet) -> dict[str, object]:
         return apply_patch_set_mutation(patch_set)
@@ -127,7 +146,11 @@ def build_server() -> FastMCP:
             Tool.from_function(
                 plan_change_tool,
                 name="plan_change",
-                description="Describe whether mcp-nixos should handle the goal first",
+                description=(
+                    "Plan a NixOS change: detects if mcp-nixos is needed, infers change_scope "
+                    "(home-manager vs system), and optionally runs policy classification when "
+                    "changed_files are provided (skipping a separate classify_change call)."
+                ),
             )
         ),
         "apply_patch_set": server.add_tool(
@@ -190,6 +213,8 @@ def apply_change_workflow(
             validation_result=decision.reason,
         )
 
+    rollback_target = get_current_profile()
+
     validation = run_dry_activate(flake_uri)
     if not validation.ok:
         return OperationResult(
@@ -199,6 +224,7 @@ def apply_change_workflow(
             policy_decision=decision.policy_decision,
             approval_required=False,
             validation_result=validation.output,
+            rollback_target=rollback_target,
         )
 
     switch_result = run_switch(flake_uri)
@@ -210,4 +236,5 @@ def apply_change_workflow(
         approval_required=False,
         validation_result=validation.output,
         apply_result=switch_result,
+        rollback_target=rollback_target,
     )

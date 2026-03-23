@@ -32,6 +32,19 @@ def _resolve_nixos_rebuild() -> str:
     return os.path.realpath(command)
 
 
+def get_current_profile() -> str | None:
+    try:
+        result = subprocess.run(
+            ["readlink", "/nix/var/nix/profiles/system"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip() or None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def run_dry_activate(flake_uri: str) -> CommandResult:
     nixos_rebuild = _resolve_nixos_rebuild()
     try:

@@ -17,6 +17,10 @@ def apply_patch_set(patch_set: PatchSet) -> dict[str, object]:
             "status": "conflict",
             "changed_files": [],
             "conflicts": [conflict],
+            "recovery_hint": (
+                "expected_content snippet was not found in the file. "
+                "Apply edits with native file tools, then re-enter the workflow at run_formatters."
+            ),
         }
 
     if any(patch.operation == OPERATION_DELETE for patch in patch_set.patches):
@@ -56,7 +60,7 @@ def _check_patch_drift(patch: Patch) -> dict[str, str] | None:
         actual_bytes = b""
         actual_text = ""
 
-    if patch.expected_content is not None and actual_text != patch.expected_content:
+    if patch.expected_content is not None and patch.expected_content not in actual_text:
         return {
             "path": str(target),
             "type": "content_mismatch",
