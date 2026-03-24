@@ -6,6 +6,8 @@ It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 - `nix-agent` handles local inspection, patching, validation, and switching
 - `mcp-nixos` handles package and option discovery
 
+## NOTE: this is experimental and a work in progress. Feedback and contributions are very welcome.
+
 ## What you get
 
 - a runnable stdio MCP server
