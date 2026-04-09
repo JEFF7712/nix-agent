@@ -28,6 +28,30 @@ Record:
 - `HOSTNAME` — value of `hostname` (must match a key under
   `nixosConfigurations.<host>` in the flake)
 
+### Secrets manager detection (informational, do not install)
+
+Grep `${FLAKE_DIR}` for an existing secrets manager:
+
+```bash
+grep -RIl --include='*.nix' -E 'sops-nix|agenix' "${FLAKE_DIR}" || true
+```
+
+- If a match is found, record which one and continue.
+- If **no** match is found, surface this notice to the user verbatim
+  before continuing — do not install anything yourself:
+
+  > No secrets manager (`sops-nix` or `agenix`) was detected in your
+  > flake. `nix-agent` will not write secret payloads through patches —
+  > it only edits references and metadata. If you plan to manage
+  > secrets on this machine, set up `sops-nix`
+  > (<https://github.com/Mic92/sops-nix>) or `agenix`
+  > (<https://github.com/ryantm/agenix>) yourself before using
+  > `nix-agent` for anything secret-adjacent. Choosing and configuring
+  > a secrets manager is intentionally out of scope for this installer
+  > because it requires user-specific key material.
+
+  Then continue with the install. Do **not** block on this.
+
 ---
 
 ## 1. Add the flake input
