@@ -286,7 +286,78 @@ The intent:
 
 ---
 
-## 8. Smoke test
+## 8. Enable passwordless `nixos-rebuild` (ask the user first)
+
+`nix-agent`'s `apply_patch_set(flake_uri=...)` call shells out to
+`sudo nixos-rebuild dry-activate` and `sudo nixos-rebuild switch`. If
+the user has not configured passwordless sudo for those exact
+commands, every apply will hang on a password prompt the agent cannot
+answer.
+
+**Ask the user this question verbatim and wait for an answer:**
+
+> nix-agent can run `nixos-rebuild dry-activate` and `nixos-rebuild
+> switch` non-interactively if I add a narrow passwordless-sudo rule
+> for just those two commands (scoped to your user). Without it,
+> every apply will pause waiting for your sudo password. Do you want
+> me to configure this now? (yes / no)
+
+### If the user says no
+
+- Record "privileged automation: skipped".
+- Warn the user that `apply_patch_set` with `flake_uri` will require
+  them to enter their sudo password in the terminal where the MCP
+  server runs, and continue to the next step.
+- Do not edit anything.
+
+### If the user says yes
+
+1. Ask for `USERNAME` (default to `whoami` on the host).
+2. Add the following to the same module list you edited in step 2,
+   substituting `${USERNAME}`:
+
+   ```nix
+   ({ pkgs, ... }: {
+     security.sudo.extraRules = [
+       {
+         users = [ "${USERNAME}" ];
+         commands = [
+           {
+             command = "${pkgs.nixos-rebuild}/bin/nixos-rebuild dry-activate --flake *";
+             options = [ "NOPASSWD" ];
+           }
+           {
+             command = "${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake *";
+             options = [ "NOPASSWD" ];
+           }
+         ];
+       }
+     ];
+   })
+   ```
+
+3. Rebuild:
+
+   ```bash
+   sudo nixos-rebuild switch --flake .#${HOSTNAME}
+   ```
+
+4. Verify the rule took effect:
+
+   ```bash
+   sudo -n nixos-rebuild dry-activate --flake "${FLAKE_DIR}#${HOSTNAME}" >/dev/null && echo OK
+   ```
+
+   If this prints `OK`, record "privileged automation: enabled" and
+   continue. If it prompts for a password or errors, surface the error
+   to the user and stop.
+
+See `docs/privileged-automation.md` for the rationale and the broader
+trust model.
+
+---
+
+## 9. Smoke test
 
 Restart the host agent so it picks up the new MCP server, then ask it
 to call `inspect_state` on a known file, e.g.:
@@ -299,7 +370,7 @@ tool is missing, the MCP registration in step 6 did not take effect.
 
 ---
 
-## 9. Rollback
+## 10. Rollback
 
 If anything goes wrong and the user wants to back out:
 
@@ -309,7 +380,8 @@ If anything goes wrong and the user wants to back out:
 3. `sudo nixos-rebuild switch --flake .#${HOSTNAME}`
 4. Remove the MCP server entry from the host config file edited in step 6.
 5. Remove the `permissions` entries added in step 7.
-6. Remove the skill directory installed in step 5.
+6. Remove the `security.sudo.extraRules` block added in step 8 (if any).
+7. Remove the skill directory installed in step 5.
 
 ---
 
@@ -321,4 +393,5 @@ Report to the user:
 - that the rebuild succeeded
 - which MCP host config you registered into
 - which permission entries you added in step 7
-- the result of the smoke test in step 8
+- whether passwordless `nixos-rebuild` was enabled in step 8 (and for which user) or skipped
+- the result of the smoke test in step 9
