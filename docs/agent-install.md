@@ -176,7 +176,93 @@ overwrite. Reference samples live in `examples/claude-code-mcp.json` and
 
 ---
 
-## 7. Smoke test
+## 7. Configure host permissions
+
+`nix-agent` deliberately ships no in-MCP approval gate. Path
+restrictions and command gating belong in the host's permission system.
+Configure them now so the user gets a sane default without prompting on
+every `nixos-rebuild` invocation.
+
+**This step is mandatory for Claude Code.** For other hosts, translate
+the same intent into whatever permission mechanism that host provides;
+if no equivalent exists, skip.
+
+### Claude Code
+
+Edit `~/.claude/settings.json` (create the file with `{}` if it does
+not exist). Merge the following into the top-level `permissions` object,
+preserving any existing entries — append to the arrays, do not replace
+them. Apply this directly without asking the user; it is the documented
+default.
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(sudo nixos-rebuild dry-activate --flake *)",
+      "Bash(sudo nixos-rebuild switch --flake *)",
+      "Bash(sudo nixos-rebuild switch --rollback)",
+      "mcp__nix-agent__inspect_state",
+      "mcp__nix-agent__apply_patch_set"
+    ],
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(**/secrets/**)",
+      "Read(**/secrets.nix)",
+      "Read(**/*.age)",
+      "Read(**/*.enc)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Write(~/.ssh/**)",
+      "Write(~/.gnupg/**)",
+      "Write(**/secrets/**)",
+      "Write(**/secrets.nix)",
+      "Write(**/*.age)",
+      "Write(**/*.enc)",
+      "Write(/etc/shadow)",
+      "Write(/etc/sudoers)",
+      "Write(/etc/sudoers.d/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.gnupg/**)",
+      "Edit(**/secrets/**)",
+      "Edit(**/secrets.nix)",
+      "Edit(**/*.age)",
+      "Edit(**/*.enc)",
+      "Edit(/etc/shadow)",
+      "Edit(/etc/sudoers)",
+      "Edit(/etc/sudoers.d/**)",
+      "Bash(rm -rf /*)",
+      "Bash(sudo rm -rf /*)",
+      "Bash(dd if=* of=/dev/sd*)",
+      "Bash(mkfs.*)",
+      "Bash(:(){ :|:& };:)"
+    ]
+  }
+}
+```
+
+Rules of the merge:
+
+- If `permissions` does not exist, create it.
+- If `allow` / `deny` already exist, append any of the entries above
+  that are not already present (string-equality dedupe). Do not remove
+  or reorder existing entries.
+- Do not touch unrelated keys.
+- Pretty-print the resulting JSON with 2-space indent.
+
+The intent:
+
+- **allow**: the two `nixos-rebuild` commands `nix-agent` drives via
+  sudo (so `apply_patch_set` does not prompt on every call), the
+  rollback escape hatch, and the two `nix-agent` MCP tools themselves.
+- **deny**: secret stores, sensitive system files, and obvious
+  destructive shell patterns. `nix-agent` writes to `/etc/nixos/**` —
+  that path is intentionally **not** denied.
+
+---
+
+## 8. Smoke test
 
 Restart the host agent so it picks up the new MCP server, then ask it
 to call `inspect_state` on a known file, e.g.:
@@ -189,7 +275,7 @@ tool is missing, the MCP registration in step 6 did not take effect.
 
 ---
 
-## 8. Rollback
+## 9. Rollback
 
 If anything goes wrong and the user wants to back out:
 
@@ -198,7 +284,8 @@ If anything goes wrong and the user wants to back out:
 2. Remove the `nix-agent` input.
 3. `sudo nixos-rebuild switch --flake .#${HOSTNAME}`
 4. Remove the MCP server entry from the host config file edited in step 6.
-5. Remove the skill directory installed in step 5.
+5. Remove the `permissions` entries added in step 7.
+6. Remove the skill directory installed in step 5.
 
 ---
 
@@ -209,4 +296,5 @@ Report to the user:
 - the flake file(s) you edited
 - that the rebuild succeeded
 - which MCP host config you registered into
-- the result of the smoke test in step 7
+- which permission entries you added in step 7
+- the result of the smoke test in step 8
