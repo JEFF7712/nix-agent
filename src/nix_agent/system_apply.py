@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+import pwd
 import shutil
 import subprocess
 
@@ -8,6 +9,16 @@ import subprocess
 class CommandResult:
     ok: bool
     output: str
+
+
+def _current_user() -> str | None:
+    user = os.environ.get("USER")
+    if user:
+        return user
+    try:
+        return pwd.getpwuid(os.getuid()).pw_name
+    except KeyError:
+        return None
 
 
 def _resolve(binary: str) -> str:
@@ -65,7 +76,7 @@ def run_switch(flake_uri: str) -> CommandResult:
 
 
 def get_current_hm_generation() -> str | None:
-    user = os.environ.get("USER") or ""
+    user = _current_user()
     if not user:
         return None
     try:

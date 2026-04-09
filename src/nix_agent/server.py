@@ -34,7 +34,22 @@ def _format_nix_files(paths: list[str]) -> str:
             )
         except FileNotFoundError:
             messages.append(f"{path}: nixpkgs-fmt not installed, skipped")
-    return "\n".join(messages) if messages else "no nix files"
+    return "\n".join(messages) if messages else "no .nix files to format"
+
+
+def _extract_first_error(output: str) -> str | None:
+    """Return the first line of `output` that looks like a Nix error.
+
+    Nix stderr is verbose; the first `error:` line is usually the
+    actionable signal. Returns None if no such line exists.
+    """
+    if not output:
+        return None
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("error:") or stripped.startswith("error ("):
+            return stripped
+    return None
 
 
 def apply_patch_set(
@@ -88,11 +103,16 @@ def apply_patch_set(
     response[validate_key] = validate.output
     if not validate.ok:
         response["status"] = "validation_failed"
+        response["first_error"] = _extract_first_error(validate.output)
         return response
 
     switch = switch_fn(flake_uri)
     response["switch_output"] = switch.output
-    response["status"] = "applied" if switch.ok else "switch_failed"
+    if switch.ok:
+        response["status"] = "applied"
+    else:
+        response["status"] = "switch_failed"
+        response["first_error"] = _extract_first_error(switch.output)
     response["current_generation"] = current_fn()
     return response
 

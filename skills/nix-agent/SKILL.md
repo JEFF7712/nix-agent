@@ -42,7 +42,9 @@ Do not use this skill for writing secret payloads or for broad architecture/desi
    - the `rollback_generation` (so the user can recover with `sudo nixos-rebuild switch --rollback` if needed)
    - any non-empty `dry_activate_output` / `switch_output`
 
-If `status` is `validation_failed` or `switch_failed`, stop and surface the command output instead of retrying blindly.
+If `status` is `validation_failed` or `switch_failed`, stop and surface `first_error` (the extracted first `error:` line) and the relevant output field instead of retrying blindly.
+
+You can also call `apply_patch_set` with an empty `PatchSet` (no patches) plus a `flake_uri` to trigger a rebuild against the current flake state without writing any files — useful after manual edits.
 
 ## Common Mistakes
 
