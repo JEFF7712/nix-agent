@@ -20,7 +20,7 @@ It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 
 Paste this to a coding agent (Claude Code, opencode, etc.) and it will do the install for you:
 
-```bash
+```
 Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.
 ```
 ## Fast install
