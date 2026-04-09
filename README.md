@@ -98,14 +98,6 @@ The MCP exposes the tools. The skill teaches the correct workflow.
 3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")`.
 4. If anything looks wrong, recover with `sudo nixos-rebuild switch --rollback`. The response includes `rollback_generation` for reference.
 
-## Verification
-
-```bash
-pytest
-nix build .#default
-nix flake check
-```
-
 ## Design notes
 
 - `nix-agent` deliberately does **not** ship an in-MCP approval gate. Path restrictions belong in the host's permission system (e.g. Claude Code's allow/deny lists), and rollback safety belongs to Nix generations. Re-implementing either inside the MCP just adds friction without improving safety.
