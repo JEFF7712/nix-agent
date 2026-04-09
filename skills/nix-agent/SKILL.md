@@ -23,7 +23,10 @@ Do not use this skill for writing secret payloads or for broad architecture/desi
 `nix-agent` exposes exactly two tools:
 
 - `inspect_state(path)` – read a local file.
-- `apply_patch_set(patch_set, flake_uri=None)` – write each patch, format any `.nix` files, and (when `flake_uri` is provided) run `nixos-rebuild dry-activate` followed by `switch`. Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and `status`.
+- `apply_patch_set(patch_set, flake_uri=None, mode="nixos")` – write each patch, format any `.nix` files, and (when `flake_uri` is provided) validate then switch.
+  - `mode="nixos"` (default): `sudo nixos-rebuild dry-activate` → `switch`.
+  - `mode="home-manager"`: `home-manager build` → `home-manager switch` (no sudo).
+  - Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and `status`.
 
 `mcp-nixos` is responsible for package and option discovery.
 
@@ -32,7 +35,7 @@ Do not use this skill for writing secret payloads or for broad architecture/desi
 1. If the request needs package or option discovery, query `mcp-nixos` first.
 2. Optionally `inspect_state(path)` on any file you intend to modify.
 3. Build a `PatchSet` of `Patch(path, content)` entries.
-4. Call `apply_patch_set(patch_set, flake_uri=...)` in a single round-trip.
+4. Call `apply_patch_set(patch_set, flake_uri=..., mode=...)` in a single round-trip. Pass `mode="home-manager"` for user-level Home Manager configs; default `mode="nixos"` for system configs.
 5. Report:
    - the `changed_files`
    - the final `status`

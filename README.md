@@ -87,7 +87,10 @@ The MCP exposes the tools. The skill teaches the correct workflow.
 `nix-agent` exposes two tools:
 
 - `inspect_state(path)` — read a local file.
-- `apply_patch_set(patch_set, flake_uri=None)` — write each `Patch(path, content)`, format any `.nix` files, and (when `flake_uri` is given) run `nixos-rebuild dry-activate` then `switch`. Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and a `status`.
+- `apply_patch_set(patch_set, flake_uri=None, mode="nixos")` — write each `Patch(path, content)`, format any `.nix` files, and (when `flake_uri` is given) validate then switch.
+  - `mode="nixos"` (default) runs `sudo nixos-rebuild dry-activate` then `switch`.
+  - `mode="home-manager"` runs `home-manager build` then `home-manager switch` (no sudo).
+  - Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and a `status`.
 
 `mcp-nixos` handles package and option discovery.
 
@@ -95,8 +98,8 @@ The MCP exposes the tools. The skill teaches the correct workflow.
 
 1. If you need package or option info, query `mcp-nixos` first.
 2. Build a `PatchSet` of `Patch(path, content)` entries.
-3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")`.
-4. If anything looks wrong, recover with `sudo nixos-rebuild switch --rollback`. The response includes `rollback_generation` for reference.
+3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")` for NixOS, or `apply_patch_set(patch_set, flake_uri="/path/to/flake#user@host", mode="home-manager")` for Home Manager.
+4. If anything looks wrong, recover via `sudo nixos-rebuild switch --rollback` (NixOS) or by activating a previous Home Manager generation. The response includes `rollback_generation` for reference.
 
 ## Design notes
 

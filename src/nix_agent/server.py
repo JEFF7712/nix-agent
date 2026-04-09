@@ -9,9 +9,15 @@ from nix_agent.models import PatchSet
 from nix_agent.patching import apply_patches
 from nix_agent.system_apply import (
     get_current_generation,
+    get_current_hm_generation,
     run_dry_activate,
+    run_hm_build,
+    run_hm_switch,
     run_switch,
 )
+
+
+VALID_MODES = {"nixos", "home-manager"}
 
 
 def _format_nix_files(paths: list[str]) -> str:
@@ -32,18 +38,32 @@ def _format_nix_files(paths: list[str]) -> str:
 
 
 def apply_patch_set(
-    patch_set: PatchSet, flake_uri: str | None = None
+    patch_set: PatchSet,
+    flake_uri: str | None = None,
+    mode: str = "nixos",
 ) -> dict[str, object]:
-    """Write patches, format, and (if flake_uri given) dry-activate + switch.
+    """Write patches, format, and (if flake_uri given) validate + switch.
 
-    Returns rollback_generation so callers can `nixos-rebuild switch
-    --rollback` or boot a prior generation if anything looks wrong.
+    mode="nixos" runs `nixos-rebuild dry-activate` then `nixos-rebuild
+    switch` (sudo). mode="home-manager" runs `home-manager build` then
+    `home-manager switch` (no sudo). In both cases the response includes
+    a `rollback_generation` pointer so a bad switch can be recovered:
+
+      - nixos:        `sudo nixos-rebuild switch --rollback`
+      - home-manager: `<rollback_generation>/activate`
     """
+    if mode not in VALID_MODES:
+        return {
+            "status": "invalid_mode",
+            "error": f"mode must be one of {sorted(VALID_MODES)}, got {mode!r}",
+        }
+
     changed = apply_patches(patch_set)
     formatter_output = _format_nix_files(changed)
 
     response: dict[str, object] = {
         "status": "written",
+        "mode": mode,
         "changed_files": changed,
         "formatter_output": formatter_output,
     }
@@ -51,19 +71,29 @@ def apply_patch_set(
     if flake_uri is None:
         return response
 
-    rollback_generation = get_current_generation()
-    response["rollback_generation"] = rollback_generation
+    if mode == "nixos":
+        rollback = get_current_generation()
+        validate = run_dry_activate(flake_uri)
+        validate_key = "dry_activate_output"
+        switch_fn = run_switch
+        current_fn = get_current_generation
+    else:  # home-manager
+        rollback = get_current_hm_generation()
+        validate = run_hm_build(flake_uri)
+        validate_key = "build_output"
+        switch_fn = run_hm_switch
+        current_fn = get_current_hm_generation
 
-    dry = run_dry_activate(flake_uri)
-    response["dry_activate_output"] = dry.output
-    if not dry.ok:
+    response["rollback_generation"] = rollback
+    response[validate_key] = validate.output
+    if not validate.ok:
         response["status"] = "validation_failed"
         return response
 
-    switch = run_switch(flake_uri)
+    switch = switch_fn(flake_uri)
     response["switch_output"] = switch.output
     response["status"] = "applied" if switch.ok else "switch_failed"
-    response["current_generation"] = get_current_generation()
+    response["current_generation"] = current_fn()
     return response
 
 
@@ -74,9 +104,11 @@ def build_server() -> FastMCP:
         return read_target(path)
 
     def apply_patch_set_tool(
-        patch_set: PatchSet, flake_uri: str | None = None
+        patch_set: PatchSet,
+        flake_uri: str | None = None,
+        mode: str = "nixos",
     ) -> dict[str, object]:
-        return apply_patch_set(patch_set, flake_uri=flake_uri)
+        return apply_patch_set(patch_set, flake_uri=flake_uri, mode=mode)
 
     server._tools = {  # type: ignore[attr-defined]
         "inspect_state": server.add_tool(
@@ -92,9 +124,11 @@ def build_server() -> FastMCP:
                 name="apply_patch_set",
                 description=(
                     "Write a set of file replacements, format any .nix files, "
-                    "and—if flake_uri is provided—run nixos-rebuild dry-activate "
-                    "then switch. Returns rollback_generation so a bad switch "
-                    "can be undone via `nixos-rebuild switch --rollback`."
+                    "and—if flake_uri is provided—validate then switch. "
+                    "mode='nixos' (default) runs `nixos-rebuild dry-activate` "
+                    "then `switch` (sudo). mode='home-manager' runs "
+                    "`home-manager build` then `switch` (no sudo). Returns "
+                    "rollback_generation so a bad switch can be undone."
                 ),
             )
         ),
