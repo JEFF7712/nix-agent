@@ -9,11 +9,10 @@
 ## Expected behavior with the skill present
 
 - Skip generic brainstorming for direct NixOS MCP execution tasks
-- Start with `plan_change()`
-- Respect `requires_mcp_nixos`
-- Run formatters before apply
-- Stop on `approval_required`
-- Treat `nix-agent` as local mutation/validation only
+- Query `mcp-nixos` first for package/option discovery
+- Use `apply_patch_set(patch_set, flake_uri=...)` as a single round-trip for write → format → dry-activate → switch
+- On failure, surface `dry_activate_output` / `switch_output` and the `rollback_generation` instead of retrying blindly
+- Treat `nix-agent` as local mutation/activation only
 
 ## Why this skill exists
 

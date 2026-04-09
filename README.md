@@ -6,7 +6,7 @@ It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 - `nix-agent` handles local inspection, patching, validation, and switching
 - `mcp-nixos` handles package and option discovery
 
-## NOTE: this is experimental and a work in progress. Feedback and contributions are very welcome.
+## NOTE: This is experimental and a work in progress. Feedback and contributions are very welcome.
 
 ## What you get
 
@@ -15,6 +15,12 @@ It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 - a NixOS module at `nixosModules.default`
 - a companion agent skill in `skills/nix-agent/`
 - example MCP host configs in `examples/`
+
+## One-shot agent install
+
+Paste this to a capable coding agent (Claude Code, opencode, etc.) and it will do the install for you:
+
+> Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.
 
 ## Fast install
 
@@ -75,14 +81,21 @@ Quick install:
 
 The MCP exposes the tools. The skill teaches the correct workflow.
 
+## Tool surface
+
+`nix-agent` exposes two tools:
+
+- `inspect_state(path)` — read a local file.
+- `apply_patch_set(patch_set, flake_uri=None)` — write each `Patch(path, content)`, format any `.nix` files, and (when `flake_uri` is given) run `nixos-rebuild dry-activate` then `switch`. Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and a `status`.
+
+`mcp-nixos` handles package and option discovery.
+
 ## Basic workflow
 
-1. Call `plan_change(goal)`
-2. If it says `requires_mcp_nixos=true`, use `mcp-nixos` first
-3. Apply patches with `apply_patch_set(...)`
-4. Run `run_formatters(changed_files)`
-5. Run `classify_change(changed_files)`
-6. If allowed, run `apply_change(intent, changed_files, flake_uri)`
+1. If you need package or option info, query `mcp-nixos` first.
+2. Build a `PatchSet` of `Patch(path, content)` entries.
+3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")`.
+4. If anything looks wrong, recover with `sudo nixos-rebuild switch --rollback`. The response includes `rollback_generation` for reference.
 
 ## Verification
 
@@ -92,12 +105,12 @@ nix build .#default
 nix flake check
 ```
 
-## Notes
+## Design notes
 
-- v1 assumes a trusted local environment
-- file writes are intentionally unrestricted in this release
-- `get_operation_result()` is only a placeholder in v1
-- fully non-interactive apply requires privileged automation; see `docs/privileged-automation.md`
+- `nix-agent` deliberately does **not** ship an in-MCP approval gate. Path restrictions belong in the host's permission system (e.g. Claude Code's allow/deny lists), and rollback safety belongs to Nix generations. Re-implementing either inside the MCP just adds friction without improving safety.
+- Do not write secret payloads through patches — reference secrets via `sops-nix` or `agenix`.
+- v1 assumes a trusted local environment.
+- Fully non-interactive apply requires privileged automation; see `docs/privileged-automation.md`.
 
 ## More detail
 

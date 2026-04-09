@@ -1,86 +1,59 @@
 ---
 name: nix-agent
-description: Use when a user wants to change NixOS packages, options, modules, or local configuration through the nix-agent and mcp-nixos MCP servers, especially when a generic brainstorming or planning workflow would be unnecessary overhead.
+description: Use when a user wants to change NixOS packages, options, modules, or local configuration through the nix-agent and mcp-nixos MCP servers.
 ---
 
 # Nix Agent
 
 ## Overview
 
-Use this skill for straightforward NixOS execution tasks through `nix-agent` and `mcp-nixos`. Core principle: use `mcp-nixos` for discovery, use `nix-agent` for local mutation and activation, and do not detour into generic design workflows unless the user is explicitly asking for architecture.
+Use this skill for direct NixOS execution tasks through `nix-agent` and `mcp-nixos`. Use `mcp-nixos` for discovery, use `nix-agent` for local mutation and activation. Do not detour into generic brainstorming for operational tasks.
 
 ## When to Use
 
 - A user asks to install a package on NixOS.
-- A user asks which option or module setting to use, then wants it applied.
+- A user asks which option to use, then wants it applied.
 - A user asks to patch local NixOS config through MCP tools.
-- The host exposes both `nix-agent` and `mcp-nixos` and the task is operational, not architectural.
-- A generic brainstorming or planning skill would slow down an otherwise direct NixOS MCP workflow.
+- The host exposes both `nix-agent` and `mcp-nixos`.
 
-Do not use this skill for imperative package installs, writing secret payloads, or broad architecture/design requests.
+Do not use this skill for writing secret payloads or for broad architecture/design requests.
 
-## Priority Rule
+## Tool Surface
 
-For direct NixOS MCP execution tasks, this skill takes precedence over generic brainstorming or planning workflows.
+`nix-agent` exposes exactly two tools:
 
-If the user says things like:
-- `install X on NixOS`
-- `enable this option`
-- `patch my NixOS config`
-- `use mcp-nixos and nix-agent together`
+- `inspect_state(path)` – read a local file.
+- `apply_patch_set(patch_set, flake_uri=None)` – write each patch, format any `.nix` files, and (when `flake_uri` is provided) run `nixos-rebuild dry-activate` followed by `switch`. Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and `status`.
 
-then execute the `mcp-nixos` + `nix-agent` workflow directly.
-
-Do **not** start a generic brainstorming flow first unless the user is asking for architecture, design trade-offs, or multi-approach planning.
-
-## Quick Reference
-
-- `mcp-nixos` for package and option discovery
-- `plan_change(goal)` before mutation
-- `apply_patch_set(patch_set)`
-- `run_formatters(changed_files)`
-- `classify_change(changed_files)`
-- `apply_change(intent, changed_files, flake_uri)` if allowed
+`mcp-nixos` is responsible for package and option discovery.
 
 ## Required Workflow
 
 1. If the request needs package or option discovery, query `mcp-nixos` first.
-2. Call `plan_change(goal)`.
-3. If `requires_mcp_nixos=true`, stop local mutation and use `mcp-nixos` before continuing.
-4. Build a `PatchSet` and call `apply_patch_set(patch_set)`.
-5. If `apply_patch_set()` returns `status="approval_required"`, stop and report that approval is needed.
-6. Run `run_formatters(changed_files)`.
-7. Run `classify_change(changed_files)`.
-8. If `approval_required` is `true`, stop and report the reason.
-9. Only then call `apply_change(intent, changed_files, flake_uri)`.
+2. Optionally `inspect_state(path)` on any file you intend to modify.
+3. Build a `PatchSet` of `Patch(path, content)` entries.
+4. Call `apply_patch_set(patch_set, flake_uri=...)` in a single round-trip.
+5. Report:
+   - the `changed_files`
+   - the final `status`
+   - the `rollback_generation` (so the user can recover with `sudo nixos-rebuild switch --rollback` if needed)
+   - any non-empty `dry_activate_output` / `switch_output`
+
+If `status` is `validation_failed` or `switch_failed`, stop and surface the command output instead of retrying blindly.
 
 ## Common Mistakes
 
 - Starting a generic brainstorming/design workflow for a simple package install.
 - Skipping `mcp-nixos` and guessing package names or option paths.
-- Skipping `plan_change()`.
-- Calling `apply_change()` right after patching without `run_formatters()`.
-- Ignoring `approval_required`.
-- Assuming `nix-agent` should do package discovery itself.
+- Calling `apply_patch_set` without `flake_uri` when the user actually wants the change applied.
 - Writing secret material through patches.
-
-## Red Flags
-
-- `I should brainstorm first`
-- `I need a design before installing this package`
-- `I should explore the whole repo before calling the MCPs`
-- `I can probably guess the NixOS option without mcp-nixos`
-
-All of these mean: return to the `mcp-nixos` + `nix-agent` workflow.
+- Re-running `apply_patch_set` after a failure without inspecting the dry-activate output.
 
 ## Example
 
-User asks: `Use mcp-nixos and nix-agent together to install floorp on my NixOS system.`
+User: `Use mcp-nixos and nix-agent together to install floorp on my NixOS system.`
 
 1. Query `mcp-nixos` for the correct Floorp package attribute.
-2. Call `plan_change("install floorp on NixOS")`.
-3. Patch the relevant NixOS file with `apply_patch_set(...)`.
-4. Run `run_formatters(changed_files)`.
-5. Run `classify_change(changed_files)`.
-6. If allowed, call `apply_change("install floorp", changed_files, flake_uri)`.
-7. Report the changed file and each tool result.
+2. Build a `PatchSet` that adds `pkgs.floorp` to the relevant module.
+3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")`.
+4. Report `changed_files`, `status`, and `rollback_generation`.
