@@ -22,7 +22,8 @@
 ### Formatting
 
 - Edit a `.nix` file with poor spacing.
-- Call `format(paths=["/path/to/file"])` and verify the file is formatted.
+- Call `format(paths=["/path/to/file"])` and verify the file is formatted;
+  the response carries per-file `results` (no `resolved_target`/`command`).
 - Or call `format()` with no paths to format the entire flake.
 
 ### Diffing and switching

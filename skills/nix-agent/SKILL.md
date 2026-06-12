@@ -20,8 +20,10 @@ Division of labor:
 ## Tool Surface
 
 All tools auto-resolve the target when `flake_uri` is omitted
-(`/etc/nixos#<hostname>` for NixOS, `~/.config/home-manager` for Home
-Manager) and echo back `resolved_target` and the exact `command` run.
+(`/etc/nixos` for NixOS, `~/.config/home-manager` for Home Manager; the
+hostname / `user@host` attribute is picked automatically) and echo back
+`resolved_target` and the exact `command` run. Exception: calling
+`format` with explicit `paths` returns per-file `results` instead.
 Pass `mode="home-manager"` for HM configs.
 
 - `eval_config(attr, flake_uri?, mode?)` — final merged value of any
