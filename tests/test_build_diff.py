@@ -58,9 +58,10 @@ def test_build_dry_run_flag(monkeypatch):
         return _result(True, command=argv)
 
     monkeypatch.setattr(build_mod.runner, "run", fake_run)
-    build(flake_uri="/x#h", mode="nixos", dry_run=True)
+    out = build(flake_uri="/x#h", mode="nixos", dry_run=True)
     assert "--dry-run" in calls[0]
     assert "--print-out-paths" not in calls[0]
+    assert "store_path" not in out
 
 
 def test_diff_runs_nvd(monkeypatch):
@@ -118,3 +119,46 @@ def test_diff_no_current_closure(monkeypatch):
     out = diff(flake_uri="/x#h", mode="home-manager")
     assert out["status"] == "failed"
     assert "current" in out["error"]
+
+
+def test_build_store_path_is_last_stdout_line(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(
+            True, stdout="warning: blah\n/nix/store/abc\n", command=argv
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    out = build(flake_uri="/x#h", mode="nixos")
+    assert out["store_path"] == "/nix/store/abc"
+
+
+def test_build_ok_but_empty_stdout_is_failed(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="", command=argv)
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    out = build(flake_uri="/x#h", mode="nixos")
+    assert out["status"] == "failed"
+
+
+def test_build_hm_candidate_retry(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "rupan@zen" in argv[-1]:
+            return _result(
+                False,
+                stderr="error: flake does not provide attribute "
+                "'homeConfigurations.\"rupan@zen\"'",
+                command=argv,
+            )
+        return _result(True, stdout="/nix/store/hm\n", command=argv)
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(
+        build_mod, "attr_candidates", lambda t: ["rupan@zen", "rupan"]
+    )
+    out = build(flake_uri="/x", mode="home-manager")
+    assert out["status"] == "ok"
+    assert len(calls) == 2

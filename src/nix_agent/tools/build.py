@@ -33,10 +33,12 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
         argv.append(installable)
         result = runner.run(argv)
         if result.ok:
-            extra: dict[str, object] = {}
-            if not dry_run:
-                extra["store_path"] = result.stdout.strip().splitlines()[-1]
-            return runner.envelope("ok", installable, result, **extra)
+            if dry_run:
+                return runner.envelope("ok", installable, result)
+            lines = result.stdout.strip().splitlines()
+            if not lines:
+                return runner.envelope("failed", installable, result)
+            return runner.envelope("ok", installable, result, store_path=lines[-1])
         if (
             "does not provide attribute" in result.output
             and i < len(candidates) - 1
@@ -80,8 +82,7 @@ def _current_closure(mode: str) -> str | None:
 def diff(
     flake_uri: str | None = None, mode: str = "nixos"
 ) -> dict[str, object]:
-    """Build the new closure and diff it against the live system, so the
-    agent can show what a switch would change before switching."""
+    """Diff the freshly built closure against the live system."""
     try:
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:
@@ -97,6 +98,8 @@ def diff(
         return {
             "status": "failed",
             "resolved_target": built["resolved_target"],
+            "command": built["command"],
+            "output": built["output"],
             "error": f"could not locate the current {mode} closure to diff against",
             "store_path": new_path,
         }
