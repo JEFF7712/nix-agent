@@ -66,9 +66,7 @@ def format_nix(
     -> `nix fmt` (respects the flake's own formatter), falling back to
     nixfmt over every .nix file when the flake defines no formatter."""
     if paths:
-        response = _format_with_nixfmt(paths)
-        response.setdefault("resolved_target", paths)
-        return response
+        return _format_with_nixfmt(paths)
 
     try:
         target = resolve_target(flake_uri, mode)
@@ -80,7 +78,7 @@ def format_nix(
         return runner.envelope(
             "ok", target.flake_dir, result, formatter="nix fmt"
         )
-    if "formatter" not in result.output:
+    if "does not provide attribute" not in result.output:
         return runner.envelope(
             "failed", target.flake_dir, result, formatter="nix fmt"
         )
