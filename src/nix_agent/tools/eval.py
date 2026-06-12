@@ -1,0 +1,47 @@
+import json
+
+from nix_agent import runner
+from nix_agent.target import TargetError, attr_candidates, config_attr, resolve_target
+
+
+def _missing_config_attr(output: str) -> bool:
+    return "does not provide attribute" in output
+
+
+def eval_config(
+    attr: str,
+    flake_uri: str | None = None,
+    mode: str = "nixos",
+) -> dict[str, object]:
+    """Evaluate the final merged value of an attr in the user's actual
+    configuration. Complements mcp-nixos: that documents what an option
+    means; this reports what this machine resolved it to."""
+    try:
+        target = resolve_target(flake_uri, mode)
+        candidates = attr_candidates(target)
+    except TargetError as exc:
+        return {"status": "no_target", "error": str(exc)}
+
+    installable = ""
+    result = runner.RunResult(ok=False, command=[], stdout="", stderr="")
+    for i, candidate in enumerate(candidates):
+        installable = f"{config_attr(target, candidate)}.config.{attr}"
+        result = runner.run(["nix", "eval", installable, "--json"])
+        if result.ok:
+            return runner.envelope(
+                "ok", installable, result, value=json.loads(result.stdout)
+            )
+        if _missing_config_attr(result.output) and i < len(candidates) - 1:
+            continue
+        if not _missing_config_attr(result.output):
+            raw = runner.run(["nix", "eval", installable])
+            if raw.ok:
+                return runner.envelope(
+                    "ok",
+                    installable,
+                    raw,
+                    value=raw.stdout.strip(),
+                    json_fallback=True,
+                )
+        break
+    return runner.envelope("failed", installable, result)
