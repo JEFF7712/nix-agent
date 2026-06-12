@@ -54,6 +54,7 @@ def test_extract_first_error():
     assert runner.extract_first_error(output) == "error: attribute 'foo' missing"
     assert runner.extract_first_error("all fine") is None
     assert runner.extract_first_error("") is None
+    assert runner.extract_first_error("error[E001]: bad thing") == "error[E001]: bad thing"
 
 
 def test_envelope_failure_includes_first_error():
@@ -72,3 +73,20 @@ def test_envelope_ok_has_no_first_error():
     result = runner.RunResult(ok=True, command=["x"], stdout="fine", stderr="")
     env = runner.envelope("ok", "t", result)
     assert "first_error" not in env
+
+
+def test_truncate_output_tiny_cap():
+    assert runner.truncate_output("abcdef", cap=1) == "a"
+    assert runner.truncate_output("abcdef", cap=0) == ""
+
+
+def test_envelope_core_keys_win_over_extras():
+    result = runner.RunResult(ok=True, command=["x"], stdout="real", stderr="")
+    env = runner.envelope("ok", "t", result, output="clobbered", command=["bad"])
+    assert env["output"] == "real"
+    assert env["command"] == ["x"]
+
+
+def test_output_drops_whitespace_only_streams():
+    r = runner.RunResult(ok=True, command=["x"], stdout="\n", stderr="   ")
+    assert r.output == ""

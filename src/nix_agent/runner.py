@@ -33,6 +33,8 @@ def truncate_output(text: str, cap: int = OUTPUT_CAP) -> str:
     if len(text) <= cap:
         return text
     half = cap // 2
+    if half == 0:
+        return text[:cap]
     omitted = len(text) - cap
     return (
         text[:half]
@@ -47,13 +49,13 @@ def run(argv: list[str], cwd: str | None = None) -> RunResult:
     except FileNotFoundError:
         return RunResult(
             ok=False,
-            command=argv,
+            command=list(argv),
             stdout="",
             stderr=f"{argv[0]}: command not found",
         )
     return RunResult(
         ok=proc.returncode == 0,
-        command=argv,
+        command=list(argv),
         stdout=truncate_output(proc.stdout or ""),
         stderr=truncate_output(proc.stderr or ""),
     )
@@ -66,7 +68,11 @@ def extract_first_error(output: str) -> str | None:
         return None
     for line in output.splitlines():
         stripped = line.strip()
-        if stripped.startswith("error:") or stripped.startswith("error ("):
+        if (
+            stripped.startswith("error:")
+            or stripped.startswith("error (")
+            or stripped.startswith("error[")
+        ):
             return stripped
     return None
 
@@ -77,13 +83,13 @@ def envelope(
     result: RunResult,
     **extra: object,
 ) -> dict[str, object]:
-    response: dict[str, object] = {
-        "status": status,
-        "resolved_target": resolved_target,
-        "command": result.command,
-        "output": result.output,
-    }
+    response: dict[str, object] = dict(extra)
+    response.update(
+        status=status,
+        resolved_target=resolved_target,
+        command=result.command,
+        output=result.output,
+    )
     if status == "failed":
         response["first_error"] = extract_first_error(result.output)
-    response.update(extra)
     return response
