@@ -1,5 +1,5 @@
 {
-  description = "MCP server and companion skill for local NixOS changes";
+  description = "MCP server and companion skill exposing composable NixOS operations";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -14,14 +14,19 @@
         python = pkgs.python3;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.4.0";
+          version = "0.5.0";
           format = "pyproject";
           src = ./.;
           nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ] ++ [ pkgs.makeWrapper ];
           propagatedBuildInputs = with pkgs.python3Packages; [ fastmcp ];
           postFixup = ''
             wrapProgram "$out/bin/nix-agent" \
-              --prefix PATH : "${lib.makeBinPath [ pkgs.nixpkgs-fmt ]}"
+              --prefix PATH : "${lib.makeBinPath [
+                pkgs.statix
+                pkgs.deadnix
+                pkgs.nixfmt
+                pkgs.nvd
+              ]}"
           '';
         };
       in {
@@ -39,7 +44,10 @@
           buildInputs = [
             python
             pkgs.python3Packages.pytest
-            pkgs.nixpkgs-fmt
+            pkgs.statix
+            pkgs.deadnix
+            pkgs.nixfmt
+            pkgs.nvd
           ];
           shellHook = ''
             export PYTHONNOUSERSITE=0
