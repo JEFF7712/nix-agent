@@ -7,7 +7,7 @@ from nix_agent.target import (
     TargetError,
     attr_candidates,
     config_attr,
-    current_user,
+    current_hm_profile,
     resolve_target,
 )
 
@@ -64,19 +64,7 @@ def _current_closure(mode: str) -> str | None:
     if mode == "nixos":
         path = Path("/run/current-system")
         return os.path.realpath(path) if path.exists() else None
-    user = current_user()
-    candidates = []
-    if user:
-        candidates.append(
-            Path(f"/nix/var/nix/profiles/per-user/{user}/home-manager")
-        )
-    candidates.append(
-        Path.home() / ".local" / "state" / "nix" / "profiles" / "home-manager"
-    )
-    for path in candidates:
-        if path.exists():
-            return os.path.realpath(path)
-    return None
+    return current_hm_profile()
 
 
 def diff(

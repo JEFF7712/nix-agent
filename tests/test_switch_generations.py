@@ -13,7 +13,7 @@ NIX_ENV_LISTING = """\
 """
 
 HM_LISTING = """\
-2026-06-10 09:31 : id 88 -> /nix/store/new-hm-gen
+2026-06-10 09:31 : id 88 -> /nix/store/new-hm-gen (current)
 2026-06-01 10:01 : id 87 -> /nix/store/old-hm-gen
 """
 
@@ -143,7 +143,7 @@ def test_generations_rollback_hm_activates_previous(monkeypatch):
 
 
 def test_generations_rollback_hm_no_previous(monkeypatch):
-    single = "2026-06-10 09:31 : id 88 -> /nix/store/only-gen\n"
+    single = "2026-06-10 09:31 : id 88 -> /nix/store/only-gen (current)\n"
 
     def fake_run(argv, cwd=None):
         return _result(True, stdout=single, command=argv)
@@ -152,6 +152,39 @@ def test_generations_rollback_hm_no_previous(monkeypatch):
     out = generations(action="rollback", mode="home-manager")
     assert out["status"] == "failed"
     assert "previous" in out["error"]
+
+
+def test_generations_rollback_hm_current_not_newest(monkeypatch):
+    listing = (
+        "2026-06-10 09:31 : id 88 -> /nix/store/new-hm-gen\n"
+        "2026-06-01 10:01 : id 87 -> /nix/store/mid-hm-gen (current)\n"
+        "2026-05-20 08:00 : id 86 -> /nix/store/old-hm-gen\n"
+    )
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if argv[0] == "home-manager":
+            return _result(True, stdout=listing, command=argv)
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    out = generations(action="rollback", mode="home-manager")
+    assert out["status"] == "ok"
+    assert calls[-1] == ["/nix/store/old-hm-gen/activate"]
+
+
+def test_switch_no_target(monkeypatch, tmp_path):
+    from nix_agent import target as target_mod
+
+    monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    out = switch()
+    assert out["status"] == "no_target"
+
+
+def test_generations_invalid_mode():
+    out = generations(mode="bogus")
+    assert out["status"] == "no_target"
 
 
 def test_generations_invalid_action():

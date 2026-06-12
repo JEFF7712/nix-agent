@@ -73,6 +73,22 @@ def attr_candidates(target: Target) -> list[str]:
     return [f"{user}@{host}", user]
 
 
+def current_hm_profile() -> str | None:
+    user = current_user()
+    candidates = []
+    if user:
+        candidates.append(
+            Path(f"/nix/var/nix/profiles/per-user/{user}/home-manager")
+        )
+    candidates.append(
+        Path.home() / ".local" / "state" / "nix" / "profiles" / "home-manager"
+    )
+    for path in candidates:
+        if path.exists():
+            return os.path.realpath(path)
+    return None
+
+
 def config_attr(target: Target, candidate: str) -> str:
     root = (
         "nixosConfigurations"

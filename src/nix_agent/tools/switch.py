@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from nix_agent import runner
-from nix_agent.target import TargetError, current_user, resolve_target
+from nix_agent.target import TargetError, current_hm_profile, resolve_target
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
 
@@ -11,7 +11,7 @@ _NIX_ENV_LINE = re.compile(
     r"^\s*(\d+)\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*(\(current\))?\s*$"
 )
 _HM_LINE = re.compile(
-    r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) : id (\d+) -> (\S+)$"
+    r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) : id (\d+) -> (\S+)(\s+\(current\))?\s*$"
 )
 
 
@@ -19,19 +19,7 @@ def _current_generation(mode: str) -> str | None:
     if mode == "nixos":
         path = Path(SYSTEM_PROFILE)
         return os.path.realpath(path) if path.exists() else None
-    user = current_user()
-    candidates = []
-    if user:
-        candidates.append(
-            Path(f"/nix/var/nix/profiles/per-user/{user}/home-manager")
-        )
-    candidates.append(
-        Path.home() / ".local" / "state" / "nix" / "profiles" / "home-manager"
-    )
-    for path in candidates:
-        if path.exists():
-            return os.path.realpath(path)
-    return None
+    return current_hm_profile()
 
 
 def switch(
@@ -86,7 +74,7 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
     if not result.ok:
         return runner.envelope("failed", "home-manager profile", result), []
     gens = []
-    for i, line in enumerate(result.stdout.splitlines()):
+    for line in result.stdout.splitlines():
         match = _HM_LINE.match(line.strip())
         if match:
             gens.append(
@@ -94,7 +82,7 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
                     "id": int(match.group(2)),
                     "date": match.group(1),
                     "path": match.group(3),
-                    "current": i == 0,
+                    "current": match.group(4) is not None,
                 }
             )
     envelope = runner.envelope(
@@ -133,13 +121,14 @@ def generations(
             current_generation=_current_generation(mode),
         )
     _, gens = _list_hm()
-    if len(gens) < 2:
+    current_index = next((i for i, g in enumerate(gens) if g["current"]), 0)
+    if current_index + 1 >= len(gens):
         return {
             "status": "failed",
             "resolved_target": "home-manager profile",
             "error": "no previous home-manager generation to roll back to",
         }
-    previous = gens[1]
+    previous = gens[current_index + 1]
     result = runner.run([f"{previous['path']}/activate"])
     return runner.envelope(
         "ok" if result.ok else "failed",
