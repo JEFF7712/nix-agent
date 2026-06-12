@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from pathlib import Path
@@ -50,6 +51,31 @@ def switch(
 
 
 def _list_nixos() -> dict[str, object]:
+    nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
+    result = runner.run([nixos_rebuild, "list-generations", "--json"])
+    if result.ok:
+        try:
+            entries = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            entries = None
+        if isinstance(entries, list):
+            gens = [
+                {
+                    "id": entry.get("generation"),
+                    "date": entry.get("date"),
+                    "current": bool(entry.get("current")),
+                }
+                for entry in entries
+            ]
+            return runner.envelope(
+                "ok", SYSTEM_PROFILE, result, generations=gens
+            )
+    return _list_nixos_nix_env()
+
+
+def _list_nixos_nix_env() -> dict[str, object]:
+    """Fallback for nixos-rebuild too old for list-generations; nix-env
+    needs a readable profile dir, which may require privileges."""
     result = runner.run(
         ["nix-env", "--list-generations", "-p", SYSTEM_PROFILE]
     )

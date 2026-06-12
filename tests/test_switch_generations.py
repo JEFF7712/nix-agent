@@ -12,6 +12,11 @@ NIX_ENV_LISTING = """\
   42   2026-06-10 09:30:00   (current)
 """
 
+NIXOS_REBUILD_JSON = (
+    '[{"generation": 41, "date": "2026-06-01 10:00:00", "current": false},'
+    ' {"generation": 42, "date": "2026-06-10 09:30:00", "current": true}]'
+)
+
 HM_LISTING = """\
 2026-06-10 09:31 : id 88 -> /nix/store/new-hm-gen (current)
 2026-06-01 10:01 : id 87 -> /nix/store/old-hm-gen
@@ -73,12 +78,34 @@ def test_switch_failure_keeps_rollback(monkeypatch):
 
 def test_generations_list_nixos(monkeypatch):
     def fake_run(argv, cwd=None):
+        assert argv == ["/bin/nixos-rebuild", "list-generations", "--json"]
+        return _result(True, stdout=NIXOS_REBUILD_JSON, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(
+        switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}"
+    )
+    out = generations()
+    assert out["status"] == "ok"
+    assert out["generations"] == [
+        {"id": 41, "date": "2026-06-01 10:00:00", "current": False},
+        {"id": 42, "date": "2026-06-10 09:30:00", "current": True},
+    ]
+
+
+def test_generations_list_nixos_falls_back_to_nix_env(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if "list-generations" in argv:
+            return _result(False, stderr="error: unknown command", command=argv)
         assert argv == [
             "nix-env", "--list-generations", "-p", "/nix/var/nix/profiles/system",
         ]
         return _result(True, stdout=NIX_ENV_LISTING, command=argv)
 
     monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(
+        switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}"
+    )
     out = generations()
     assert out["status"] == "ok"
     assert out["generations"] == [
