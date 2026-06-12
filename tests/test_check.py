@@ -178,3 +178,10 @@ def test_parse_statix_list_form():
     findings = _parse_statix(f"[{STATIX_FIXTURE}]")
     assert len(findings) == 1
     assert findings[0]["tool"] == "statix"
+
+
+def test_parse_statix_concatenated_stream():
+    stream = STATIX_FIXTURE + "\n" + STATIX_FIXTURE
+    findings = _parse_statix(stream)
+    assert len(findings) == 2
+    assert all(f["tool"] == "statix" for f in findings)

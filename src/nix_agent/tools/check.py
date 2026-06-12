@@ -8,11 +8,22 @@ LEVELS = ("lint", "flake", "dry-build", "dry-activate")
 
 
 def _parse_statix(stdout: str) -> list[dict[str, object]]:
-    if not stdout.strip():
+    text = stdout.strip()
+    if not text:
         return []
-    try:
-        entry = json.loads(stdout)
-    except json.JSONDecodeError:
+    decoder = json.JSONDecoder()
+    entries: list[object] = []
+    idx = 0
+    while idx < len(text):
+        try:
+            obj, end = decoder.raw_decode(text, idx)
+        except json.JSONDecodeError:
+            break
+        entries.extend(obj if isinstance(obj, list) else [obj])
+        idx = end
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+    if not entries:
         return [
             {
                 "tool": "statix",
@@ -20,15 +31,15 @@ def _parse_statix(stdout: str) -> list[dict[str, object]]:
                 "line": None,
                 "column": None,
                 "severity": "unknown",
-                "message": "not json: " + stdout.strip(),
+                "message": text,
             }
         ]
-    # statix emits a single object; normalise to list for uniform iteration
-    entries = entry if isinstance(entry, list) else [entry]
     findings: list[dict[str, object]] = []
-    for ent in entries:
-        file = ent.get("file")
-        for report in ent.get("report", []):
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        file = entry.get("file")
+        for report in entry.get("report", []):
             note = report.get("note", "")
             severity = report.get("severity", "Warn")
             for diag in report.get("diagnostics", []):
