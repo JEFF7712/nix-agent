@@ -89,24 +89,37 @@ def _lint(target: Target) -> dict[str, object]:
     findings: list[dict[str, object]] = []
     commands: list[list[str]] = []
     outputs: list[str] = []
+    crashed: list[str] = []
 
-    statix_result = runner.run([statix, "check", "-o", "json", target.flake_dir])
-    commands.append(statix_result.command)
-    outputs.append(statix_result.output)
-    findings.extend(_parse_statix(statix_result.stdout))
+    for name, argv, parse in (
+        ("statix", [statix, "check", "-o", "json", target.flake_dir], _parse_statix),
+        ("deadnix", [deadnix, "--output-format", "json", target.flake_dir], _parse_deadnix),
+    ):
+        result = runner.run(argv)
+        commands.append(result.command)
+        outputs.append(result.output)
+        if not result.ok and not result.stdout.strip():
+            crashed.append(name)
+            continue
+        findings.extend(parse(result.stdout))
 
-    deadnix_result = runner.run(
-        [deadnix, "--output-format", "json", target.flake_dir]
-    )
-    commands.append(deadnix_result.command)
-    outputs.append(deadnix_result.output)
-    findings.extend(_parse_deadnix(deadnix_result.stdout))
-
+    output = "\n".join(o for o in outputs if o)
+    if crashed:
+        return {
+            "status": "failed",
+            "resolved_target": target.flake_dir,
+            "commands": commands,
+            "output": output,
+            "error": f"linter crashed (non-zero exit, no output): {', '.join(crashed)}",
+            "first_error": runner.extract_first_error(output),
+            "findings": findings,
+            "finding_count": len(findings),
+        }
     return {
         "status": "ok",
         "resolved_target": target.flake_dir,
-        "command": commands,
-        "output": "\n".join(o for o in outputs if o),
+        "commands": commands,
+        "output": output,
         "findings": findings,
         "finding_count": len(findings),
     }

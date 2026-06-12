@@ -157,3 +157,24 @@ def test_check_dry_activate_hm_not_applicable():
     out = check("dry-activate", flake_uri="/x", mode="home-manager")
     assert out["status"] == "not_applicable"
     assert "dry-build" in out["hint"]
+
+
+def test_check_lint_linter_crash_is_failed(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0].endswith("statix"):
+            return _result(
+                False, stderr="error: invalid configuration", command=argv
+            )
+        return _result(True, stdout="", command=argv)
+
+    monkeypatch.setattr(check_mod.runner, "run", fake_run)
+    monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = check("lint", flake_uri="/x")
+    assert out["status"] == "failed"
+    assert "statix" in out["error"]
+
+
+def test_parse_statix_list_form():
+    findings = _parse_statix(f"[{STATIX_FIXTURE}]")
+    assert len(findings) == 1
+    assert findings[0]["tool"] == "statix"
