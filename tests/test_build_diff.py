@@ -50,7 +50,10 @@ def test_build_failure(monkeypatch):
     assert out["first_error"] == "error: syntax error"
 
 
-def test_build_dry_run_flag(monkeypatch):
+def test_build_closure_dry_run_flag(monkeypatch):
+    from nix_agent.target import Target
+    from nix_agent.tools.build import build_closure
+
     calls = []
 
     def fake_run(argv, cwd=None):
@@ -58,7 +61,9 @@ def test_build_dry_run_flag(monkeypatch):
         return _result(True, command=argv)
 
     monkeypatch.setattr(build_mod.runner, "run", fake_run)
-    out = build(flake_uri="/x#h", mode="nixos", dry_run=True)
+    out = build_closure(
+        Target(flake_dir="/x", attr="h", mode="nixos"), dry_run=True
+    )
     assert "--dry-run" in calls[0]
     assert "--print-out-paths" not in calls[0]
     assert "store_path" not in out

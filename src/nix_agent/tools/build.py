@@ -51,13 +51,12 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
 def build(
     flake_uri: str | None = None,
     mode: str = "nixos",
-    dry_run: bool = False,
 ) -> dict[str, object]:
     try:
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
-    return build_closure(target, dry_run=dry_run)
+    return build_closure(target)
 
 
 def _current_closure(mode: str) -> str | None:

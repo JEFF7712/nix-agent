@@ -20,10 +20,10 @@ _TOOLS = [
         check,
         "check",
         "Validation ladder for the configuration, fast to slow: "
-        "level='lint' (statix+deadnix, structured findings), 'flake' "
-        "(nix flake check), 'dry-build' (evaluate and plan the closure "
-        "build), 'dry-activate' (NixOS only, shows what activation "
-        "would change).",
+        "level='lint' (statix+deadnix; returns a structured findings "
+        "list — lint only), 'flake' (nix flake check), 'dry-build' "
+        "(evaluate and plan the closure build), 'dry-activate' (NixOS "
+        "only, shows what activation would change).",
     ),
     (
         format_nix,
@@ -57,7 +57,7 @@ _TOOLS = [
         "generations",
         "action='list': enumerate system/HM generations with dates and "
         "current marker. action='rollback': revert to the previous "
-        "generation.",
+        "generation. Pass mode='home-manager' for HM generations.",
     ),
 ]
 
