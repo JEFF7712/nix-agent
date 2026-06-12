@@ -283,7 +283,7 @@ Rules of the merge:
 
 The intent:
 
-- **allow**: the two `nixos-rebuild` commands `nix-agent` drives via
+- **allow**: the `nixos-rebuild` commands `nix-agent` drives via
   sudo (so `switch` does not prompt on every call), the rollback escape
   hatch, and the seven `nix-agent` MCP tools themselves.
 - **deny**: secret stores, sensitive system files, and obvious
