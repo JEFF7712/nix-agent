@@ -11,12 +11,11 @@ def test_flake_exports_package_app_and_nixos_module():
     assert "checks.default" in flake_text
 
 
-def test_flake_package_wraps_nixpkgs_fmt_for_runtime():
+def test_flake_package_wraps_lint_and_diff_tools_for_runtime():
     flake_text = Path("flake.nix").read_text()
 
-    assert "makeWrapper" in flake_text
-    assert "nixpkgs-fmt" in flake_text
-    assert "wrapProgram" in flake_text
+    for tool in ("statix", "deadnix", "nixfmt", "nvd"):
+        assert tool in flake_text
 
 
 def test_nixos_module_exposes_enable_option():

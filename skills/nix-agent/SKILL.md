@@ -1,64 +1,70 @@
 ---
 name: nix-agent
-description: Use when a user wants to change NixOS packages, options, modules, or local configuration through the nix-agent and mcp-nixos MCP servers.
+description: Use when a user wants to change NixOS packages, options, modules, or local configuration and the host exposes the nix-agent MCP server (usually alongside mcp-nixos).
 ---
 
 # Nix Agent
 
 ## Overview
 
-Use this skill for direct NixOS execution tasks through `nix-agent` and `mcp-nixos`. Use `mcp-nixos` for discovery, use `nix-agent` for local mutation and activation. Do not detour into generic brainstorming for operational tasks.
+`nix-agent` is a pure Nix operations toolbox. It does NOT read or write
+files — use your own file tools (Read/Edit/Write) for that. It gives you
+the NixOS-specific operations: evaluate the live config, lint, format,
+validate, build, diff, switch, and manage generations.
 
-## When to Use
-
-- A user asks to install a package on NixOS.
-- A user asks which option to use, then wants it applied.
-- A user asks to patch local NixOS config through MCP tools.
-- The host exposes both `nix-agent` and `mcp-nixos`.
-
-Do not use this skill for writing secret payloads or for broad architecture/design requests.
+Division of labor:
+- **Your native tools** — read and edit `.nix` files.
+- **`mcp-nixos`** — discover packages and options (what exists, what it means).
+- **`nix-agent`** — operate on the user's actual configuration (what their machine resolves, whether it builds, what a switch would change).
 
 ## Tool Surface
 
-`nix-agent` exposes exactly two tools:
+All tools auto-resolve the target when `flake_uri` is omitted
+(`/etc/nixos` for NixOS, `~/.config/home-manager` for Home Manager; the
+hostname / `user@host` attribute is picked automatically) and echo back
+`resolved_target` and the exact `command` run. Exception: calling
+`format` with explicit `paths` returns per-file `results` instead.
+Pass `mode="home-manager"` for HM configs.
 
-- `inspect_state(path)` – read a local file.
-- `apply_patch_set(patch_set, flake_uri=None, mode="nixos")` – write each patch, format any `.nix` files, and (when `flake_uri` is provided) validate then switch.
-  - `mode="nixos"` (default): `sudo nixos-rebuild dry-activate` → `switch`.
-  - `mode="home-manager"`: `home-manager build` → `home-manager switch` (no sudo).
-  - Returns `changed_files`, `rollback_generation`, `current_generation`, command outputs, and `status`.
+- `eval_config(attr, flake_uri?, mode?)` — final merged value of any
+  config attribute on THIS machine (after all modules/overlays).
+  `mcp-nixos` tells you what an option means; this tells you what it is.
+- `check(level, flake_uri?, mode?)` — validation ladder, fast to slow:
+  `"lint"` (statix + deadnix, structured `findings` list), `"flake"`,
+  `"dry-build"`, `"dry-activate"` (NixOS only).
+- `format(paths?, flake_uri?, mode?)` — `nix fmt` / nixfmt.
+- `build(flake_uri?, mode?)` — build the closure, no activation.
+- `diff(flake_uri?, mode?)` — what a switch would change (package
+  adds/removes/version bumps). Show this to the user before switching.
+- `switch(flake_uri?, mode?)` — activate. Records `rollback_generation`.
+- `generations(action="list"|"rollback", mode?)` — list or roll back.
 
-`mcp-nixos` is responsible for package and option discovery.
+## Recommended Workflow
 
-## Required Workflow
+1. Discovery (if needed): query `mcp-nixos` for packages/options;
+   `eval_config` to see what the user's machine currently resolves.
+2. Edit `.nix` files with your native file tools.
+3. `format()` then `check("lint")` — fix findings worth fixing.
+4. `check("dry-build")` — catches eval/build errors cheaply. On failure,
+   `first_error` has the actionable line.
+5. `diff()` — show the user what will change.
+6. `switch()` — report the result and `rollback_generation`.
+7. On regret: `generations(action="rollback")`.
 
-1. If the request needs package or option discovery, query `mcp-nixos` first.
-2. Optionally `inspect_state(path)` on any file you intend to modify.
-3. Build a `PatchSet` of `Patch(path, content)` entries.
-4. Call `apply_patch_set(patch_set, flake_uri=..., mode=...)` in a single round-trip. Pass `mode="home-manager"` for user-level Home Manager configs; default `mode="nixos"` for system configs.
-5. Report:
-   - the `changed_files`
-   - the final `status`
-   - the `rollback_generation` (so the user can recover with `sudo nixos-rebuild switch --rollback` if needed)
-   - any non-empty `dry_activate_output` / `switch_output`
+Steps 3–5 are judgment calls, not gates — for a trivial change, going
+straight to `switch` is fine. Compose what the situation needs.
 
-If `status` is `validation_failed` or `switch_failed`, stop and surface `first_error` (the extracted first `error:` line) and the relevant output field instead of retrying blindly.
+## Failure Handling
 
-You can also call `apply_patch_set` with an empty `PatchSet` (no patches) plus a `flake_uri` to trigger a rebuild against the current flake state without writing any files — useful after manual edits.
+- `status="failed"` — read `first_error` first, full `output` second.
+  Fix the config and retry; don't retry blindly.
+- `status="no_target"` — pass an explicit `flake_uri`.
+- `status="tool_missing"` — the named binary isn't on PATH (only
+  happens outside the flake-packaged install).
 
-## Common Mistakes
+## Hard Rules
 
-- Starting a generic brainstorming/design workflow for a simple package install.
-- Skipping `mcp-nixos` and guessing package names or option paths.
-- Calling `apply_patch_set` without `flake_uri` when the user actually wants the change applied.
-- Writing secret material through patches.
-- Re-running `apply_patch_set` after a failure without inspecting the dry-activate output.
-
-## Example
-
-User: `Use mcp-nixos and nix-agent together to install floorp on my NixOS system.`
-
-1. Query `mcp-nixos` for the correct Floorp package attribute.
-2. Build a `PatchSet` that adds `pkgs.floorp` to the relevant module.
-3. Call `apply_patch_set(patch_set, flake_uri="/etc/nixos#hostname")`.
-4. Report `changed_files`, `status`, and `rollback_generation`.
+- Never write secret payloads into config files; reference secrets via
+  sops-nix/agenix and only edit references.
+- Never call `switch` when the user asked only to check or preview;
+  `diff` is the preview.

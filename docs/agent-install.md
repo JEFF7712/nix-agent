@@ -41,8 +41,9 @@ grep -RIl --include='*.nix' -E 'sops-nix|agenix' "${FLAKE_DIR}" || true
   before continuing — do not install anything yourself:
 
   > No secrets manager (`sops-nix` or `agenix`) was detected in your
-  > flake. `nix-agent` will not write secret payloads through patches —
-  > it only edits references and metadata. If you plan to manage
+  > flake. `nix-agent` does not write files — it only provides Nix
+  > operations. Do not write secret payloads into configs; reference
+  > secrets via sops-nix or agenix only. If you plan to manage
   > secrets on this machine, set up `sops-nix`
   > (<https://github.com/Mic92/sops-nix>) or `agenix`
   > (<https://github.com/ryantm/agenix>) yourself before using
@@ -226,8 +227,13 @@ default.
       "Bash(sudo nixos-rebuild dry-activate --flake *)",
       "Bash(sudo nixos-rebuild switch --flake *)",
       "Bash(sudo nixos-rebuild switch --rollback)",
-      "mcp__nix-agent__inspect_state",
-      "mcp__nix-agent__apply_patch_set"
+      "mcp__nix-agent__eval_config",
+      "mcp__nix-agent__check",
+      "mcp__nix-agent__format",
+      "mcp__nix-agent__build",
+      "mcp__nix-agent__diff",
+      "mcp__nix-agent__switch",
+      "mcp__nix-agent__generations"
     ],
     "deny": [
       "Read(~/.ssh/**)",
@@ -277,9 +283,9 @@ Rules of the merge:
 
 The intent:
 
-- **allow**: the two `nixos-rebuild` commands `nix-agent` drives via
-  sudo (so `apply_patch_set` does not prompt on every call), the
-  rollback escape hatch, and the two `nix-agent` MCP tools themselves.
+- **allow**: the `nixos-rebuild` commands `nix-agent` drives via
+  sudo (so `switch` does not prompt on every call), the rollback escape
+  hatch, and the seven `nix-agent` MCP tools themselves.
 - **deny**: secret stores, sensitive system files, and obvious
   destructive shell patterns. `nix-agent` writes to `/etc/nixos/**` —
   that path is intentionally **not** denied.
@@ -288,24 +294,23 @@ The intent:
 
 ## 8. Enable passwordless `nixos-rebuild` (ask the user first)
 
-`nix-agent`'s `apply_patch_set(flake_uri=...)` call shells out to
-`sudo nixos-rebuild dry-activate` and `sudo nixos-rebuild switch`. If
-the user has not configured passwordless sudo for those exact
-commands, every apply will hang on a password prompt the agent cannot
-answer.
+`nix-agent`'s `check("dry-activate")`, `build`, and `switch` tools
+shell out to `sudo nixos-rebuild`. If the user has not configured
+passwordless sudo for those exact commands, every invocation will hang
+on a password prompt the agent cannot answer.
 
 **Ask the user this question verbatim and wait for an answer:**
 
 > nix-agent can run `nixos-rebuild dry-activate` and `nixos-rebuild
 > switch` non-interactively if I add a narrow passwordless-sudo rule
 > for just those two commands (scoped to your user). Without it,
-> every apply will pause waiting for your sudo password. Do you want
-> me to configure this now? (yes / no)
+> every build or switch will pause waiting for your sudo password. Do
+> you want me to configure this now? (yes / no)
 
 ### If the user says no
 
 - Record "privileged automation: skipped".
-- Warn the user that `apply_patch_set` with `flake_uri` will require
+- Warn the user that `check("dry-activate")` and `switch` will require
   them to enter their sudo password in the terminal where the MCP
   server runs, and continue to the next step.
 - Do not edit anything.
@@ -360,12 +365,12 @@ trust model.
 ## 9. Smoke test
 
 Restart the host agent so it picks up the new MCP server, then ask it
-to call `inspect_state` on a known file, e.g.:
+to call `eval_config` on a known attribute, e.g.:
 
-> Use nix-agent's `inspect_state` tool to read `/etc/nixos/flake.nix`
-> and show me the first few lines.
+> Use nix-agent's `eval_config` tool to evaluate
+> `networking.hostName` and show me the result.
 
-A successful call returns the file contents. If the host reports the
+A successful call returns the resolved value. If the host reports the
 tool is missing, the MCP registration in step 6 did not take effect.
 
 ---
