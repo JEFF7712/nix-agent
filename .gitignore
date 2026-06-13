@@ -3,3 +3,4 @@ CLAUDE.md
 *.egg-info/
 uv.lock
 result
+docs/superpowers
