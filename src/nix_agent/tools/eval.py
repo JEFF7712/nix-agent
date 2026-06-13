@@ -28,9 +28,17 @@ def eval_config(
         installable = f"{config_attr(target, candidate)}.config.{attr}"
         result = runner.run(["nix", "eval", installable, "--json"])
         if result.ok:
-            return runner.envelope(
-                "ok", installable, result, value=json.loads(result.stdout)
-            )
+            try:
+                value = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                return runner.envelope(
+                    "ok",
+                    installable,
+                    result,
+                    value=result.stdout.strip(),
+                    json_parse_failed=True,
+                )
+            return runner.envelope("ok", installable, result, value=value)
         if _missing_config_attr(result.output) and i < len(candidates) - 1:
             continue
         if not _missing_config_attr(result.output):

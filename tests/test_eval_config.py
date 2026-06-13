@@ -71,6 +71,18 @@ def test_eval_non_json_fallback(monkeypatch):
     assert out["json_fallback"] is True
 
 
+def test_eval_truncated_json_does_not_crash(monkeypatch):
+    def fake_run(argv, cwd=None):
+        # Simulate runner truncation producing invalid JSON on an ok result
+        return _result(True, stdout='{"a": 1, "b": ... [truncated]', command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("environment.systemPackages", flake_uri="/x#h", mode="nixos")
+    assert out["status"] == "ok"
+    assert out["value"] == '{"a": 1, "b": ... [truncated]'
+    assert out["json_parse_failed"] is True
+
+
 def test_eval_real_failure(monkeypatch):
     def fake_run(argv, cwd=None):
         return _result(
