@@ -49,8 +49,12 @@ _TOOLS = [
         switch,
         "switch",
         "Activate the configuration (sudo nixos-rebuild switch / "
-        "home-manager switch). Records rollback_generation first. No "
-        "implicit validation: run check/diff first as needed.",
+        "home-manager switch). Records rollback_generation first. Returns a "
+        "structured 'summary' (units changed, derivations built) plus gen "
+        "before/after; on success the raw log is trimmed to a tail (pass "
+        "full_log=True for all of it). No implicit validation by default; "
+        "pass validate=True to gate on check('dry-build') first. On a sudo "
+        "auth failure returns a 'privilege' diagnosis.",
     ),
     (
         generations,

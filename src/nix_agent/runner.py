@@ -4,6 +4,7 @@ import shutil
 import subprocess
 
 OUTPUT_CAP = 64_000
+TAIL_CAP = 2_000
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,14 @@ def truncate_output(text: str, cap: int = OUTPUT_CAP) -> str:
         + f"\n... [nix-agent: {omitted} bytes truncated] ...\n"
         + text[-half:]
     )
+
+
+def tail(text: str, cap: int = TAIL_CAP) -> str:
+    """Last `cap` chars, for surfacing the end of an otherwise-noisy log
+    (e.g. a successful activation) without spending tokens on the whole thing."""
+    if len(text) <= cap:
+        return text
+    return f"... [nix-agent: {len(text) - cap} leading bytes omitted] ...\n" + text[-cap:]
 
 
 def run(argv: list[str], cwd: str | None = None) -> RunResult:
@@ -88,8 +97,10 @@ def envelope(
         status=status,
         resolved_target=resolved_target,
         command=result.command,
-        output=result.output,
     )
+    # Callers may pre-set a trimmed `output` (e.g. switch's success tail);
+    # only fill in the full log when they did not.
+    response.setdefault("output", result.output)
     if status == "failed":
         response["first_error"] = extract_first_error(result.output)
     return response

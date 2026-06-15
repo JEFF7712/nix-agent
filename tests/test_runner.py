@@ -82,9 +82,28 @@ def test_truncate_output_tiny_cap():
 
 def test_envelope_core_keys_win_over_extras():
     result = runner.RunResult(ok=True, command=["x"], stdout="real", stderr="")
-    env = runner.envelope("ok", "t", result, output="clobbered", command=["bad"])
-    assert env["output"] == "real"
+    env = runner.envelope("ok", "t", result, command=["bad"])
     assert env["command"] == ["x"]
+    assert env["status"] == "ok"
+
+
+def test_envelope_output_override_wins():
+    """A caller can pre-trim `output` (switch's success tail); envelope only
+    fills the full log when the caller did not set one."""
+    result = runner.RunResult(ok=True, command=["x"], stdout="real", stderr="")
+    overridden = runner.envelope("ok", "t", result, output="trimmed")
+    assert overridden["output"] == "trimmed"
+    default = runner.envelope("ok", "t", result)
+    assert default["output"] == "real"
+
+
+def test_tail_keeps_end():
+    text = "head" + "z" * 5000 + "TAILEND"
+    out = runner.tail(text, cap=100)
+    assert out.endswith("TAILEND")
+    assert "head" not in out
+    assert "omitted" in out
+    assert runner.tail("short", cap=100) == "short"
 
 
 def test_output_drops_whitespace_only_streams():

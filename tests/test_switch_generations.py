@@ -76,6 +76,109 @@ def test_switch_failure_keeps_rollback(monkeypatch):
     assert out["first_error"] == "error: activation failed"
 
 
+SWITCH_LOG = """\
+building '/nix/store/aaaa-foo.drv'...
+building '/nix/store/bbbb-bar.drv'...
+activating the configuration...
+stopping the following units: old.service
+reloading the following units: dbus.service, systemd-logind.service
+restarting the following units: nscd.service
+starting the following units: new.service
+the following new units were started: fresh.service
+"""
+
+
+def test_switch_summary_and_trimmed_log(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri="/x#h")
+    summary = out["summary"]
+    assert summary["derivations_built"] == 2
+    assert summary["changed"] is True
+    assert summary["units"]["stopped"] == ["old.service"]
+    assert summary["units"]["reloaded"] == ["dbus.service", "systemd-logind.service"]
+    assert summary["units"]["restarted"] == ["nscd.service"]
+    assert summary["units"]["started"] == ["new.service"]
+    assert summary["units"]["new"] == ["fresh.service"]
+
+
+def test_switch_full_log(monkeypatch):
+    big = "x" * 5000
+
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=big, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+
+    trimmed = switch(flake_uri="/x#h")
+    assert trimmed["log_truncated"] is True
+    assert len(trimmed["output"]) < len(big)
+
+    full = switch(flake_uri="/x#h", full_log=True)
+    assert full["output"] == big
+    assert "log_truncated" not in full
+
+
+def test_switch_sudo_diagnosis(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(
+            False,
+            stderr="sudo: a terminal is required to read the password",
+            command=argv,
+        )
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert out["rollback_generation"] == "gen"
+    assert "sudo" in out["privilege"]["cause"]
+    assert out["privilege"]["command_form"][0] == "sudo"
+
+
+def test_switch_validate_aborts_on_failed_dry_build(monkeypatch):
+    ran = []
+
+    def fake_run(argv, cwd=None):
+        ran.append(argv)
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        switch_mod,
+        "check",
+        lambda *a, **k: {"status": "failed", "first_error": "error: boom"},
+    )
+    out = switch(flake_uri="/x#h", validate=True)
+    assert out["status"] == "preflight_failed"
+    assert out["first_error"] == "error: boom"
+    assert ran == []
+
+
+def test_switch_validate_proceeds_when_dry_build_ok(monkeypatch):
+    ran = []
+
+    def fake_run(argv, cwd=None):
+        ran.append(argv)
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    monkeypatch.setattr(switch_mod, "check", lambda *a, **k: {"status": "ok"})
+    out = switch(flake_uri="/x#h", validate=True)
+    assert out["status"] == "ok"
+    assert ran and ran[0][0] == "sudo"
+
+
 def test_generations_list_nixos(monkeypatch):
     def fake_run(argv, cwd=None):
         assert argv == ["/bin/nixos-rebuild", "list-generations", "--json"]
@@ -202,9 +305,13 @@ def test_generations_rollback_hm_current_not_newest(monkeypatch):
 
 
 def test_switch_no_target(monkeypatch, tmp_path):
+    from pathlib import Path
+
     from nix_agent import target as target_mod
 
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
     monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = switch()
     assert out["status"] == "no_target"
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nix_agent import runner
 from nix_agent.target import TargetError, current_hm_profile, resolve_target
+from nix_agent.tools.check import check
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
 
@@ -15,6 +16,24 @@ _HM_LINE = re.compile(
     r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) : id (\d+) -> (\S+)(\s+\(current\))?\s*$"
 )
 
+# Activation lines emitted by switch-to-configuration. Each lists its units
+# comma-separated on one line; the last occurrence wins.
+_UNIT_PATTERNS = {
+    "stopped": re.compile(r"stopping the following units:\s*(.+)"),
+    "started": re.compile(r"^starting the following units:\s*(.+)"),
+    "restarted": re.compile(r"restarting the following units:\s*(.+)"),
+    "reloaded": re.compile(r"reloading the following units:\s*(.+)"),
+    "new": re.compile(r"the following new units were started:\s*(.+)"),
+}
+_BUILDING = re.compile(r"^\s*building '/nix/store/\S+\.drv'")
+
+# sudo refused because there is no interactive terminal or askpass helper.
+_SUDO_NO_AUTH = re.compile(
+    r"sudo: (a terminal is required|a password is required|"
+    r"no askpass program|no tty present)",
+    re.IGNORECASE,
+)
+
 
 def _current_generation(mode: str) -> str | None:
     if mode == "nixos":
@@ -23,16 +42,77 @@ def _current_generation(mode: str) -> str | None:
     return current_hm_profile()
 
 
+def _summarize_switch(output: str) -> dict[str, object]:
+    """Pull the genuinely useful signal out of an activation log: which
+    units changed and how many derivations were built."""
+    units: dict[str, list[str]] = {}
+    built = 0
+    for line in output.splitlines():
+        stripped = line.strip()
+        if _BUILDING.match(line):
+            built += 1
+        for key, pattern in _UNIT_PATTERNS.items():
+            match = pattern.search(stripped)
+            if match:
+                units[key] = [
+                    u.strip() for u in match.group(1).split(",") if u.strip()
+                ]
+    summary: dict[str, object] = {"derivations_built": built}
+    if units:
+        summary["units"] = units
+    summary["changed"] = bool(units) or built > 0
+    return summary
+
+
+def _sudo_diagnosis(argv: list[str], output: str) -> dict[str, object] | None:
+    if not _SUDO_NO_AUTH.search(output):
+        return None
+    return {
+        "cause": "sudo could not authenticate non-interactively",
+        "detail": (
+            "Activation needs root via sudo, but there is no TTY/askpass and "
+            "no passwordless rule matched this command form. nix-agent invokes "
+            "sudo with the resolved store path of nixos-rebuild; a NOPASSWD "
+            "rule must match that exact argv."
+        ),
+        "command_form": argv,
+        "fixes": [
+            "Add a NOPASSWD sudoers rule for this nixos-rebuild store path, or",
+            "Set SUDO_ASKPASS and run with sudo -A, or",
+            "Run switch from an interactive session.",
+        ],
+    }
+
+
 def switch(
-    flake_uri: str | None = None, mode: str = "nixos"
+    flake_uri: str | None = None,
+    mode: str = "nixos",
+    validate: bool = False,
+    full_log: bool = False,
 ) -> dict[str, object]:
     """Switch with no implicit validation gate; the agent composes
     check -> diff -> switch itself. rollback_generation is always
-    recorded first so a bad switch can be undone."""
+    recorded first so a bad switch can be undone.
+
+    validate=True runs check(level='dry-build') first and aborts the
+    switch if it does not pass. full_log=True returns the full activation
+    log; by default a successful switch returns only a short tail plus a
+    structured ``summary`` of the units that changed."""
     try:
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
+
+    if validate:
+        preflight = check("dry-build", flake_uri=flake_uri, mode=mode)
+        if preflight.get("status") != "ok":
+            return {
+                "status": "preflight_failed",
+                "resolved_target": target.flake_ref,
+                "stage": "dry-build",
+                "preflight": preflight,
+                "first_error": preflight.get("first_error"),
+            }
 
     rollback = _current_generation(mode)
     if mode == "nixos":
@@ -41,13 +121,22 @@ def switch(
     else:
         argv = ["home-manager", "switch", "--flake", target.flake_ref]
     result = runner.run(argv)
-    return runner.envelope(
-        "ok" if result.ok else "failed",
-        target.flake_ref,
-        result,
-        rollback_generation=rollback,
-        current_generation=_current_generation(mode),
-    )
+
+    extra: dict[str, object] = {
+        "rollback_generation": rollback,
+        "current_generation": _current_generation(mode),
+    }
+    if result.ok:
+        extra["summary"] = _summarize_switch(result.output)
+        if not full_log:
+            extra["output"] = runner.tail(result.output)
+            extra["log_truncated"] = extra["output"] != result.output
+        return runner.envelope("ok", target.flake_ref, result, **extra)
+
+    diagnosis = _sudo_diagnosis(argv, result.output)
+    if diagnosis is not None:
+        extra["privilege"] = diagnosis
+    return runner.envelope("failed", target.flake_ref, result, **extra)
 
 
 def _list_nixos() -> dict[str, object]:

@@ -96,9 +96,13 @@ def test_eval_real_failure(monkeypatch):
 
 
 def test_eval_no_target(monkeypatch, tmp_path):
+    from pathlib import Path
+
     from nix_agent import target as target_mod
 
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
     monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = eval_config("a.b", mode="nixos")
     assert out["status"] == "no_target"
     assert "flake_uri" in out["error"]

@@ -85,10 +85,13 @@ The MCP exposes the tools. The skill teaches the correct workflow.
 
 ## Tool surface
 
-All tools auto-resolve the target when `flake_uri` is omitted (`/etc/nixos`
-for NixOS, `~/.config/home-manager` for Home Manager; hostname / `user@host`
-attribute is picked automatically) and echo back `resolved_target` and the
-exact `command` run. Exception: calling `format` with explicit `paths` returns
+All tools auto-resolve the target when `flake_uri` is omitted. Resolution
+order: `$NIX_AGENT_FLAKE` (or `$NIX_AGENT_HM_FLAKE` for HM), then the first
+existing `flake.nix` among `/etc/nixos`, `~/nixos`, `~/.config/nixos`,
+`~/nix-config`, `~/nixos-config` for NixOS (`~/.config/home-manager`,
+`~/.config/nixpkgs` for Home Manager). The hostname / `user@host` attribute is
+picked automatically. Every result echoes back `resolved_target` and the exact
+`command` run. Exception: calling `format` with explicit `paths` returns
 per-file `results` instead. Pass `mode="home-manager"` for HM configs.
 
 | Tool | What it does |
@@ -98,7 +101,7 @@ per-file `results` instead. Pass `mode="home-manager"` for HM configs.
 | `format(paths?, flake_uri?, mode?)` | `nix fmt` / nixfmt. With explicit `paths`, returns per-file `results`. |
 | `build(flake_uri?, mode?)` | Build the closure, no activation. |
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Show this to the user before switching. |
-| `switch(flake_uri?, mode?)` | Activate. Records `rollback_generation`. |
+| `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
 | `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
 
 ## Basic workflow

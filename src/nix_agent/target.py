@@ -7,6 +7,14 @@ from pathlib import Path
 VALID_MODES = ("nixos", "home-manager")
 NIXOS_DEFAULT_DIR = Path("/etc/nixos")
 
+# Searched, in order, after the env override and before erroring. Covers the
+# common flake-in-$HOME layouts. cwd walk-up is deliberately NOT searched: an
+# MCP server's cwd is usually the caller's project dir (which may carry an
+# unrelated flake.nix), so it is a wrong-flake hazard. Point a nonstandard
+# config at NIX_AGENT_FLAKE / NIX_AGENT_HM_FLAKE instead.
+NIXOS_FALLBACK_DIRNAMES = ("nixos", ".config/nixos", "nix-config", "nixos-config")
+HM_FALLBACK_DIRNAMES = (".config/home-manager", ".config/nixpkgs")
+
 
 class TargetError(Exception):
     pass
@@ -37,24 +45,42 @@ def current_user() -> str | None:
         return None
 
 
+def _env_override(mode: str) -> str | None:
+    if mode == "home-manager":
+        return os.environ.get("NIX_AGENT_HM_FLAKE") or os.environ.get(
+            "NIX_AGENT_FLAKE"
+        )
+    return os.environ.get("NIX_AGENT_FLAKE")
+
+
+def flake_search_dirs(mode: str) -> list[Path]:
+    home = Path.home()
+    if mode == "nixos":
+        return [NIXOS_DEFAULT_DIR, *(home / d for d in NIXOS_FALLBACK_DIRNAMES)]
+    return [home / d for d in HM_FALLBACK_DIRNAMES]
+
+
 def resolve_target(flake_uri: str | None, mode: str) -> Target:
     if mode not in VALID_MODES:
         raise TargetError(
             f"mode must be one of {list(VALID_MODES)}, got {mode!r}"
         )
-    if flake_uri is not None:
-        dir_part, _, attr = flake_uri.partition("#")
+    ref = flake_uri if flake_uri is not None else _env_override(mode)
+    if ref is not None:
+        dir_part, _, attr = ref.partition("#")
         return Target(flake_dir=dir_part, attr=attr or None, mode=mode)
-    if mode == "nixos":
-        default_dir = NIXOS_DEFAULT_DIR
-    else:
-        default_dir = Path.home() / ".config" / "home-manager"
-    if not (default_dir / "flake.nix").is_file():
-        raise TargetError(
-            f"no flake_uri given and {default_dir}/flake.nix does not exist; "
-            "pass flake_uri explicitly"
-        )
-    return Target(flake_dir=str(default_dir), attr=None, mode=mode)
+
+    searched = flake_search_dirs(mode)
+    for candidate in searched:
+        if (candidate / "flake.nix").is_file():
+            return Target(flake_dir=str(candidate), attr=None, mode=mode)
+
+    env_name = "NIX_AGENT_HM_FLAKE" if mode == "home-manager" else "NIX_AGENT_FLAKE"
+    searched_str = ", ".join(str(d) for d in searched)
+    raise TargetError(
+        f"no flake_uri given and no flake.nix found in any of: {searched_str}. "
+        f"Pass flake_uri (e.g. '/home/you/nixos#host') or set ${env_name}."
+    )
 
 
 def attr_candidates(target: Target) -> list[str]:

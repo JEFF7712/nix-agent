@@ -128,8 +128,12 @@ def test_format_fallback_formats_flake_nix_itself(monkeypatch, tmp_path):
 
 
 def test_format_no_target(monkeypatch, tmp_path):
+    from pathlib import Path
+
     from nix_agent import target as target_mod
 
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
     monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = format_nix()
     assert out["status"] == "no_target"
