@@ -24,7 +24,31 @@ All tools auto-resolve the target when `flake_uri` is omitted
 hostname / `user@host` attribute is picked automatically) and echo back
 `resolved_target` and the exact `command` run. Exception: calling
 `format` with explicit `paths` returns per-file `results` instead.
-Pass `mode="home-manager"` for HM configs.
+
+### Picking `mode` (read before any HM change)
+
+`mode` defaults to `"nixos"`. Do NOT reflexively switch to
+`"home-manager"` just because the task touches Home Manager options —
+that is the most common way to operate on the wrong config.
+
+- **Integrated HM** (Home Manager wired in as a NixOS module via
+  `home-manager.nixosModules.home-manager` + `home-manager.users.*`):
+  there is no separate `home-manager switch`. HM is built and activated
+  as part of the system closure. Use `mode="nixos"` (the default) and
+  `switch` the whole system. This is the common laptop/desktop layout.
+- **Standalone HM** (its own flake exposing `homeConfigurations.*`,
+  applied with `home-manager switch`): use `mode="home-manager"`.
+
+If both a NixOS flake and a standalone `~/.config/home-manager` flake
+exist on the machine, the standalone one is often vestigial — confirm
+which is actually active (`eval_config` against each, or check what the
+running generation was built from) before mutating. When in doubt,
+`mode="nixos"` is the safer guess.
+
+For nonstandard or multi-flake layouts, don't rely on auto-resolution:
+set `NIX_AGENT_FLAKE` (or `NIX_AGENT_HM_FLAKE`) once, or pass an explicit
+`flake_uri` like `/home/you/nixos#host`. Either pins the target and
+removes the guesswork entirely.
 
 - `eval_config(attr, flake_uri?, mode?)` — final merged value of any
   config attribute on THIS machine (after all modules/overlays).
