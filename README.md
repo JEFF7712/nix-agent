@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="nix-agent — composable NixOS operations for AI agents" width="100%">
+</p>
+
 # nix-agent
 
 A local MCP server that gives AI agents composable NixOS / Home Manager
@@ -25,3 +29,7 @@ Or do it by hand — see [docs/usage.md](docs/usage.md#install).
 - [docs/agent-install.md](docs/agent-install.md) — one-shot agent install guide
 - [docs/privileged-automation.md](docs/privileged-automation.md) — non-interactive switch
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md) — companion agent skill
+
+---
+
+The banner uses the Nix snowflake from [NixOS/nixos-artwork](https://github.com/NixOS/nixos-artwork), licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
