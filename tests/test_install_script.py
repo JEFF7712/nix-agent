@@ -11,7 +11,7 @@ def test_install_script_exists_and_mentions_supported_hosts():
     assert ".claude/skills" in script_text
 
 
-def test_readme_mentions_install_script():
-    readme_text = Path("README.md").read_text()
+def test_docs_mention_install_script():
+    usage_text = Path("docs/usage.md").read_text()
 
-    assert "./install-skill.sh opencode" in readme_text
+    assert "./install-skill.sh opencode" in usage_text
