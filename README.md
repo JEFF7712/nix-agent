@@ -92,7 +92,16 @@ existing `flake.nix` among `/etc/nixos`, `~/nixos`, `~/.config/nixos`,
 `~/.config/nixpkgs` for Home Manager). The hostname / `user@host` attribute is
 picked automatically. Every result echoes back `resolved_target` and the exact
 `command` run. Exception: calling `format` with explicit `paths` returns
-per-file `results` instead. Pass `mode="home-manager"` for HM configs.
+per-file `results` instead.
+
+`mode` defaults to `"nixos"`. Use `"home-manager"` only for a **standalone** HM
+flake (its own `homeConfigurations`, applied with `home-manager switch`). When
+HM is integrated as a NixOS module (built into the system closure), keep
+`mode="nixos"` and switch the whole system — there is no separate HM switch. On
+a machine that has both a NixOS flake and a leftover `~/.config/home-manager`
+flake, pin the target with `$NIX_AGENT_FLAKE` or an explicit `flake_uri` so
+resolution can't pick the wrong one. See `skills/nix-agent/SKILL.md` for the
+full mode-selection guidance.
 
 | Tool | What it does |
 |------|-------------|
