@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="nix-agent — composable NixOS operations for AI agents" width="100%">
+  <img src="assets/banner.png" alt="nix-agent: composable NixOS operations for AI agents" width="100%">
 </p>
 
 # nix-agent
@@ -21,14 +21,14 @@ Paste this to a coding agent (Claude Code, opencode, …) and it does the instal
 Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.
 ```
 
-Or do it by hand — see [docs/usage.md](docs/usage.md#install).
+Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 
 ## Docs
 
-- [docs/usage.md](docs/usage.md) — install, MCP host config, tool surface, workflow, design notes
-- [docs/agent-install.md](docs/agent-install.md) — one-shot agent install guide
-- [docs/privileged-automation.md](docs/privileged-automation.md) — non-interactive switch
-- [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md) — companion agent skill
+- [docs/usage.md](docs/usage.md): install, MCP host config, tool surface, workflow, design notes
+- [docs/agent-install.md](docs/agent-install.md): one-shot agent install guide
+- [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive switch
+- [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion agent skill
 
 ---
 
