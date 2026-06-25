@@ -2,8 +2,6 @@
   <img src="assets/banner.png" alt="nix-agent: composable NixOS operations for AI agents" width="100%">
 </p>
 
-# nix-agent
-
 A local MCP server that gives AI agents composable NixOS / Home Manager
 operations: eval, lint, format, build, diff, switch, generations.
 
