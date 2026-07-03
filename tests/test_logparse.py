@@ -59,6 +59,15 @@ def test_extract_error_detail_location_before_message():
     assert detail["line"] == 9
 
 
+def test_extract_error_detail_no_cross_block_location():
+    text = (
+        "       error: first failure\n"
+        "         at /home/u/first.nix:1:1:\n"
+        "       error: second failure with no location"
+    )
+    assert logparse.extract_error_detail(text) is None
+
+
 BUILD_FAILURE = """\
 building '/nix/store/aaa-dep.drv'...
 error: builder for '/nix/store/bbb-leaf-1.0.drv' failed with exit code 1;

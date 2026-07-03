@@ -35,7 +35,16 @@ def extract_error_detail(output: str | None) -> dict[str, object] | None:
             at = match
             break
     if at is None:
-        for line in lines[:message_idx]:
+        start = 0
+        for i in range(message_idx - 1, -1, -1):
+            if lines[i].strip().startswith("error:"):
+                start = i + 1
+                # the at line directly under an error line is that error's
+                # location, not context for the current one
+                if start < message_idx and _AT_LINE.match(lines[start]):
+                    start += 1
+                break
+        for line in lines[start:message_idx]:
             match = _AT_LINE.match(line)
             if match:
                 at = match
