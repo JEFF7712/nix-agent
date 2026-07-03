@@ -3,6 +3,8 @@ import os
 import shutil
 import subprocess
 
+from nix_agent import logparse
+
 OUTPUT_CAP = 64_000
 TAIL_CAP = 2_000
 
@@ -49,7 +51,9 @@ def tail(text: str, cap: int = TAIL_CAP) -> str:
     (e.g. a successful activation) without spending tokens on the whole thing."""
     if len(text) <= cap:
         return text
-    return f"... [nix-agent: {len(text) - cap} leading bytes omitted] ...\n" + text[-cap:]
+    return (
+        f"... [nix-agent: {len(text) - cap} leading bytes omitted] ...\n" + text[-cap:]
+    )
 
 
 def run(argv: list[str], cwd: str | None = None) -> RunResult:
@@ -103,4 +107,20 @@ def envelope(
     response.setdefault("output", result.output)
     if status == "failed":
         response["first_error"] = extract_first_error(result.output)
+        detail = logparse.extract_error_detail(result.output)
+        if detail is not None:
+            response["error_detail"] = detail
     return response
+
+
+def failed_derivation_info(output: str) -> dict[str, object] | None:
+    """For a failed build log: the first failing .drv plus the tail of its
+    builder log via `nix log`, replacing the agent's manual follow-up call."""
+    drvs = logparse.extract_failed_drvs(output)
+    if not drvs:
+        return None
+    drv = drvs[0]
+    result = run(["nix", "log", drv])
+    if result.ok and result.stdout.strip():
+        return {"drv": drv, "log_tail": logparse.tail_lines(result.stdout)}
+    return {"drv": drv, "note": "nix log unavailable for this derivation"}
