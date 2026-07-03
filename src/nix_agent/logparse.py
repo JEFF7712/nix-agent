@@ -56,3 +56,28 @@ def extract_error_detail(output: str | None) -> dict[str, object] | None:
         "column": int(at.group(3)),
         "trace": trace,
     }
+
+
+_BUILDER_FAILED = re.compile(r"builder for '(/nix/store/\S+\.drv)' failed")
+
+
+def extract_failed_drvs(output: str | None) -> list[str]:
+    """Leaf builder failures ('builder for ... failed'), deduped, in order.
+    Dependency-chain errors name aggregate drvs; the builder lines are the
+    actual failures."""
+    seen: list[str] = []
+    for match in _BUILDER_FAILED.finditer(output or ""):
+        drv = match.group(1)
+        if drv not in seen:
+            seen.append(drv)
+    return seen
+
+
+def tail_lines(text: str, n: int = LOG_TAIL_LINES) -> str:
+    lines = text.splitlines()
+    if len(lines) <= n:
+        return text
+    omitted = len(lines) - n
+    return f"... [nix-agent: {omitted} leading lines omitted] ...\n" + "\n".join(
+        lines[-n:]
+    )
