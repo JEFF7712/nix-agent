@@ -180,3 +180,27 @@ def test_parse_diff_closures():
 
 def test_parse_diff_closures_unrecognized_returns_none():
     assert logparse.parse_diff_closures("nothing matching") is None
+
+
+def test_parse_diff_closures_multi_version_no_size():
+    packages = logparse.parse_diff_closures("linux: 6.6.30 → 6.6.32, 6.6.34")
+    assert packages["changed"] == [
+        {"name": "linux", "old": "6.6.30", "new": "6.6.32, 6.6.34"}
+    ]
+
+
+def test_parse_diff_closures_epsilon_version():
+    packages = logparse.parse_diff_closures("foo: ε → 1.2, 96.4 KiB")
+    assert packages["changed"] == [{"name": "foo", "old": "ε", "new": "1.2"}]
+
+
+def test_parse_nvd_header_only_is_empty_diff():
+    text = (
+        "<<< /run/current-system\n>>> /nix/store/zzz\nClosure size: 1234 -> 1234 paths."
+    )
+    assert logparse.parse_nvd(text) == {"added": [], "removed": [], "changed": []}
+
+
+def test_parsers_empty_input_returns_none():
+    assert logparse.parse_nvd("") is None
+    assert logparse.parse_diff_closures("") is None

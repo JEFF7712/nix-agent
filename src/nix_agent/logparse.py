@@ -99,12 +99,13 @@ _NVD_SECTIONS = {
 }
 _NVD_ENTRY = re.compile(r"^\[[^\]]+\]\s+#\d+\s+(\S+)\s+(.+)$")
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
-_DIFF_CLOSURES = re.compile(r"^(\S+): (.+?) → (.+?)(?:, [+-]?[\d.]+\s*\S+)?$")
+_DIFF_CLOSURES = re.compile(r"^(\S+): (.+?) → (.+?)(?:, [+-]?[\d.]+\s+\S+)?$")
 
 
 def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
-    """nvd diff output to structured package changes. None when nothing
-    matched: format drift degrades to text-only, never guesses."""
+    """nvd diff output to structured package changes. Returns the empty
+    lists when the output is recognizably nvd but shows no package changes;
+    None only when the text is not recognizable nvd output."""
     packages: dict[str, list[dict[str, str]]] = {
         "added": [],
         "removed": [],
@@ -116,6 +117,10 @@ def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
         stripped = line.strip()
         if stripped in _NVD_SECTIONS:
             section = _NVD_SECTIONS[stripped]
+            matched = True
+            continue
+        if stripped.startswith("Closure size:"):
+            matched = True
             continue
         if stripped.endswith(":") and not _NVD_ENTRY.match(stripped):
             # unknown section header (e.g. "Selection state changes:");
@@ -141,7 +146,9 @@ def parse_diff_closures(text: str) -> dict[str, list[dict[str, str]]] | None:
     """`nix store diff-closures` output to structured package changes.
     The empty-set character marks an absent side (added/removed). Size
     deltas are always ANSI-colored (no --no-color / NO_COLOR escape hatch),
-    so strip escape codes before matching."""
+    so strip escape codes before matching. Identical closures print
+    nothing at all, so callers must treat empty input as an empty diff
+    themselves; None here means only that no line was recognizable."""
     packages: dict[str, list[dict[str, str]]] = {
         "added": [],
         "removed": [],
