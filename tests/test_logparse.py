@@ -110,3 +110,53 @@ def test_tail_lines():
     assert "line59" not in out.splitlines()[0]
     assert "60 leading lines omitted" in out
     assert logparse.tail_lines("a\nb", n=40) == "a\nb"
+
+
+NVD_OUTPUT = """\
+<<< /run/current-system
+>>> /nix/store/zzz-nixos-system-laptop
+Version changes:
+[U.]  #1  firefox  128.0 -> 129.0
+[C.]  #2  linux    6.6.30 -> 6.6.32
+Added packages:
+[A+]  #1  htop  3.3.0
+Removed packages:
+[R-]  #1  tmux  3.4
+Closure size: 1234 -> 1250 paths.
+"""
+
+DIFF_CLOSURES_OUTPUT = """\
+firefox: 128.0 → 129.0, \x1b[31;1m12.3 KiB\x1b[0m
+htop: ∅ → 3.3.0, \x1b[31;1m512.4 KiB\x1b[0m
+tmux: 3.4 → ∅, \x1b[32;1m-800.1 KiB\x1b[0m
+libfoo: \x1b[31;1m8.8 KiB\x1b[0m
+"""
+
+
+def test_parse_nvd():
+    packages = logparse.parse_nvd(NVD_OUTPUT)
+    assert packages == {
+        "added": [{"name": "htop", "version": "3.3.0"}],
+        "removed": [{"name": "tmux", "version": "3.4"}],
+        "changed": [
+            {"name": "firefox", "old": "128.0", "new": "129.0"},
+            {"name": "linux", "old": "6.6.30", "new": "6.6.32"},
+        ],
+    }
+
+
+def test_parse_nvd_unrecognized_returns_none():
+    assert logparse.parse_nvd("random text\nno sections here") is None
+
+
+def test_parse_diff_closures():
+    packages = logparse.parse_diff_closures(DIFF_CLOSURES_OUTPUT)
+    assert packages == {
+        "added": [{"name": "htop", "version": "3.3.0"}],
+        "removed": [{"name": "tmux", "version": "3.4"}],
+        "changed": [{"name": "firefox", "old": "128.0", "new": "129.0"}],
+    }
+
+
+def test_parse_diff_closures_unrecognized_returns_none():
+    assert logparse.parse_diff_closures("nothing matching") is None

@@ -90,3 +90,71 @@ def tail_lines(text: str, n: int = LOG_TAIL_LINES) -> str:
     return f"... [nix-agent: {omitted} leading lines omitted] ...\n" + "\n".join(
         lines[-n:]
     )
+
+
+_NVD_SECTIONS = {
+    "Version changes:": "changed",
+    "Added packages:": "added",
+    "Removed packages:": "removed",
+}
+_NVD_ENTRY = re.compile(r"^\[[^\]]+\]\s+#\d+\s+(\S+)\s+(.+)$")
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+_DIFF_CLOSURES = re.compile(r"^(\S+): (.+?) → (.+?)(?:, [+-]?[\d.]+\s*\S+)?$")
+
+
+def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
+    """nvd diff output to structured package changes. None when nothing
+    matched: format drift degrades to text-only, never guesses."""
+    packages: dict[str, list[dict[str, str]]] = {
+        "added": [],
+        "removed": [],
+        "changed": [],
+    }
+    section = None
+    matched = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped in _NVD_SECTIONS:
+            section = _NVD_SECTIONS[stripped]
+            continue
+        entry = _NVD_ENTRY.match(stripped)
+        if section is None or entry is None:
+            continue
+        matched = True
+        name, rest = entry.group(1), entry.group(2).strip()
+        if section == "changed":
+            old, _, new = rest.partition("->")
+            packages["changed"].append(
+                {"name": name, "old": old.strip(), "new": new.strip()}
+            )
+        else:
+            packages[section].append({"name": name, "version": rest})
+    return packages if matched else None
+
+
+def parse_diff_closures(text: str) -> dict[str, list[dict[str, str]]] | None:
+    """`nix store diff-closures` output to structured package changes.
+    The empty-set character marks an absent side (added/removed). Size
+    deltas are always ANSI-colored (no --no-color / NO_COLOR escape hatch),
+    so strip escape codes before matching."""
+    packages: dict[str, list[dict[str, str]]] = {
+        "added": [],
+        "removed": [],
+        "changed": [],
+    }
+    matched = False
+    for line in text.splitlines():
+        entry = _DIFF_CLOSURES.match(_ANSI_ESCAPE.sub("", line).strip())
+        if entry is None:
+            continue
+        matched = True
+        name = entry.group(1)
+        old = entry.group(2).strip()
+        new = entry.group(3).strip()
+        if old == "∅":
+            packages["added"].append({"name": name, "version": new})
+        elif new == "∅":
+            packages["removed"].append({"name": name, "version": old})
+        else:
+            packages["changed"].append({"name": name, "old": old, "new": new})
+    return packages if matched else None
