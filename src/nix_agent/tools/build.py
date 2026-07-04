@@ -43,9 +43,9 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
             continue
         break
     extra: dict[str, object] = {}
-    info = runner.failed_derivation_info(result.output)
-    if info is not None:
-        extra["failed_derivation"] = info
+    drv_info = runner.failed_derivation_info(result.output)
+    if drv_info is not None:
+        extra["failed_derivation"] = drv_info
     return runner.envelope("failed", installable, result, **extra)
 
 
