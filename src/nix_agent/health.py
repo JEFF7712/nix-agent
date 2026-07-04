@@ -6,6 +6,7 @@ import json
 from nix_agent import runner
 
 JOURNAL_LINES = 20
+JOURNAL_TAIL_UNITS = 5
 
 
 def _systemctl(mode: str) -> list[str]:
@@ -46,17 +47,22 @@ def journal_tail(unit: str, mode: str) -> str:
 
 def health_report(before: list[str] | None, mode: str) -> dict[str, object] | None:
     """Diff failed units against a pre-switch snapshot. None when either
-    snapshot was undetectable; callers surface a note instead."""
+    snapshot was undetectable; callers surface a note instead. Journal
+    tails are fetched for at most JOURNAL_TAIL_UNITS newly-failed units,
+    to avoid burning tokens on a mass-failure cascade."""
     if before is None:
         return None
     after, _ = failed_units(mode)
     if after is None:
         return None
     before_set, after_set = set(before), set(after)
+    newly_failed = sorted(after_set - before_set)
     return {
         "newly_failed": [
             {"unit": unit, "log_tail": journal_tail(unit, mode)}
-            for unit in sorted(after_set - before_set)
+            if i < JOURNAL_TAIL_UNITS
+            else {"unit": unit}
+            for i, unit in enumerate(newly_failed)
         ],
         "resolved": sorted(before_set - after_set),
         "still_failed": sorted(before_set & after_set),

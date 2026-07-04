@@ -131,3 +131,24 @@ def test_journal_tail_hm_uses_user_bus(monkeypatch):
     monkeypatch.setattr(health.runner, "run", fake_run)
     health.journal_tail("x.service", "home-manager")
     assert calls[0][:2] == ["journalctl", "--user"]
+
+
+def test_health_report_caps_journal_tails(monkeypatch):
+    units = [f"u{i:02d}.service" for i in range(8)]
+
+    def fake_run(argv, cwd=None):
+        if argv[0] == "journalctl":
+            return _result(True, stdout="log\n", command=argv)
+        return _result(
+            True,
+            stdout="[" + ", ".join(f'{{"unit": "{u}"}}' for u in units) + "]",
+            command=argv,
+        )
+
+    monkeypatch.setattr(health.runner, "run", fake_run)
+    report = health.health_report([], "nixos")
+    assert len(report["newly_failed"]) == 8
+    with_tails = [e for e in report["newly_failed"] if "log_tail" in e]
+    assert len(with_tails) == 5
+    assert report["newly_failed"][0]["log_tail"] == "log\n"
+    assert "log_tail" not in report["newly_failed"][7]
