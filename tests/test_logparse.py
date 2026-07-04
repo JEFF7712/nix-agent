@@ -149,6 +149,26 @@ def test_parse_nvd_unrecognized_returns_none():
     assert logparse.parse_nvd("random text\nno sections here") is None
 
 
+NVD_SELECTION_OUTPUT = """\
+<<< /nix/var/nix/profiles/system-740-link
+>>> /nix/var/nix/profiles/system-741-link
+Version changes:
+[U.]  #1  firefox  128.0 -> 129.0
+Selection state changes:
+[C+]  #1  age   1.3.1, 1.3.1-fish-completions
+[C+]  #2  sops  3.13.1, 3.13.1-fish-completions
+Closure size: 4355 -> 4359 (26 paths added, 22 paths removed, delta +4, disk usage +51.5MiB).
+"""
+
+
+def test_parse_nvd_ignores_unknown_sections():
+    packages = logparse.parse_nvd(NVD_SELECTION_OUTPUT)
+    assert packages["changed"] == [{"name": "firefox", "old": "128.0", "new": "129.0"}]
+    assert all(
+        "fish-completions" not in str(p) for lst in packages.values() for p in lst
+    )
+
+
 def test_parse_diff_closures():
     packages = logparse.parse_diff_closures(DIFF_CLOSURES_OUTPUT)
     assert packages == {

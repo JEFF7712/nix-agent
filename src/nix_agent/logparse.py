@@ -117,6 +117,11 @@ def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
         if stripped in _NVD_SECTIONS:
             section = _NVD_SECTIONS[stripped]
             continue
+        if stripped.endswith(":") and not _NVD_ENTRY.match(stripped):
+            # unknown section header (e.g. "Selection state changes:");
+            # reset so its entries cannot leak into the previous section
+            section = None
+            continue
         entry = _NVD_ENTRY.match(stripped)
         if section is None or entry is None:
             continue
