@@ -54,9 +54,7 @@ def _summarize_switch(output: str) -> dict[str, object]:
         for key, pattern in _UNIT_PATTERNS.items():
             match = pattern.search(stripped)
             if match:
-                units[key] = [
-                    u.strip() for u in match.group(1).split(",") if u.strip()
-                ]
+                units[key] = [u.strip() for u in match.group(1).split(",") if u.strip()]
     summary: dict[str, object] = {"derivations_built": built}
     if units:
         summary["units"] = units
@@ -136,6 +134,9 @@ def switch(
     diagnosis = _sudo_diagnosis(argv, result.output)
     if diagnosis is not None:
         extra["privilege"] = diagnosis
+    drv_info = runner.failed_derivation_info(result.output)
+    if drv_info is not None:
+        extra["failed_derivation"] = drv_info
     return runner.envelope("failed", target.flake_ref, result, **extra)
 
 
@@ -156,18 +157,14 @@ def _list_nixos() -> dict[str, object]:
                 }
                 for entry in entries
             ]
-            return runner.envelope(
-                "ok", SYSTEM_PROFILE, result, generations=gens
-            )
+            return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
     return _list_nixos_nix_env()
 
 
 def _list_nixos_nix_env() -> dict[str, object]:
     """Fallback for nixos-rebuild too old for list-generations; nix-env
     needs a readable profile dir, which may require privileges."""
-    result = runner.run(
-        ["nix-env", "--list-generations", "-p", SYSTEM_PROFILE]
-    )
+    result = runner.run(["nix-env", "--list-generations", "-p", SYSTEM_PROFILE])
     if not result.ok:
         return runner.envelope("failed", SYSTEM_PROFILE, result)
     gens = []
@@ -200,15 +197,11 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
                     "current": match.group(4) is not None,
                 }
             )
-    envelope = runner.envelope(
-        "ok", "home-manager profile", result, generations=gens
-    )
+    envelope = runner.envelope("ok", "home-manager profile", result, generations=gens)
     return envelope, gens
 
 
-def generations(
-    action: str = "list", mode: str = "nixos"
-) -> dict[str, object]:
+def generations(action: str = "list", mode: str = "nixos") -> dict[str, object]:
     if action not in ("list", "rollback"):
         return {
             "status": "invalid_action",
