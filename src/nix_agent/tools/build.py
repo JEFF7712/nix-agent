@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from nix_agent import runner
+from nix_agent import logparse, runner
 from nix_agent.target import (
     Target,
     TargetError,
@@ -67,6 +67,27 @@ def _current_closure(mode: str) -> str | None:
     return current_hm_profile()
 
 
+def closure_diff(
+    old_path: str, new_path: str
+) -> tuple[runner.RunResult, dict[str, list[dict[str, str]]] | None]:
+    """Diff two closures; structured packages when the output parses.
+    diff-closures prints nothing for identical closures, so whitespace-only
+    output counts as an empty diff rather than a parse failure."""
+    nvd = runner.resolve_binary("nvd")
+    if nvd:
+        argv = [nvd, "diff", old_path, new_path]
+        parse = logparse.parse_nvd
+    else:
+        argv = ["nix", "store", "diff-closures", old_path, new_path]
+        parse = logparse.parse_diff_closures
+    result = runner.run(argv)
+    if not result.ok:
+        return result, None
+    if not result.output.strip():
+        return result, {"added": [], "removed": [], "changed": []}
+    return result, parse(result.output)
+
+
 def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]:
     """Diff the freshly built closure against the live system."""
     try:
@@ -90,18 +111,13 @@ def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]
             "store_path": new_path,
         }
 
-    nvd = runner.resolve_binary("nvd")
-    if nvd:
-        argv = [nvd, "diff", current, new_path]
-    else:
-        argv = ["nix", "store", "diff-closures", current, new_path]
-    result = runner.run(argv)
+    result, packages = closure_diff(current, new_path)
     status = "ok" if result.ok else "failed"
-    return runner.envelope(
-        status,
-        str(built["resolved_target"]),
-        result,
-        diff=result.output,
-        store_path=new_path,
-        current_closure=current,
-    )
+    extra: dict[str, object] = {
+        "diff": result.output,
+        "store_path": new_path,
+        "current_closure": current,
+    }
+    if packages is not None:
+        extra["packages"] = packages
+    return runner.envelope(status, str(built["resolved_target"]), result, **extra)

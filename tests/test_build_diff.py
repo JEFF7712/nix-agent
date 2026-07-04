@@ -168,6 +168,69 @@ def test_build_hm_candidate_retry(monkeypatch):
     assert len(calls) == 2
 
 
+NVD_FIXTURE = """\
+Version changes:
+[U.]  #1  firefox  128.0 -> 129.0
+"""
+
+
+def test_diff_attaches_packages(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            return RunResult(ok=True, command=argv, stdout=NVD_FIXTURE, stderr="")
+        return RunResult(
+            ok=True, command=argv, stdout="/nix/store/new-toplevel\n", stderr=""
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["packages"]["changed"] == [
+        {"name": "firefox", "old": "128.0", "new": "129.0"}
+    ]
+
+
+def test_diff_degrades_without_packages(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            return RunResult(ok=True, command=argv, stdout="garbled output", stderr="")
+        return RunResult(
+            ok=True, command=argv, stdout="/nix/store/new-toplevel\n", stderr=""
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert "packages" not in out
+    assert out["diff"] == "garbled output"
+
+
+def test_diff_empty_diff_closures_is_empty_packages(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[:3] == ["nix", "store", "diff-closures"]:
+            return RunResult(ok=True, command=argv, stdout="", stderr="")
+        return RunResult(
+            ok=True, command=argv, stdout="/nix/store/new-toplevel\n", stderr=""
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: None)
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["packages"] == {"added": [], "removed": [], "changed": []}
+
+
 def test_build_failure_attaches_failed_derivation(monkeypatch):
     from nix_agent.runner import RunResult
     from nix_agent.tools import build as build_mod
