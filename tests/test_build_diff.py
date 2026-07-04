@@ -253,3 +253,22 @@ def test_build_failure_attaches_failed_derivation(monkeypatch):
     assert out["status"] == "failed"
     assert out["failed_derivation"]["drv"] == "/nix/store/abc-x.drv"
     assert out["failed_derivation"]["log_tail"] == "builder said no\n"
+
+
+def test_diff_tool_failure_keeps_store_path(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            return RunResult(ok=False, command=argv, stdout="", stderr="nvd exploded")
+        return RunResult(
+            ok=True, command=argv, stdout="/nix/store/new-toplevel\n", stderr=""
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert out["store_path"] == "/nix/store/new-toplevel"
+    assert "packages" not in out
