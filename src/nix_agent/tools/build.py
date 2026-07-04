@@ -72,7 +72,10 @@ def closure_diff(
 ) -> tuple[runner.RunResult, dict[str, list[dict[str, str]]] | None]:
     """Diff two closures; structured packages when the output parses.
     diff-closures prints nothing for identical closures, so whitespace-only
-    output counts as an empty diff rather than a parse failure."""
+    output counts as an empty diff rather than a parse failure. In practice
+    this rule only fires for diff-closures: nvd always prints at least a
+    header, so it never hits the whitespace-only path, and treating it the
+    same way is harmless."""
     nvd = runner.resolve_binary("nvd")
     if nvd:
         argv = [nvd, "diff", old_path, new_path]
