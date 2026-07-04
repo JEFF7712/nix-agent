@@ -130,7 +130,8 @@ def switch(
         summary = _summarize_switch(result.output)
         new_gen = extra["current_generation"]
         if rollback and new_gen and rollback != new_gen:
-            _, packages = closure_diff(str(rollback), str(new_gen))
+            # new_gen comes out of a dict[str, object]; cast for typing only
+            _, packages = closure_diff(rollback, str(new_gen))
             if packages is not None:
                 summary["packages"] = packages
         report = health.health_report(pre_failed, mode)
