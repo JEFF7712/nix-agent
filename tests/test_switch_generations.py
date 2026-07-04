@@ -407,3 +407,21 @@ def test_switch_failure_attaches_failed_derivation(monkeypatch):
     assert out["status"] == "failed"
     assert out["failed_derivation"]["drv"] == "/nix/store/abc-x.drv"
     assert out["failed_derivation"]["log_tail"] == "unit build exploded\n"
+
+
+def test_switch_summary_packages_unparseable(monkeypatch):
+    gens = iter(["/nix/store/old-gen", "/nix/store/new-gen"])
+
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            return _result(True, stdout="garbled beyond recognition", command=argv)
+        if argv[0] == "systemctl":
+            return _result(True, stdout="[]", command=argv)
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: next(gens))
+    out = switch(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert "packages" not in out["summary"]
