@@ -105,7 +105,10 @@ _DIFF_CLOSURES = re.compile(r"^(\S+): (.+?) → (.+?)(?:, [+-]?[\d.]+\s+\S+)?$")
 def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
     """nvd diff output to structured package changes. Returns the empty
     lists when the output is recognizably nvd but shows no package changes;
-    None only when the text is not recognizable nvd output."""
+    None when the text is not recognizable nvd output, or when a known
+    section header appeared but no entry anywhere parsed (nvd never prints
+    a section header with zero entries, so that combination signals output
+    format drift rather than a genuine empty diff)."""
     packages: dict[str, list[dict[str, str]]] = {
         "added": [],
         "removed": [],
@@ -113,11 +116,14 @@ def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
     }
     section = None
     matched = False
+    saw_section_header = False
+    entry_count = 0
     for line in text.splitlines():
         stripped = line.strip()
         if stripped in _NVD_SECTIONS:
             section = _NVD_SECTIONS[stripped]
             matched = True
+            saw_section_header = True
             continue
         if stripped.startswith("Closure size:"):
             matched = True
@@ -131,6 +137,7 @@ def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
         if section is None or entry is None:
             continue
         matched = True
+        entry_count += 1
         name, rest = entry.group(1), entry.group(2).strip()
         if section == "changed":
             old, _, new = rest.partition("->")
@@ -139,6 +146,8 @@ def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:
             )
         else:
             packages[section].append({"name": name, "version": rest})
+    if saw_section_header and entry_count == 0:
+        return None
     return packages if matched else None
 
 

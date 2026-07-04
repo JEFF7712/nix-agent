@@ -204,3 +204,8 @@ def test_parse_nvd_header_only_is_empty_diff():
 def test_parsers_empty_input_returns_none():
     assert logparse.parse_nvd("") is None
     assert logparse.parse_diff_closures("") is None
+
+
+def test_parse_nvd_header_without_entries_is_drift():
+    text = "Version changes:\ncompletely reshaped entry format we cannot read"
+    assert logparse.parse_nvd(text) is None
