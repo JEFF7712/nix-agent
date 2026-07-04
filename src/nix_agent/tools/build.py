@@ -39,13 +39,14 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
             if not lines:
                 return runner.envelope("failed", installable, result)
             return runner.envelope("ok", installable, result, store_path=lines[-1])
-        if (
-            "does not provide attribute" in result.output
-            and i < len(candidates) - 1
-        ):
+        if "does not provide attribute" in result.output and i < len(candidates) - 1:
             continue
         break
-    return runner.envelope("failed", installable, result)
+    extra: dict[str, object] = {}
+    info = runner.failed_derivation_info(result.output)
+    if info is not None:
+        extra["failed_derivation"] = info
+    return runner.envelope("failed", installable, result, **extra)
 
 
 def build(
@@ -66,9 +67,7 @@ def _current_closure(mode: str) -> str | None:
     return current_hm_profile()
 
 
-def diff(
-    flake_uri: str | None = None, mode: str = "nixos"
-) -> dict[str, object]:
+def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]:
     """Diff the freshly built closure against the live system."""
     try:
         target = resolve_target(flake_uri, mode)

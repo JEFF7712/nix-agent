@@ -61,9 +61,7 @@ def test_build_closure_dry_run_flag(monkeypatch):
         return _result(True, command=argv)
 
     monkeypatch.setattr(build_mod.runner, "run", fake_run)
-    out = build_closure(
-        Target(flake_dir="/x", attr="h", mode="nixos"), dry_run=True
-    )
+    out = build_closure(Target(flake_dir="/x", attr="h", mode="nixos"), dry_run=True)
     assert "--dry-run" in calls[0]
     assert "--print-out-paths" not in calls[0]
     assert "store_path" not in out
@@ -86,7 +84,12 @@ def test_diff_runs_nvd(monkeypatch):
     out = diff(flake_uri="/etc/nixos#zen", mode="nixos")
     assert out["status"] == "ok"
     assert "firefox" in out["diff"]
-    assert calls[-1] == ["/bin/nvd", "diff", "/run/current-system", "/nix/store/new-system"]
+    assert calls[-1] == [
+        "/bin/nvd",
+        "diff",
+        "/run/current-system",
+        "/nix/store/new-system",
+    ]
 
 
 def test_diff_falls_back_to_diff_closures(monkeypatch):
@@ -128,9 +131,7 @@ def test_diff_no_current_closure(monkeypatch):
 
 def test_build_store_path_is_last_stdout_line(monkeypatch):
     def fake_run(argv, cwd=None):
-        return _result(
-            True, stdout="warning: blah\n/nix/store/abc\n", command=argv
-        )
+        return _result(True, stdout="warning: blah\n/nix/store/abc\n", command=argv)
 
     monkeypatch.setattr(build_mod.runner, "run", fake_run)
     out = build(flake_uri="/x#h", mode="nixos")
@@ -161,9 +162,31 @@ def test_build_hm_candidate_retry(monkeypatch):
         return _result(True, stdout="/nix/store/hm\n", command=argv)
 
     monkeypatch.setattr(build_mod.runner, "run", fake_run)
-    monkeypatch.setattr(
-        build_mod, "attr_candidates", lambda t: ["rupan@zen", "rupan"]
-    )
+    monkeypatch.setattr(build_mod, "attr_candidates", lambda t: ["rupan@zen", "rupan"])
     out = build(flake_uri="/x", mode="home-manager")
     assert out["status"] == "ok"
     assert len(calls) == 2
+
+
+def test_build_failure_attaches_failed_derivation(monkeypatch):
+    from nix_agent.runner import RunResult
+    from nix_agent.tools import build as build_mod
+    from nix_agent.tools.build import build
+
+    def fake_run(argv, cwd=None):
+        if argv[:2] == ["nix", "log"]:
+            return RunResult(
+                ok=True, command=argv, stdout="builder said no\n", stderr=""
+            )
+        return RunResult(
+            ok=False,
+            command=argv,
+            stdout="",
+            stderr="error: builder for '/nix/store/abc-x.drv' failed with exit code 1",
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    out = build(flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert out["failed_derivation"]["drv"] == "/nix/store/abc-x.drv"
+    assert out["failed_derivation"]["log_tail"] == "builder said no\n"
