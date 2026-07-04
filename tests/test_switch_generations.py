@@ -38,13 +38,13 @@ def test_switch_nixos(monkeypatch):
     assert out["status"] == "ok"
     assert out["rollback_generation"] == "/nix/var/.../system-42-link"
     assert out["current_generation"] == "/nix/var/.../system-43-link"
-    assert calls[0] == [
+    assert [
         "sudo",
         "/bin/nixos-rebuild",
         "switch",
         "--flake",
         "/etc/nixos#zen",
-    ]
+    ] in calls
 
 
 def test_switch_hm_no_sudo(monkeypatch):
@@ -58,7 +58,7 @@ def test_switch_hm_no_sudo(monkeypatch):
     monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: None)
     out = switch(flake_uri="/x#rupan", mode="home-manager")
     assert out["status"] == "ok"
-    assert calls[0] == ["home-manager", "switch", "--flake", "/x#rupan"]
+    assert ["home-manager", "switch", "--flake", "/x#rupan"] in calls
 
 
 def test_switch_failure_keeps_rollback(monkeypatch):
@@ -174,7 +174,7 @@ def test_switch_validate_proceeds_when_dry_build_ok(monkeypatch):
     monkeypatch.setattr(switch_mod, "check", lambda *a, **k: {"status": "ok"})
     out = switch(flake_uri="/x#h", validate=True)
     assert out["status"] == "ok"
-    assert ran and ran[0][0] == "sudo"
+    assert any(argv[0] == "sudo" for argv in ran)
 
 
 def test_generations_list_nixos(monkeypatch):
@@ -350,6 +350,44 @@ def test_switch_summary_packages_skipped_without_generations(monkeypatch):
     monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: None)
     out = switch(flake_uri="/x#h")
     assert "packages" not in out["summary"]
+
+
+def test_switch_reports_newly_failed_units(monkeypatch):
+    systemctl_calls = iter(["[]", '[{"unit": "broken.service"}]'])
+
+    def fake_run(argv, cwd=None):
+        if argv[0] == "systemctl":
+            return _result(True, stdout=next(systemctl_calls), command=argv)
+        if argv[0] == "journalctl":
+            return _result(True, stdout="unit crashed\n", command=argv)
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    health = out["summary"]["health"]
+    assert health["newly_failed"] == [
+        {"unit": "broken.service", "log_tail": "unit crashed\n"}
+    ]
+    assert health["resolved"] == []
+    assert health["still_failed"] == []
+
+
+def test_switch_health_degrades_to_note(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0] == "systemctl":
+            return _result(False, stderr="nope", command=argv)
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert "health" not in out["summary"]
+    assert "skipped" in out["health_note"]
 
 
 def test_switch_failure_attaches_failed_derivation(monkeypatch):

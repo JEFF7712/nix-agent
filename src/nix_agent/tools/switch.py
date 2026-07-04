@@ -3,7 +3,7 @@ import os
 import re
 from pathlib import Path
 
-from nix_agent import runner
+from nix_agent import health, runner
 from nix_agent.target import TargetError, current_hm_profile, resolve_target
 from nix_agent.tools.build import closure_diff
 from nix_agent.tools.check import check
@@ -114,6 +114,7 @@ def switch(
             }
 
     rollback = _current_generation(mode)
+    pre_failed, health_note = health.failed_units(mode)
     if mode == "nixos":
         nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
         argv = ["sudo", nixos_rebuild, "switch", "--flake", target.flake_ref]
@@ -132,6 +133,13 @@ def switch(
             _, packages = closure_diff(str(rollback), str(new_gen))
             if packages is not None:
                 summary["packages"] = packages
+        report = health.health_report(pre_failed, mode)
+        if report is not None:
+            summary["health"] = report
+        else:
+            extra["health_note"] = (
+                health_note or "systemctl --failed unavailable; health check skipped"
+            )
         extra["summary"] = summary
         if not full_log:
             extra["output"] = runner.tail(result.output)
