@@ -58,7 +58,9 @@ def tail(text: str, cap: int = TAIL_CAP) -> str:
 
 def run(argv: list[str], cwd: str | None = None) -> RunResult:
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, cwd=cwd)
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, errors="replace", cwd=cwd
+        )
     except FileNotFoundError:
         return RunResult(
             ok=False,
