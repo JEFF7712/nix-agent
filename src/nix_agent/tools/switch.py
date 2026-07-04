@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nix_agent import runner
 from nix_agent.target import TargetError, current_hm_profile, resolve_target
+from nix_agent.tools.build import closure_diff
 from nix_agent.tools.check import check
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
@@ -125,7 +126,13 @@ def switch(
         "current_generation": _current_generation(mode),
     }
     if result.ok:
-        extra["summary"] = _summarize_switch(result.output)
+        summary = _summarize_switch(result.output)
+        new_gen = extra["current_generation"]
+        if rollback and new_gen and rollback != new_gen:
+            _, packages = closure_diff(str(rollback), str(new_gen))
+            if packages is not None:
+                summary["packages"] = packages
+        extra["summary"] = summary
         if not full_log:
             extra["output"] = runner.tail(result.output)
             extra["log_truncated"] = extra["output"] != result.output

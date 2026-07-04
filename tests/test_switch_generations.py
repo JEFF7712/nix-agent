@@ -321,6 +321,37 @@ def test_generations_invalid_action():
     assert out["status"] == "invalid_action"
 
 
+def test_switch_summary_packages(monkeypatch):
+    gens = iter(["/nix/store/old-gen", "/nix/store/new-gen"])
+    nvd_out = "Version changes:\n[U.]  #1  firefox  128.0 -> 129.0\n"
+
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            assert argv[1:] == ["diff", "/nix/store/old-gen", "/nix/store/new-gen"]
+            return _result(True, stdout=nvd_out, command=argv)
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: next(gens))
+    out = switch(flake_uri="/x#h")
+    assert out["summary"]["packages"]["changed"] == [
+        {"name": "firefox", "old": "128.0", "new": "129.0"}
+    ]
+
+
+def test_switch_summary_packages_skipped_without_generations(monkeypatch):
+    def fake_run(argv, cwd=None):
+        assert argv[0] != "/bin/nvd"
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: None)
+    out = switch(flake_uri="/x#h")
+    assert "packages" not in out["summary"]
+
+
 def test_switch_failure_attaches_failed_derivation(monkeypatch):
     def fake_run(argv, cwd=None):
         if argv[:2] == ["nix", "log"]:
