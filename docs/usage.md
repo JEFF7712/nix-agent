@@ -99,15 +99,18 @@ full mode-selection guidance.
 | `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"flake"`, `"dry-build"`, `"dry-activate"` (NixOS only). |
 | `format(paths?, flake_uri?, mode?)` | `nix fmt` / nixfmt. With explicit `paths`, returns per-file `results`. |
 | `build(flake_uri?, mode?)` | Build the closure, no activation. |
-| `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object (`added`/`removed`/`changed`, each with names and versions) alongside the human-readable diff, when the diff output parses. Show this to the user before switching. |
-| `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation, with journal tails for newly failed units) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
+| `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
+| `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
 | `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
 
 `summary.health` reports post-activation unit status and is success-only by
 design: a switch that leaves units newly failed still returns `status: "ok"`
 (activation succeeded), with the failures surfaced in
-`summary.health.newly_failed` for the agent to act on. When systemctl probing
-is unavailable, a top-level `health_note` replaces `summary.health`.
+`summary.health.newly_failed` for the agent to act on. Each newly failed unit
+carries a `log_tail` (last 20 journal lines); to stay compact under mass
+failures, only the first 5 newly failed units (sorted) include a tail, the
+rest list the unit name alone. When systemctl probing is unavailable, a
+top-level `health_note` replaces `summary.health`.
 
 ## Basic workflow
 
@@ -126,7 +129,7 @@ to `switch` is fine.
 
 On failure, the response carries the full log plus:
 
-- `first_error`: the first actionable error line from Nix's output. Always present on failure.
+- `first_error`: the first actionable error line from Nix's output. Present on failure envelopes produced through the standard path (most failures).
 - `error_detail`: `{message, file, line, column, trace}` when the output matched Nix's eval-error shape, a direct file:line:column edit target. Omitted otherwise.
 - `failed_derivation`: on a failed build, diff, or switch, `{drv, log_tail}` with the last 40 lines of the failing builder's `nix log` (or `{drv, note}` when the log is unavailable). Omitted when the failure has no failing derivation (a pure eval error or a sudo auth failure, for example).
 
