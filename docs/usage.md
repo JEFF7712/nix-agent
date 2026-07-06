@@ -1,8 +1,8 @@
 # nix-agent usage
 
 `nix-agent` is a local stdio MCP server that gives AI agents composable
-NixOS / Home Manager operations: eval, lint, format, build, diff, switch,
-generations. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
+NixOS / Home Manager operations: eval, locate, lint, format, build, diff,
+switch, generations. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 nix-agent operates on your actual configuration; `mcp-nixos` handles package
 and option discovery.
 
@@ -95,7 +95,8 @@ full mode-selection guidance.
 
 | Tool | What it does |
 |------|-------------|
-| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. |
+| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. |
+| `locate_option(attr, flake_uri?, mode?)` | Where this configuration sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it; large values degrade under the same size guard as `eval_config`, marked `truncated: true` per entry). For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`. |
 | `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"flake"`, `"dry-build"`, `"dry-activate"` (NixOS only). |
 | `format(paths?, flake_uri?, mode?)` | `nix fmt` / nixfmt. With explicit `paths`, returns per-file `results`. |
 | `build(flake_uri?, mode?)` | Build the closure, no activation. |
