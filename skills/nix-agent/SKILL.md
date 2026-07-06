@@ -53,6 +53,15 @@ removes the guesswork entirely.
 - `eval_config(attr, flake_uri?, mode?)` — final merged value of any
   config attribute on THIS machine (after all modules/overlays).
   `mcp-nixos` tells you what an option means; this tells you what it is.
+  `attr` also takes a list, evaluating each in one call and returning
+  per-attr `results`; values above ~2 KB degrade to attr names / length /
+  a head slice with `truncated: true`.
+- `locate_option(attr, flake_uri?, mode?)` — where this configuration
+  sets an option: `declarations` (files declaring it) and `definitions`
+  (`{file, value}` per defining file). `status` is `not_an_option` for
+  plain config values (use `eval_config` there instead). For integrated
+  Home Manager, spell the attr `home-manager.users.<user>.<attr>` with
+  `mode="nixos"`.
 - `check(level, flake_uri?, mode?)` — validation ladder, fast to slow:
   `"lint"` (statix + deadnix, structured `findings` list), `"flake"`,
   `"dry-build"`, `"dry-activate"` (NixOS only).
@@ -77,6 +86,12 @@ removes the guesswork entirely.
 
 Steps 3–5 are judgment calls, not gates — for a trivial change, going
 straight to `switch` is fine. Compose what the situation needs.
+
+Between discovery and editing, `locate_option` closes the gap `mcp-nixos`
+leaves open: it tells you which file to open, not just what the option
+means. For integrated Home Manager, spell the attr
+`home-manager.users.<user>.<attr>` with `mode="nixos"`: HM options live
+under the NixOS options tree, not a separate config.
 
 ## Failure Handling
 

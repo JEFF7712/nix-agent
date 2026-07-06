@@ -95,7 +95,8 @@ full mode-selection guidance.
 
 | Tool | What it does |
 |------|-------------|
-| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. |
+| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. |
+| `locate_option(attr, flake_uri?, mode?)` | Where this configuration sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it). For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`. |
 | `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"flake"`, `"dry-build"`, `"dry-activate"` (NixOS only). |
 | `format(paths?, flake_uri?, mode?)` | `nix fmt` / nixfmt. With explicit `paths`, returns per-file `results`. |
 | `build(flake_uri?, mode?)` | Build the closure, no activation. |
