@@ -38,6 +38,9 @@ def guard_value(value: object) -> tuple[object, bool]:
 
 
 def _eval_one(target, candidates, attr: str) -> dict[str, object]:
+    # Success envelopes pass output="" because envelope() would otherwise
+    # setdefault the raw pre-guard stdout next to the guarded value,
+    # defeating the size guard. Failures keep raw output for diagnostics.
     installable = ""
     result = runner.RunResult(ok=False, command=[], stdout="", stderr="")
     for i, candidate in enumerate(candidates):
@@ -51,12 +54,13 @@ def _eval_one(target, candidates, attr: str) -> dict[str, object]:
                 extra: dict[str, object] = {
                     "value": guarded,
                     "json_parse_failed": True,
+                    "output": "",
                 }
                 if truncated:
                     extra["truncated"] = True
                 return runner.envelope("ok", installable, result, **extra)
             guarded, truncated = guard_value(value)
-            extra = {"value": guarded}
+            extra = {"value": guarded, "output": ""}
             if truncated:
                 extra["truncated"] = True
             return runner.envelope("ok", installable, result, **extra)
@@ -66,7 +70,7 @@ def _eval_one(target, candidates, attr: str) -> dict[str, object]:
             raw = runner.run(["nix", "eval", installable])
             if raw.ok:
                 guarded, truncated = guard_value(raw.stdout.strip())
-                extra = {"value": guarded, "json_fallback": True}
+                extra = {"value": guarded, "json_fallback": True, "output": ""}
                 if truncated:
                     extra["truncated"] = True
                 return runner.envelope("ok", installable, raw, **extra)
@@ -82,7 +86,9 @@ def eval_config(
     """Evaluate the final merged value of one or more attrs in the user's
     actual configuration. A list of attrs evaluates each in one tool call
     and returns per-attr results. Values above GUARD_CAP bytes degrade to
-    attr names / length / a head slice (truncated: true)."""
+    attr names / length / a head slice (truncated: true). The batched
+    envelope's resolved_target is the flake ref; the single-attr form's
+    resolved_target is the full installable including the attr path."""
     try:
         target = resolve_target(flake_uri, mode)
         candidates = attr_candidates(target)

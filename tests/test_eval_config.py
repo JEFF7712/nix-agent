@@ -153,6 +153,44 @@ def test_eval_large_value_guarded(monkeypatch):
     assert out["status"] == "ok"
     assert out["truncated"] is True
     assert out["value"]["attr_names"] == sorted(json.loads(big))
+    assert out["output"] == ""
+
+
+def test_eval_success_omits_raw_output(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("services.openssh.enable", flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["value"] is True
+    assert out["output"] == ""
+
+
+def test_eval_failure_keeps_output(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(False, stderr="error: attribute 'nope' missing", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("services.nope", flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert "error: attribute 'nope' missing" in out["output"]
+
+
+def test_guard_value_at_cap_passthrough():
+    big = "z" * (eval_mod.GUARD_CAP - 2)
+    assert len(json.dumps(big)) == eval_mod.GUARD_CAP
+    value, truncated = eval_mod.guard_value(big)
+    assert value == big
+    assert truncated is False
+
+
+def test_guard_value_one_over_cap_truncated():
+    big = "z" * (eval_mod.GUARD_CAP - 1)
+    assert len(json.dumps(big)) == eval_mod.GUARD_CAP + 1
+    value, truncated = eval_mod.guard_value(big)
+    assert truncated is True
+    assert value.endswith("... [nix-agent: truncated]")
 
 
 def test_eval_batched_attrs(monkeypatch):
