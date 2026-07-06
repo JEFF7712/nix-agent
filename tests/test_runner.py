@@ -4,7 +4,7 @@ from nix_agent import runner
 
 
 def test_run_success_combines_streams(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
         return subprocess.CompletedProcess(argv, 0, stdout="out\n", stderr="warn\n")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -16,7 +16,7 @@ def test_run_success_combines_streams(monkeypatch):
 
 
 def test_run_failure(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="error: boom\n")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -26,7 +26,7 @@ def test_run_failure(monkeypatch):
 
 
 def test_run_missing_binary(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
         raise FileNotFoundError(argv[0])
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -54,7 +54,9 @@ def test_extract_first_error():
     assert runner.extract_first_error(output) == "error: attribute 'foo' missing"
     assert runner.extract_first_error("all fine") is None
     assert runner.extract_first_error("") is None
-    assert runner.extract_first_error("error[E001]: bad thing") == "error[E001]: bad thing"
+    assert (
+        runner.extract_first_error("error[E001]: bad thing") == "error[E001]: bad thing"
+    )
 
 
 def test_envelope_failure_includes_first_error():
@@ -109,3 +111,76 @@ def test_tail_keeps_end():
 def test_output_drops_whitespace_only_streams():
     r = runner.RunResult(ok=True, command=["x"], stdout="\n", stderr="   ")
     assert r.output == ""
+
+
+def test_envelope_failure_includes_error_detail():
+    stderr = "error: attribute 'foo' missing\n  at /home/u/nixos/net.nix:12:5:"
+    result = runner.RunResult(
+        ok=False, command=["nix", "build"], stdout="", stderr=stderr
+    )
+    env = runner.envelope("failed", "t", result)
+    assert env["error_detail"]["file"] == "/home/u/nixos/net.nix"
+    assert env["error_detail"]["line"] == 12
+
+
+def test_envelope_failure_omits_error_detail_when_unparseable():
+    result = runner.RunResult(ok=False, command=["x"], stdout="", stderr="error: nope")
+    env = runner.envelope("failed", "t", result)
+    assert "error_detail" not in env
+    assert env["first_error"] == "error: nope"
+
+
+def test_failed_derivation_info_fetches_log(monkeypatch):
+    calls = []
+
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="log line\n", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    info = runner.failed_derivation_info(
+        "error: builder for '/nix/store/abc-x.drv' failed with exit code 1"
+    )
+    assert info == {"drv": "/nix/store/abc-x.drv", "log_tail": "log line\n"}
+    assert calls == [["nix", "log", "/nix/store/abc-x.drv"]]
+
+
+def test_failed_derivation_info_log_unavailable(monkeypatch):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="error: gone")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    info = runner.failed_derivation_info(
+        "error: builder for '/nix/store/abc-x.drv' failed with exit code 1"
+    )
+    assert info["drv"] == "/nix/store/abc-x.drv"
+    assert "log_tail" not in info
+    assert "unavailable" in info["note"]
+
+
+def test_failed_derivation_info_no_drv():
+    assert runner.failed_derivation_info("error: eval only") is None
+
+
+def test_run_tolerates_non_utf8_output():
+    import sys
+
+    result = runner.run(
+        [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok \\xff bad')"]
+    )
+    assert result.ok
+    assert "ok" in result.stdout
+
+
+def test_failed_derivation_info_empty_log(monkeypatch):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+        return subprocess.CompletedProcess(argv, 0, stdout="  \n", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    info = runner.failed_derivation_info(
+        "error: builder for '/nix/store/abc-x.drv' failed with exit code 1"
+    )
+    assert info == {
+        "drv": "/nix/store/abc-x.drv",
+        "note": "nix log unavailable for this derivation",
+    }

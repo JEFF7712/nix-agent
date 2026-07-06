@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from nix_agent import runner
+from nix_agent import logparse, runner
 from nix_agent.target import (
     Target,
     TargetError,
@@ -39,13 +39,14 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
             if not lines:
                 return runner.envelope("failed", installable, result)
             return runner.envelope("ok", installable, result, store_path=lines[-1])
-        if (
-            "does not provide attribute" in result.output
-            and i < len(candidates) - 1
-        ):
+        if "does not provide attribute" in result.output and i < len(candidates) - 1:
             continue
         break
-    return runner.envelope("failed", installable, result)
+    extra: dict[str, object] = {}
+    drv_info = runner.failed_derivation_info(result.output)
+    if drv_info is not None:
+        extra["failed_derivation"] = drv_info
+    return runner.envelope("failed", installable, result, **extra)
 
 
 def build(
@@ -66,9 +67,31 @@ def _current_closure(mode: str) -> str | None:
     return current_hm_profile()
 
 
-def diff(
-    flake_uri: str | None = None, mode: str = "nixos"
-) -> dict[str, object]:
+def closure_diff(
+    old_path: str, new_path: str
+) -> tuple[runner.RunResult, dict[str, list[dict[str, str]]] | None]:
+    """Diff two closures; structured packages when the output parses.
+    diff-closures prints nothing for identical closures, so whitespace-only
+    output counts as an empty diff rather than a parse failure. In practice
+    this rule only fires for diff-closures: nvd always prints at least a
+    header, so it never hits the whitespace-only path, and treating it the
+    same way is harmless."""
+    nvd = runner.resolve_binary("nvd")
+    if nvd:
+        argv = [nvd, "diff", old_path, new_path]
+        parse = logparse.parse_nvd
+    else:
+        argv = ["nix", "store", "diff-closures", old_path, new_path]
+        parse = logparse.parse_diff_closures
+    result = runner.run(argv)
+    if not result.ok:
+        return result, None
+    if not result.output.strip():
+        return result, {"added": [], "removed": [], "changed": []}
+    return result, parse(result.output)
+
+
+def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]:
     """Diff the freshly built closure against the live system."""
     try:
         target = resolve_target(flake_uri, mode)
@@ -91,18 +114,13 @@ def diff(
             "store_path": new_path,
         }
 
-    nvd = runner.resolve_binary("nvd")
-    if nvd:
-        argv = [nvd, "diff", current, new_path]
-    else:
-        argv = ["nix", "store", "diff-closures", current, new_path]
-    result = runner.run(argv)
+    result, packages = closure_diff(current, new_path)
     status = "ok" if result.ok else "failed"
-    return runner.envelope(
-        status,
-        str(built["resolved_target"]),
-        result,
-        diff=result.output,
-        store_path=new_path,
-        current_closure=current,
-    )
+    extra: dict[str, object] = {
+        "diff": result.output,
+        "store_path": new_path,
+        "current_closure": current,
+    }
+    if packages is not None:
+        extra["packages"] = packages
+    return runner.envelope(status, str(built["resolved_target"]), result, **extra)

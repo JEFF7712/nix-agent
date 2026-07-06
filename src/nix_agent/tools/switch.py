@@ -3,8 +3,9 @@ import os
 import re
 from pathlib import Path
 
-from nix_agent import runner
+from nix_agent import health, runner
 from nix_agent.target import TargetError, current_hm_profile, resolve_target
+from nix_agent.tools.build import closure_diff
 from nix_agent.tools.check import check
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
@@ -54,9 +55,7 @@ def _summarize_switch(output: str) -> dict[str, object]:
         for key, pattern in _UNIT_PATTERNS.items():
             match = pattern.search(stripped)
             if match:
-                units[key] = [
-                    u.strip() for u in match.group(1).split(",") if u.strip()
-                ]
+                units[key] = [u.strip() for u in match.group(1).split(",") if u.strip()]
     summary: dict[str, object] = {"derivations_built": built}
     if units:
         summary["units"] = units
@@ -115,6 +114,7 @@ def switch(
             }
 
     rollback = _current_generation(mode)
+    pre_failed, health_note = health.failed_units(mode)
     if mode == "nixos":
         nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
         argv = ["sudo", nixos_rebuild, "switch", "--flake", target.flake_ref]
@@ -127,7 +127,22 @@ def switch(
         "current_generation": _current_generation(mode),
     }
     if result.ok:
-        extra["summary"] = _summarize_switch(result.output)
+        summary = _summarize_switch(result.output)
+        new_gen = extra["current_generation"]
+        if rollback and new_gen and rollback != new_gen:
+            # new_gen comes out of a dict[str, object]; cast for typing only
+            _, packages = closure_diff(rollback, str(new_gen))
+            if packages is not None:
+                summary["packages"] = packages
+        report = health.health_report(pre_failed, mode)
+        if report is not None:
+            summary["health"] = report
+        else:
+            extra["health_note"] = (
+                health_note
+                or "post-activation systemctl snapshot unavailable; health diff skipped"
+            )
+        extra["summary"] = summary
         if not full_log:
             extra["output"] = runner.tail(result.output)
             extra["log_truncated"] = extra["output"] != result.output
@@ -136,6 +151,9 @@ def switch(
     diagnosis = _sudo_diagnosis(argv, result.output)
     if diagnosis is not None:
         extra["privilege"] = diagnosis
+    drv_info = runner.failed_derivation_info(result.output)
+    if drv_info is not None:
+        extra["failed_derivation"] = drv_info
     return runner.envelope("failed", target.flake_ref, result, **extra)
 
 
@@ -156,18 +174,14 @@ def _list_nixos() -> dict[str, object]:
                 }
                 for entry in entries
             ]
-            return runner.envelope(
-                "ok", SYSTEM_PROFILE, result, generations=gens
-            )
+            return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
     return _list_nixos_nix_env()
 
 
 def _list_nixos_nix_env() -> dict[str, object]:
     """Fallback for nixos-rebuild too old for list-generations; nix-env
     needs a readable profile dir, which may require privileges."""
-    result = runner.run(
-        ["nix-env", "--list-generations", "-p", SYSTEM_PROFILE]
-    )
+    result = runner.run(["nix-env", "--list-generations", "-p", SYSTEM_PROFILE])
     if not result.ok:
         return runner.envelope("failed", SYSTEM_PROFILE, result)
     gens = []
@@ -200,15 +214,11 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
                     "current": match.group(4) is not None,
                 }
             )
-    envelope = runner.envelope(
-        "ok", "home-manager profile", result, generations=gens
-    )
+    envelope = runner.envelope("ok", "home-manager profile", result, generations=gens)
     return envelope, gens
 
 
-def generations(
-    action: str = "list", mode: str = "nixos"
-) -> dict[str, object]:
+def generations(action: str = "list", mode: str = "nixos") -> dict[str, object]:
     if action not in ("list", "rollback"):
         return {
             "status": "invalid_action",
