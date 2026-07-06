@@ -10,6 +10,8 @@ MODULE_DIR_CANDIDATES = (
     "modules/home-manager",
     "modules/darwin",
     "nixos/modules",
+    "nix",
+    "darwin",
     "home",
     "hosts",
     "overlays",
@@ -54,8 +56,9 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
     lock_path = root / "flake.lock"
     if lock_path.is_file():
         try:
-            nodes = json.loads(lock_path.read_text()).get("nodes", {})
-            hm_in_lock = "home-manager" in nodes
+            parsed = json.loads(lock_path.read_text())
+            nodes = parsed.get("nodes", {}) if isinstance(parsed, dict) else {}
+            hm_in_lock = isinstance(nodes, dict) and "home-manager" in nodes
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -98,11 +101,14 @@ def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
     determined are None/'unknown', never guessed."""
     try:
         target = resolve_target(flake_uri, "nixos")
-    except TargetError:
+    except TargetError as nixos_exc:
         try:
             target = resolve_target(flake_uri, "home-manager")
-        except TargetError as exc:
-            return {"status": "no_target", "error": str(exc)}
+        except TargetError as hm_exc:
+            return {
+                "status": "no_target",
+                "error": f"nixos: {nixos_exc}; home-manager: {hm_exc}",
+            }
 
     flake_dir = target.flake_dir
     repo = scan_repo(flake_dir)

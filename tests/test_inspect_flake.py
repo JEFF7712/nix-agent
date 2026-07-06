@@ -96,6 +96,13 @@ def test_scan_repo_unreadable_flake(tmp_path):
     assert facts["auto_import"] == "unknown"
 
 
+def test_scan_repo_lock_not_an_object(tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+    (tmp_path / "flake.lock").write_text("[1, 2, 3]")
+    facts = inspect_mod.scan_repo(str(tmp_path))
+    assert facts["hm_in_lock"] is False
+
+
 def test_inspect_flake_integrated_hm(monkeypatch, tmp_path):
     (tmp_path / "flake.nix").write_text('{ inputs.import-tree.url = "x"; }')
     (tmp_path / "flake.lock").write_text(json.dumps({"nodes": {"home-manager": {}}}))
@@ -163,3 +170,32 @@ def test_inspect_flake_no_target(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = inspect_flake()
     assert out["status"] == "no_target"
+
+
+def test_inspect_flake_no_target_reports_both_modes(monkeypatch, tmp_path):
+    from pathlib import Path
+
+    from nix_agent import target as target_mod
+
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_HM_FLAKE", raising=False)
+    monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
+    out = inspect_flake()
+    assert out["status"] == "no_target"
+    assert "NIX_AGENT_FLAKE" in out["error"]
+    assert "NIX_AGENT_HM_FLAKE" in out["error"]
+
+
+def test_inspect_flake_show_non_dict_json(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="[]", command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: None)
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["status"] == "ok"
+    assert out["hosts"] is None
+    assert out["note"] == "flake show output was not valid JSON"
