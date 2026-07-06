@@ -46,6 +46,20 @@ def _missing_attr(output: str) -> bool:
     return "does not provide attribute" in output
 
 
+def _config_root_exists(target, candidate: str) -> bool:
+    probe = runner.run(
+        [
+            "nix",
+            "eval",
+            f"{config_attr(target, candidate)}.options",
+            "--apply",
+            "o: true",
+            "--json",
+        ]
+    )
+    return probe.ok
+
+
 def locate_option(
     attr: str,
     flake_uri: str | None = None,
@@ -73,7 +87,10 @@ def locate_option(
         break
 
     if not result.ok:
-        if _missing_attr(result.output):
+        # nix echoes the full requested attrpath whether the option or the
+        # host attr is what's missing; probing the options root is the only
+        # way to tell a bad option apart from a bad flake_uri/hostname.
+        if _missing_attr(result.output) and _config_root_exists(target, candidate):
             return {
                 "status": "not_an_option",
                 "resolved_target": installable,

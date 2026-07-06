@@ -80,6 +80,8 @@ def test_locate_option_candidate_retry(monkeypatch):
 
 def test_locate_option_missing_attr_is_not_an_option(monkeypatch):
     def fake_run(argv, cwd=None):
+        if argv[2].endswith(".options"):
+            return _result(True, stdout="true\n", command=argv)
         return _result(
             False,
             stderr="error: flake 'git+file:///x' does not provide attribute "
@@ -90,6 +92,21 @@ def test_locate_option_missing_attr_is_not_an_option(monkeypatch):
     monkeypatch.setattr(locate_mod.runner, "run", fake_run)
     out = locate_option("services.bogus.enable", flake_uri="/x#h")
     assert out["status"] == "not_an_option"
+
+
+def test_locate_option_missing_host_is_failed(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(
+            False,
+            stderr="error: flake 'git+file:///x' does not provide attribute "
+            "'nixosConfigurations.\"laptop-nixos\".options.networking.hostName'",
+            command=argv,
+        )
+
+    monkeypatch.setattr(locate_mod.runner, "run", fake_run)
+    out = locate_option("networking.hostName", flake_uri="/x#laptop-nixos")
+    assert out["status"] == "failed"
+    assert "does not provide attribute" in out["first_error"]
 
 
 def test_locate_option_real_failure(monkeypatch):
