@@ -5,6 +5,7 @@ from nix_agent.tools.build import build, diff
 from nix_agent.tools.check import check
 from nix_agent.tools.eval import eval_config
 from nix_agent.tools.fmt import format_nix
+from nix_agent.tools.inspect_flake import inspect_flake
 from nix_agent.tools.locate import locate_option
 from nix_agent.tools.switch import generations, switch
 
@@ -75,6 +76,16 @@ _TOOLS = [
         "(e.g. attr='services.openssh.enable'). The bridge from mcp-nixos "
         "discovery to editing the right file. For integrated Home Manager, "
         "query the NixOS config with attr='home-manager.users.<user>.<attr>'.",
+    ),
+    (
+        inspect_flake,
+        "inspect_flake",
+        "Structured facts about the config repo in one call: hosts, "
+        "homeConfigurations, integrated-vs-standalone Home Manager, module "
+        "dirs, auto-import mechanism, formatter, lint tools, justfile/CI/"
+        ".mcp.json presence. Run this before onboarding a repo or when "
+        "orienting in an unfamiliar config; facts that cannot be determined "
+        "are null/'unknown'.",
     ),
 ]
 
