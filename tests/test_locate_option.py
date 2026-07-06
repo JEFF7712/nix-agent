@@ -124,6 +124,18 @@ def test_locate_option_definition_values_guarded(monkeypatch):
     assert definition["value"]["attr_names"] == sorted(big["definitions"][0]["value"])
 
 
+def test_locate_option_invalid_json_output(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(
+            True, stdout='{"is_option": true, "decl... [truncated]', command=argv
+        )
+
+    monkeypatch.setattr(locate_mod.runner, "run", fake_run)
+    out = locate_option("services.openssh.enable", flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert "not valid JSON" in out["error"]
+
+
 def test_locate_option_no_target(monkeypatch, tmp_path):
     from pathlib import Path
 
