@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 
+from nix_agent import runner
+from nix_agent.target import TargetError, resolve_target
+
 MODULE_DIR_CANDIDATES = (
     "modules",
     "modules/nixos",
@@ -85,4 +88,73 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
         ),
         "has_ci": has_ci,
         "mcp_json": "present" if (root / ".mcp.json").is_file() else "absent",
+    }
+
+
+def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
+    """Structured facts about a config repo in one call: hosts, HM
+    integration, module layout, formatter, tooling. The discovery step
+    for the /nix-agent-init onboarding skill. Facts that cannot be
+    determined are None/'unknown', never guessed."""
+    try:
+        target = resolve_target(flake_uri, "nixos")
+    except TargetError:
+        try:
+            target = resolve_target(flake_uri, "home-manager")
+        except TargetError as exc:
+            return {"status": "no_target", "error": str(exc)}
+
+    flake_dir = target.flake_dir
+    repo = scan_repo(flake_dir)
+
+    result = runner.run(["nix", "flake", "show", flake_dir, "--json"])
+    facts: dict[str, object]
+    extra: dict[str, object] = {}
+    if result.ok:
+        try:
+            shown = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            shown = None
+        if isinstance(shown, dict):
+            facts = parse_flake_show(shown)
+        else:
+            facts = {}
+            extra["note"] = "flake show output was not valid JSON"
+    else:
+        facts = {}
+        extra["note"] = "flake show failed; evaluated facts unavailable"
+        first = runner.extract_first_error(result.output)
+        if first:
+            extra["first_error"] = first
+
+    hosts = facts.get("hosts")
+    home_configurations = facts.get("home_configurations")
+    if facts:
+        hm_integration = classify_hm(
+            bool(repo["hm_in_lock"]), list(home_configurations or [])
+        )
+        formatter = facts["formatter"]
+    else:
+        hosts = None
+        home_configurations = None
+        hm_integration = "unknown"
+        formatter = "unknown"
+
+    lint_tools = sorted(
+        name for name in ("statix", "deadnix") if runner.resolve_binary(name)
+    )
+    return {
+        "status": "ok",
+        "flake_dir": flake_dir,
+        "hosts": hosts,
+        "home_configurations": home_configurations,
+        "hm_integration": hm_integration,
+        "module_dirs": repo["module_dirs"],
+        "auto_import": repo["auto_import"],
+        "formatter": formatter,
+        "lint_tools": lint_tools,
+        "has_justfile": repo["has_justfile"],
+        "has_ci": repo["has_ci"],
+        "mcp_json": repo["mcp_json"],
+        **extra,
     }

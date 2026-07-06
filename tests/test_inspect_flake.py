@@ -2,6 +2,7 @@ import json
 
 from nix_agent.runner import RunResult
 from nix_agent.tools import inspect_flake as inspect_mod
+from nix_agent.tools.inspect_flake import inspect_flake
 
 
 def _result(ok, stdout="", stderr="", command=("nix",)):
@@ -93,3 +94,72 @@ def test_scan_repo_bare(tmp_path):
 def test_scan_repo_unreadable_flake(tmp_path):
     facts = inspect_mod.scan_repo(str(tmp_path))
     assert facts["auto_import"] == "unknown"
+
+
+def test_inspect_flake_integrated_hm(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text('{ inputs.import-tree.url = "x"; }')
+    (tmp_path / "flake.lock").write_text(json.dumps({"nodes": {"home-manager": {}}}))
+
+    def fake_run(argv, cwd=None):
+        assert argv == ["nix", "flake", "show", str(tmp_path), "--json"]
+        return _result(True, stdout=SHOW_JSON, command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["status"] == "ok"
+    assert out["flake_dir"] == str(tmp_path)
+    assert out["hosts"] == ["iso", "laptop"]
+    assert out["home_configurations"] == []
+    assert out["hm_integration"] == "integrated"
+    assert out["formatter"] == "treefmt"
+    assert out["auto_import"] == "import-tree"
+    assert out["lint_tools"] == ["deadnix", "statix"]
+    assert out["mcp_json"] == "absent"
+
+
+def test_inspect_flake_show_failure_degrades(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+
+    def fake_run(argv, cwd=None):
+        return _result(False, stderr="error: cannot evaluate", command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: None)
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["status"] == "ok"
+    assert out["hosts"] is None
+    assert out["home_configurations"] is None
+    assert out["hm_integration"] == "unknown"
+    assert out["formatter"] == "unknown"
+    assert "flake show failed" in out["note"]
+    assert out["first_error"] == "error: cannot evaluate"
+    assert out["lint_tools"] == []
+
+
+def test_inspect_flake_strips_attr_from_uri(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return _result(True, stdout=SHOW_JSON, command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = inspect_flake(flake_uri=f"{tmp_path}#laptop")
+    assert out["status"] == "ok"
+    assert calls[0][3] == str(tmp_path)
+
+
+def test_inspect_flake_no_target(monkeypatch, tmp_path):
+    from pathlib import Path
+
+    from nix_agent import target as target_mod
+
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_HM_FLAKE", raising=False)
+    monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
+    out = inspect_flake()
+    assert out["status"] == "no_target"
