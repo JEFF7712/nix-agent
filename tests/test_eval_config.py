@@ -1,3 +1,5 @@
+import json
+
 from nix_agent.runner import RunResult
 from nix_agent.tools import eval as eval_mod
 from nix_agent.tools.eval import eval_config
@@ -138,3 +140,62 @@ def test_guard_value_large_string_head_truncated():
     assert isinstance(value, str)
     assert len(value) < 3_000
     assert value.endswith("... [nix-agent: truncated]")
+
+
+def test_eval_large_value_guarded(monkeypatch):
+    big = json.dumps({f"k{i:03d}": "x" * 50 for i in range(100)})
+
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=big, command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("environment.etc", flake_uri="/x#h", mode="nixos")
+    assert out["status"] == "ok"
+    assert out["truncated"] is True
+    assert out["value"]["attr_names"] == sorted(json.loads(big))
+
+
+def test_eval_batched_attrs(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if "hostName" in argv[2]:
+            return _result(True, stdout='"laptop"\n', command=argv)
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(
+        ["networking.hostName", "services.openssh.enable"],
+        flake_uri="/x#h",
+        mode="nixos",
+    )
+    assert out["status"] == "ok"
+    assert out["results"] == [
+        {"attr": "networking.hostName", "status": "ok", "value": "laptop"},
+        {"attr": "services.openssh.enable", "status": "ok", "value": True},
+    ]
+    assert "value" not in out
+
+
+def test_eval_batched_partial_failure(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if "nope" in argv[2]:
+            return _result(
+                False, stderr="error: attribute 'nope' missing", command=argv
+            )
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(["services.nope", "services.openssh.enable"], flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["results"][0]["attr"] == "services.nope"
+    assert out["results"][0]["status"] == "failed"
+    assert "first_error" in out["results"][0]
+    assert out["results"][1] == {
+        "attr": "services.openssh.enable",
+        "status": "ok",
+        "value": True,
+    }
+
+
+def test_eval_batched_empty_list():
+    out = eval_config([], flake_uri="/x#h")
+    assert out["status"] == "invalid_attr"
