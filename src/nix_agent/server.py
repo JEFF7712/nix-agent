@@ -5,6 +5,7 @@ from nix_agent.tools.build import build, diff
 from nix_agent.tools.check import check
 from nix_agent.tools.eval import eval_config
 from nix_agent.tools.fmt import format_nix
+from nix_agent.tools.locate import locate_option
 from nix_agent.tools.switch import generations, switch
 
 _TOOLS = [
@@ -14,7 +15,10 @@ _TOOLS = [
         "Evaluate the final merged value of an attribute in the user's "
         "actual NixOS/Home Manager configuration via `nix eval` "
         "(e.g. attr='services.openssh.enable'). flake_uri and mode "
-        "auto-resolve when omitted.",
+        "auto-resolve when omitted. Pass a list of attrs to batch several "
+        "evals into one call, returning per-attr results. Values above the "
+        "size guard degrade to attr names / length / a head slice "
+        "(truncated: true).",
     ),
     (
         check,
@@ -62,6 +66,15 @@ _TOOLS = [
         "action='list': enumerate system/HM generations with dates and "
         "current marker. action='rollback': revert to the previous "
         "generation. Pass mode='home-manager' for HM generations.",
+    ),
+    (
+        locate_option,
+        "locate_option",
+        "Where does this configuration set an option: files declaring it "
+        "and every file defining it, with each contributed value "
+        "(e.g. attr='services.openssh.enable'). The bridge from mcp-nixos "
+        "discovery to editing the right file. For integrated Home Manager, "
+        "query the NixOS config with attr='home-manager.users.<user>.<attr>'.",
     ),
 ]
 
