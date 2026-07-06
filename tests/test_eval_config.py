@@ -43,12 +43,8 @@ def test_eval_hm_candidate_fallback(monkeypatch):
         return _result(True, stdout='"niri"\n', command=argv)
 
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
-    monkeypatch.setattr(
-        eval_mod, "attr_candidates", lambda t: ["rupan@zen", "rupan"]
-    )
-    out = eval_config(
-        "wayland.windowManager", flake_uri="/x", mode="home-manager"
-    )
+    monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["rupan@zen", "rupan"])
+    out = eval_config("wayland.windowManager", flake_uri="/x", mode="home-manager")
     assert out["status"] == "ok"
     assert out["value"] == "niri"
     assert len(calls) == 2
@@ -85,9 +81,7 @@ def test_eval_truncated_json_does_not_crash(monkeypatch):
 
 def test_eval_real_failure(monkeypatch):
     def fake_run(argv, cwd=None):
-        return _result(
-            False, stderr="error: attribute 'nope' missing", command=argv
-        )
+        return _result(False, stderr="error: attribute 'nope' missing", command=argv)
 
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     out = eval_config("services.nope", flake_uri="/x#h", mode="nixos")
@@ -111,3 +105,36 @@ def test_eval_no_target(monkeypatch, tmp_path):
 def test_eval_invalid_mode():
     out = eval_config("a.b", flake_uri="/x", mode="bogus")
     assert out["status"] == "no_target"
+
+
+def test_guard_value_small_passthrough():
+    value, truncated = eval_mod.guard_value({"a": 1})
+    assert value == {"a": 1}
+    assert truncated is False
+
+
+def test_guard_value_large_dict_returns_attr_names():
+    big = {f"key{i:03d}": "x" * 50 for i in range(100)}
+    value, truncated = eval_mod.guard_value(big)
+    assert truncated is True
+    assert value["attr_names"] == sorted(big)
+    assert value["truncated"] is True
+    assert "hint" in value
+
+
+def test_guard_value_large_list_summarized():
+    big = ["/nix/store/" + "a" * 60 for _ in range(100)]
+    value, truncated = eval_mod.guard_value(big)
+    assert truncated is True
+    assert value["length"] == 100
+    assert value["truncated"] is True
+    assert "hint" in value
+
+
+def test_guard_value_large_string_head_truncated():
+    big = "z" * 10_000
+    value, truncated = eval_mod.guard_value(big)
+    assert truncated is True
+    assert isinstance(value, str)
+    assert len(value) < 3_000
+    assert value.endswith("... [nix-agent: truncated]")

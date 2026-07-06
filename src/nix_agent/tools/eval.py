@@ -8,6 +8,35 @@ def _missing_config_attr(output: str) -> bool:
     return "does not provide attribute" in output
 
 
+GUARD_CAP = 2048
+
+
+def guard_value(value: object) -> tuple[object, bool]:
+    """Cap the context cost of a value: over GUARD_CAP bytes of JSON, an
+    attrset degrades to its attr names, a list to its length, a scalar to
+    a head slice. Returns (value, truncated)."""
+    try:
+        encoded = json.dumps(value)
+    except (TypeError, ValueError):
+        encoded = str(value)
+    if len(encoded) <= GUARD_CAP:
+        return value, False
+    if isinstance(value, dict):
+        return {
+            "attr_names": sorted(value),
+            "truncated": True,
+            "hint": "value exceeds the size guard; eval a child attr",
+        }, True
+    if isinstance(value, list):
+        return {
+            "length": len(value),
+            "truncated": True,
+            "hint": "value exceeds the size guard; eval a narrower attr or index",
+        }, True
+    text = value if isinstance(value, str) else encoded
+    return text[:GUARD_CAP] + "... [nix-agent: truncated]", True
+
+
 def eval_config(
     attr: str,
     flake_uri: str | None = None,
