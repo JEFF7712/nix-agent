@@ -139,7 +139,8 @@ def switch(
             summary["health"] = report
         else:
             extra["health_note"] = (
-                health_note or "systemctl --failed unavailable; health check skipped"
+                health_note
+                or "post-activation systemctl snapshot unavailable; health diff skipped"
             )
         extra["summary"] = summary
         if not full_log:
