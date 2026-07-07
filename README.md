@@ -2,13 +2,11 @@
   <img src="assets/banner.png" alt="nix-agent: composable NixOS operations for AI agents" width="100%">
 </p>
 
-# nix-agent
-
 A local MCP server that gives AI agents composable NixOS / Home Manager
 operations: eval, locate, inspect, lint, format, build, diff, switch,
 generations.
 
-It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos): nix-agent
+It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos). nix-agent
 operates on your actual configuration, `mcp-nixos` handles package and option
 discovery. Every response that ran a command reports raw vs returned bytes,
 so the token savings are visible per call, not just claimed.
