@@ -222,3 +222,12 @@ def test_account_helper_on_hand_built_envelope():
     runner.account(response)
     assert "raw_bytes" not in response
     assert response["returned_bytes"] == len('{"status": "ok", "value": 1}')
+
+
+def test_run_raw_bytes_counts_bytes_not_chars(monkeypatch):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+        return subprocess.CompletedProcess(argv, 0, stdout="héllo", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    result = runner.run(["x"])
+    assert result.raw_bytes == 6

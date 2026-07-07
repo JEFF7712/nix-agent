@@ -72,7 +72,7 @@ def run(argv: list[str], cwd: str | None = None) -> RunResult:
             stderr=stderr,
             raw_bytes=len(stderr),
         )
-    raw = len(proc.stdout or "") + len(proc.stderr or "")
+    raw = len((proc.stdout or "").encode()) + len((proc.stderr or "").encode())
     return RunResult(
         ok=proc.returncode == 0,
         command=list(argv),
