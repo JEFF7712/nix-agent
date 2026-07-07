@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-source_dir="$repo_root/skills/nix-agent"
+skills_dir="$repo_root/skills"
 
 target=${1:-opencode}
 
@@ -20,10 +20,12 @@ case "$target" in
     ;;
 esac
 
-dest_dir="$skills_root/nix-agent"
-
 mkdir -p "$skills_root"
-rm -rf "$dest_dir"
-cp -R "$source_dir" "$dest_dir"
 
-printf 'Installed nix-agent skill to %s\n' "$dest_dir"
+for source_dir in "$skills_dir"/*/; do
+  skill_name=$(basename "$source_dir")
+  dest_dir="$skills_root/$skill_name"
+  rm -rf "$dest_dir"
+  cp -R "$source_dir" "$dest_dir"
+  printf 'Installed %s skill to %s\n' "$skill_name" "$dest_dir"
+done
