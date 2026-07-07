@@ -199,3 +199,19 @@ def test_inspect_flake_show_non_dict_json(monkeypatch, tmp_path):
     assert out["status"] == "ok"
     assert out["hosts"] is None
     assert out["note"] == "flake show output was not valid JSON"
+
+
+def test_scan_repo_nested_host_dirs(tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+    (tmp_path / "hosts" / "laptop").mkdir(parents=True)
+    (tmp_path / "hosts" / "laptop" / "default.nix").write_text("{}")
+    facts = inspect_mod.scan_repo(str(tmp_path))
+    assert facts["module_dirs"] == ["hosts"]
+
+
+def test_scan_repo_parent_dir_not_duplicated(tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+    (tmp_path / "modules" / "nixos").mkdir(parents=True)
+    (tmp_path / "modules" / "nixos" / "a.nix").write_text("{}")
+    facts = inspect_mod.scan_repo(str(tmp_path))
+    assert facts["module_dirs"] == ["modules/nixos"]

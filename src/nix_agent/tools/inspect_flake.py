@@ -71,10 +71,22 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
         except OSError:
             pass
 
-    module_dirs = [
+    # One level of nesting covers per-host/per-module subdir layouts
+    # (hosts/laptop/default.nix); parents of a matched candidate are
+    # dropped so the most specific dir wins.
+    matched = [
         candidate
         for candidate in MODULE_DIR_CANDIDATES
-        if (root / candidate).is_dir() and any((root / candidate).glob("*.nix"))
+        if (root / candidate).is_dir()
+        and (
+            any((root / candidate).glob("*.nix"))
+            or any((root / candidate).glob("*/*.nix"))
+        )
+    ]
+    module_dirs = [
+        d
+        for d in matched
+        if not any(other.startswith(d + "/") for other in matched if other != d)
     ]
 
     workflows = root / ".github" / "workflows"
