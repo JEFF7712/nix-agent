@@ -147,21 +147,24 @@ On failure, the response carries the full log plus:
 
 ### Byte accounting
 
-Every response carries `raw_bytes` and `returned_bytes` so the token savings
-are visible per call, not just claimed:
+Every response that ran a command carries `raw_bytes` and `returned_bytes`
+so the token savings are visible per call, not just claimed:
 
-- `raw_bytes` is the primary command's combined stdout+stderr size, in
-  bytes, before any truncation. For multi-command tools (`switch`'s
-  health/diff probes), only the primary operation counts, not the
-  secondary probes.
+- `raw_bytes` is the underlying command output size (combined
+  stdout+stderr, in bytes, before any truncation). Tools whose work is
+  several co-equal runs sum them: `check("lint")` sums statix+deadnix,
+  `format` with explicit `paths` sums the per-file runs, batched
+  `eval_config` sums the per-attr evals. Tools with auxiliary probes
+  count only the primary operation: `switch`'s post-activation
+  health/diff probes are not included.
 - `returned_bytes` is the serialized size of the envelope actually handed
   back, computed last, and excludes the ~30 bytes of the two accounting
   fields themselves.
-- Hand-built envelopes without a single primary command (`inspect_flake`,
-  batched `eval_config`) may omit `raw_bytes` when there is no one
-  meaningful raw size to report; `returned_bytes` is always present.
-  Trivial error statuses (`no_target`, `invalid_attr`, `not_an_option`)
-  carry neither field.
+- An envelope whose operation never produced command output omits
+  `raw_bytes` but keeps `returned_bytes` (e.g. `format` when every given
+  path was skipped). Statuses that never ran a command (`no_target`,
+  `invalid_attr`, `invalid_level`, `not_an_option`, `tool_missing`,
+  `not_applicable`) carry neither field.
 
 ### Measured on a real config
 

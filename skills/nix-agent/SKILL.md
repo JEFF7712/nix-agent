@@ -115,7 +115,7 @@ do not re-fetch.
   unless these fields are absent.
 - **After a switch, read `summary`, do not re-probe.** `summary.health`
   reports units `newly_failed`/`resolved`/`still_failed` with journal
-  tails for the first five failures; `summary.packages` reports changes
+  tails for the first five newly failed units; `summary.packages` reports changes
   vs the rollback generation. These replace running `systemctl --failed`
   or a second `diff()`.
 - **Batch attr checks.** `eval_config([...])` answers N questions in one
@@ -123,7 +123,7 @@ do not re-fetch.
   you need, NOT retry for full output.
 - **`locate_option` before grepping.** It answers "which file sets this"
   in one call; a tree-wide grep does not.
-- **`raw_bytes`/`returned_bytes`** on every envelope tell you how much log
+- **`raw_bytes`/`returned_bytes`** on every envelope that ran a command tell you how much log
   the trimming saved. They are diagnostics, not knobs.
 - **Escape hatches are deliberate last resorts.** `full_log=True` and the
   raw `output` field exist for the rare case the trimmed view genuinely
