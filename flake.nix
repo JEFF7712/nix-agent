@@ -6,30 +6,45 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
         python = pkgs.python3;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.5.0";
+          version = "0.7.0";
           format = "pyproject";
           src = ./.;
-          nativeBuildInputs = with pkgs.python3Packages; [ setuptools wheel ] ++ [ pkgs.makeWrapper ];
+          nativeBuildInputs =
+            with pkgs.python3Packages;
+            [
+              setuptools
+              wheel
+            ]
+            ++ [ pkgs.makeWrapper ];
           propagatedBuildInputs = with pkgs.python3Packages; [ fastmcp ];
           postFixup = ''
             wrapProgram "$out/bin/nix-agent" \
-              --prefix PATH : "${lib.makeBinPath [
-                pkgs.statix
-                pkgs.deadnix
-                pkgs.nixfmt
-                pkgs.nvd
-              ]}"
+              --prefix PATH : "${
+                lib.makeBinPath [
+                  pkgs.statix
+                  pkgs.deadnix
+                  pkgs.nixfmt
+                  pkgs.nvd
+                ]
+              }"
           '';
         };
-      in {
+      in
+      {
         packages.default = nix-agent-package;
 
         checks.default = nix-agent-package;
@@ -54,7 +69,8 @@
             python -m pip install --break-system-packages --force-reinstall --upgrade --editable . pytest
           '';
         };
-      })
+      }
+    )
     // {
       nixosModules.default = import ./nix/module.nix { inherit self; };
     };
