@@ -161,7 +161,7 @@ def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
     lint_tools = sorted(
         name for name in ("statix", "deadnix") if runner.resolve_binary(name)
     )
-    return {
+    response: dict[str, object] = {
         "status": "ok",
         "flake_dir": flake_dir,
         "hosts": hosts,
@@ -175,4 +175,10 @@ def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
         "has_ci": repo["has_ci"],
         "mcp_json": repo["mcp_json"],
         **extra,
+        "raw_bytes": (
+            result.raw_bytes
+            if result.raw_bytes is not None
+            else len(result.stdout) + len(result.stderr)
+        ),
     }
+    return runner.account(response)

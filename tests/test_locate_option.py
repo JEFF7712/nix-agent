@@ -163,3 +163,13 @@ def test_locate_option_no_target(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = locate_option("a.b")
     assert out["status"] == "no_target"
+
+
+def test_locate_option_envelope_accounted(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=LOCATED, command=argv)
+
+    monkeypatch.setattr(locate_mod.runner, "run", fake_run)
+    out = locate_option("services.openssh.enable", flake_uri="/x#h")
+    assert out["raw_bytes"] == len(LOCATED)
+    assert out["returned_bytes"] > 0

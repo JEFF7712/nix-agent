@@ -215,3 +215,16 @@ def test_scan_repo_parent_dir_not_duplicated(tmp_path):
     (tmp_path / "modules" / "nixos" / "a.nix").write_text("{}")
     facts = inspect_mod.scan_repo(str(tmp_path))
     assert facts["module_dirs"] == ["modules/nixos"]
+
+
+def test_inspect_flake_envelope_accounted(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=SHOW_JSON, command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: None)
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["raw_bytes"] == len(SHOW_JSON)
+    assert out["returned_bytes"] > 0
