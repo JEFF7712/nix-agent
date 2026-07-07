@@ -16,18 +16,25 @@ def _format_with_nixfmt(paths: list[str]) -> dict[str, object]:
     skipped = [p for p in paths if not p.endswith(".nix")]
     results = []
     ok = True
+    raw_total = 0
     for path in nix_paths:
         result = runner.run([nixfmt, path])
         ok = ok and result.ok
-        results.append(
-            {"path": path, "ok": result.ok, "output": result.output}
+        raw_total += (
+            result.raw_bytes
+            if result.raw_bytes is not None
+            else len(result.stdout) + len(result.stderr)
         )
-    return {
+        results.append({"path": path, "ok": result.ok, "output": result.output})
+    response: dict[str, object] = {
         "status": "ok" if ok else "failed",
         "formatter": "nixfmt",
         "results": results,
         "skipped": skipped,
     }
+    if nix_paths:
+        response["raw_bytes"] = raw_total
+    return runner.account(response)
 
 
 def _format_dir_with_nixfmt(flake_dir: str) -> dict[str, object]:
@@ -54,6 +61,11 @@ def _format_dir_with_nixfmt(flake_dir: str) -> dict[str, object]:
         "output": result.output,
         "results": [{"path": p, "ok": result.ok} for p in all_nix],
         "skipped": [],
+        "raw_bytes": (
+            result.raw_bytes
+            if result.raw_bytes is not None
+            else len(result.stdout) + len(result.stderr)
+        ),
     }
 
 
@@ -75,14 +87,14 @@ def format_nix(
 
     result = runner.run(["nix", "fmt"], cwd=target.flake_dir)
     if result.ok:
-        return runner.envelope(
-            "ok", target.flake_dir, result, formatter="nix fmt"
-        )
+        return runner.envelope("ok", target.flake_dir, result, formatter="nix fmt")
     if "does not provide attribute" not in result.output:
-        return runner.envelope(
-            "failed", target.flake_dir, result, formatter="nix fmt"
-        )
+        return runner.envelope("failed", target.flake_dir, result, formatter="nix fmt")
 
+    # account() runs after resolved_target is attached so returned_bytes
+    # covers the envelope actually sent back.
     response = _format_dir_with_nixfmt(target.flake_dir)
     response["resolved_target"] = target.flake_dir
-    return response
+    if response["status"] == "tool_missing":
+        return response
+    return runner.account(response)
