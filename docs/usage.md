@@ -145,6 +145,50 @@ On failure, the response carries the full log plus:
 - `error_detail`: `{message, file, line, column, trace}` when the output matched Nix's eval-error shape, a direct file:line:column edit target. Omitted otherwise.
 - `failed_derivation`: on a failed build, diff, or switch, `{drv, log_tail}` with the last 40 lines of the failing builder's `nix log` (or `{drv, note}` when the log is unavailable). Omitted when the failure has no failing derivation (a pure eval error or a sudo auth failure, for example).
 
+### Byte accounting
+
+Every response carries `raw_bytes` and `returned_bytes` so the token savings
+are visible per call, not just claimed:
+
+- `raw_bytes` is the primary command's combined stdout+stderr size, in
+  bytes, before any truncation. For multi-command tools (`switch`'s
+  health/diff probes), only the primary operation counts, not the
+  secondary probes.
+- `returned_bytes` is the serialized size of the envelope actually handed
+  back, computed last, and excludes the ~30 bytes of the two accounting
+  fields themselves.
+- Hand-built envelopes without a single primary command (`inspect_flake`,
+  batched `eval_config`) may omit `raw_bytes` when there is no one
+  meaningful raw size to report; `returned_bytes` is always present.
+  Trivial error statuses (`no_target`, `invalid_attr`, `not_an_option`)
+  carry neither field.
+
+### Measured on a real config
+
+Captured 2026-07-07 on a NixOS laptop, Nix 2.34, running real read-only
+operations against a live config (`/home/rupan/nixos#laptop`):
+
+| Operation | raw bytes | returned bytes | note |
+|---|---|---|---|
+| `diff` | 338 | 1431 | the underlying package diff was tiny (one internal package removed); envelope metadata and the structured `packages` breakout dominate on a near-empty diff, the win grows with the diff |
+| `eval_config("environment.systemPackages")` | 13,500 | 394 | the raw value is a huge list of store paths; the size guard collapses it to a length + head slice instead of returning it whole |
+| `locate_option("environment.systemPackages")` | 24,066 | 20,396 | 95 defining files, each already close to its per-entry size guard; savings here are modest because the option is genuinely defined in many places |
+| `inspect_flake` | 805 | 381 | a full `nix flake show` collapsed to the structured facts an onboarding agent actually needs |
+
+`switch` carries the same `raw_bytes`/`returned_bytes` pair on its envelope;
+its log is trimmed to a tail on success by design, so the win there tracks
+the same shape as the numbers above rather than a fifth number worth
+quoting in isolation.
+
+The failure path shows a different kind of win, not a smaller
+`returned_bytes` (failure envelopes keep the full output on purpose, so
+`returned_bytes` can exceed `raw_bytes`): building a scratch flake with a
+builder that does `exit 1` gave `raw_bytes: 7187`, `returned_bytes: 7975`,
+and a populated `failed_derivation: {drv: ".../boom.drv", log_tail:
+"failing to build\n"}`. That field is the actual saving: it names the one
+failing `.drv` and its last log line directly, instead of the agent running
+a separate `nix log` and scanning a much longer derivation log by hand.
+
 ## Design notes
 
 - nix-agent does no file I/O. The host agent's own file tools are better

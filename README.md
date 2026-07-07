@@ -10,7 +10,8 @@ generations.
 
 It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos): nix-agent
 operates on your actual configuration, `mcp-nixos` handles package and option
-discovery.
+discovery. Every response reports raw vs returned bytes, so the token
+savings are visible per call, not just claimed.
 
 > **Experimental and a work in progress.** Feedback and contributions welcome.
 
