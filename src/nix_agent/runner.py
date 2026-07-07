@@ -8,6 +8,7 @@ from nix_agent import logparse
 
 OUTPUT_CAP = 64_000
 TAIL_CAP = 2_000
+COMMAND_TIMEOUT = 30 * 60
 
 
 @dataclass(frozen=True)
@@ -58,10 +59,19 @@ def tail(text: str, cap: int = TAIL_CAP) -> str:
     )
 
 
-def run(argv: list[str], cwd: str | None = None) -> RunResult:
+def run(
+    argv: list[str],
+    cwd: str | None = None,
+    timeout: float | None = COMMAND_TIMEOUT,
+) -> RunResult:
     try:
         proc = subprocess.run(
-            argv, capture_output=True, text=True, errors="replace", cwd=cwd
+            argv,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            cwd=cwd,
+            timeout=timeout,
         )
     except FileNotFoundError:
         stderr = f"{argv[0]}: command not found"
@@ -71,6 +81,15 @@ def run(argv: list[str], cwd: str | None = None) -> RunResult:
             stdout="",
             stderr=stderr,
             raw_bytes=len(stderr),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stderr = f"{argv[0]}: timed out after {exc.timeout} seconds"
+        return RunResult(
+            ok=False,
+            command=list(argv),
+            stdout=exc.stdout or "",
+            stderr=stderr,
+            raw_bytes=len(stderr.encode()),
         )
     raw = len((proc.stdout or "").encode()) + len((proc.stderr or "").encode())
     return RunResult(

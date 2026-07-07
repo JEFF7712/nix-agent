@@ -4,7 +4,7 @@ from nix_agent import runner
 
 
 def test_run_success_combines_streams(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 0, stdout="out\n", stderr="warn\n")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -16,7 +16,7 @@ def test_run_success_combines_streams(monkeypatch):
 
 
 def test_run_failure(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="error: boom\n")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -26,13 +26,24 @@ def test_run_failure(monkeypatch):
 
 
 def test_run_missing_binary(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         raise FileNotFoundError(argv[0])
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     result = runner.run(["nvd", "diff"])
     assert not result.ok
     assert "nvd: command not found" in result.output
+
+
+def test_run_timeout_returns_failed_result(monkeypatch):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    result = runner.run(["nix", "build"], timeout=0.01)
+    assert not result.ok
+    assert result.command == ["nix", "build"]
+    assert "timed out after 0.01 seconds" in result.output
 
 
 def test_truncate_output_keeps_head_and_tail():
@@ -133,7 +144,7 @@ def test_envelope_failure_omits_error_detail_when_unparseable():
 def test_failed_derivation_info_fetches_log(monkeypatch):
     calls = []
 
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         calls.append(argv)
         return subprocess.CompletedProcess(argv, 0, stdout="log line\n", stderr="")
 
@@ -146,7 +157,7 @@ def test_failed_derivation_info_fetches_log(monkeypatch):
 
 
 def test_failed_derivation_info_log_unavailable(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="error: gone")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -173,7 +184,7 @@ def test_run_tolerates_non_utf8_output():
 
 
 def test_failed_derivation_info_empty_log(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 0, stdout="  \n", stderr="")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -189,7 +200,7 @@ def test_failed_derivation_info_empty_log(monkeypatch):
 def test_run_records_raw_bytes(monkeypatch):
     big = "x" * 100_000
 
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 0, stdout=big, stderr="err")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -225,7 +236,7 @@ def test_account_helper_on_hand_built_envelope():
 
 
 def test_run_raw_bytes_counts_bytes_not_chars(monkeypatch):
-    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 0, stdout="héllo", stderr="")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)

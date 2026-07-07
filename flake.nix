@@ -20,7 +20,7 @@
         python = pkgs.python3;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.7.0";
+          version = "0.7.1";
           format = "pyproject";
           src = ./.;
           nativeBuildInputs =
@@ -31,6 +31,7 @@
             ]
             ++ [ pkgs.makeWrapper ];
           propagatedBuildInputs = with pkgs.python3Packages; [ fastmcp ];
+          nativeCheckInputs = with pkgs.python3Packages; [ pytestCheckHook ];
           postFixup = ''
             wrapProgram "$out/bin/nix-agent" \
               --prefix PATH : "${
@@ -43,6 +44,12 @@
               }"
           '';
         };
+        devPython = python.withPackages (
+          ps: with ps; [
+            fastmcp
+            pytest
+          ]
+        );
       in
       {
         packages.default = nix-agent-package;
@@ -57,16 +64,15 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            python
-            pkgs.python3Packages.pytest
+            devPython
             pkgs.statix
             pkgs.deadnix
             pkgs.nixfmt
             pkgs.nvd
           ];
           shellHook = ''
-            export PYTHONNOUSERSITE=0
-            python -m pip install --break-system-packages --force-reinstall --upgrade --editable . pytest
+            export PYTHONNOUSERSITE=1
+            export PYTHONPATH="$PWD/src''${PYTHONPATH:+:$PYTHONPATH}"
           '';
         };
       }

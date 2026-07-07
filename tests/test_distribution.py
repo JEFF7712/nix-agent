@@ -9,6 +9,7 @@ def test_flake_exports_package_app_and_nixos_module():
     assert "meta.description" in flake_text
     assert "nixosModules.default" in flake_text
     assert "checks.default" in flake_text
+    assert "pytestCheckHook" in flake_text
 
 
 def test_flake_package_wraps_lint_and_diff_tools_for_runtime():
@@ -16,6 +17,15 @@ def test_flake_package_wraps_lint_and_diff_tools_for_runtime():
 
     for tool in ("statix", "deadnix", "nixfmt", "nvd"):
         assert tool in flake_text
+
+
+def test_dev_shell_does_not_pip_install_into_user_site():
+    flake_text = Path("flake.nix").read_text()
+
+    assert "fastmcp" in flake_text
+    assert "PYTHONPATH" in flake_text
+    assert "pip install" not in flake_text
+    assert "PYTHONNOUSERSITE=1" in flake_text
 
 
 def test_nixos_module_exposes_enable_option():
