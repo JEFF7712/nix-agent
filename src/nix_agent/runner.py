@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 import os
 import shutil
 import subprocess
@@ -15,6 +16,7 @@ class RunResult:
     command: list[str]
     stdout: str
     stderr: str
+    raw_bytes: int | None = None
 
     @property
     def output(self) -> str:
@@ -62,17 +64,21 @@ def run(argv: list[str], cwd: str | None = None) -> RunResult:
             argv, capture_output=True, text=True, errors="replace", cwd=cwd
         )
     except FileNotFoundError:
+        stderr = f"{argv[0]}: command not found"
         return RunResult(
             ok=False,
             command=list(argv),
             stdout="",
-            stderr=f"{argv[0]}: command not found",
+            stderr=stderr,
+            raw_bytes=len(stderr),
         )
+    raw = len(proc.stdout or "") + len(proc.stderr or "")
     return RunResult(
         ok=proc.returncode == 0,
         command=list(argv),
         stdout=truncate_output(proc.stdout or ""),
         stderr=truncate_output(proc.stderr or ""),
+        raw_bytes=raw,
     )
 
 
@@ -112,6 +118,21 @@ def envelope(
         detail = logparse.extract_error_detail(result.output)
         if detail is not None:
             response["error_detail"] = detail
+    response["raw_bytes"] = (
+        result.raw_bytes
+        if result.raw_bytes is not None
+        else len(result.stdout) + len(result.stderr)
+    )
+    return account(response)
+
+
+def account(response: dict[str, object]) -> dict[str, object]:
+    """Attach returned_bytes: the serialized size of the envelope minus
+    the accounting fields themselves."""
+    body = {
+        k: v for k, v in response.items() if k not in ("raw_bytes", "returned_bytes")
+    }
+    response["returned_bytes"] = len(json.dumps(body))
     return response
 
 

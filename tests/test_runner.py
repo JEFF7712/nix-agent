@@ -184,3 +184,41 @@ def test_failed_derivation_info_empty_log(monkeypatch):
         "drv": "/nix/store/abc-x.drv",
         "note": "nix log unavailable for this derivation",
     }
+
+
+def test_run_records_raw_bytes(monkeypatch):
+    big = "x" * 100_000
+
+    def fake_run(argv, capture_output, text, cwd=None, errors=None):
+        return subprocess.CompletedProcess(argv, 0, stdout=big, stderr="err")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    result = runner.run(["x"])
+    assert result.raw_bytes == 100_003
+    assert len(result.stdout) < 100_000
+
+
+def test_envelope_accounting_fields():
+    result = runner.RunResult(
+        ok=True, command=["x"], stdout="out", stderr="", raw_bytes=1234
+    )
+    env = runner.envelope("ok", "t", result)
+    assert env["raw_bytes"] == 1234
+    assert env["returned_bytes"] > 0
+    import json as json_mod
+
+    without = {k: v for k, v in env.items() if k not in ("raw_bytes", "returned_bytes")}
+    assert env["returned_bytes"] == len(json_mod.dumps(without))
+
+
+def test_envelope_accounting_defaults_to_stream_sizes():
+    result = runner.RunResult(ok=True, command=["x"], stdout="abcd", stderr="ef")
+    env = runner.envelope("ok", "t", result)
+    assert env["raw_bytes"] == 6
+
+
+def test_account_helper_on_hand_built_envelope():
+    response = {"status": "ok", "value": 1}
+    runner.account(response)
+    assert "raw_bytes" not in response
+    assert response["returned_bytes"] == len('{"status": "ok", "value": 1}')
