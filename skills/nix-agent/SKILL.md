@@ -21,8 +21,9 @@ Division of labor:
 ## Tool Surface
 
 All tools auto-resolve the target when `flake_uri` is omitted and echo
-back `resolved_target`, the exact `command` run, and
-`raw_bytes`/`returned_bytes` (see Token discipline).
+back what they resolved and ran (`resolved_target` and `command`;
+`inspect_flake` reports `flake_dir`), plus `raw_bytes`/`returned_bytes`
+accounting (see Token discipline).
 
 - `eval_config(attr, flake_uri?, mode?)`: final merged value of any
   config attribute on THIS machine, after all modules/overlays.
