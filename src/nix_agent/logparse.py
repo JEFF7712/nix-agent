@@ -68,15 +68,26 @@ def extract_error_detail(output: str | None) -> dict[str, object] | None:
 
 
 _BUILDER_FAILED = re.compile(r"builder for '(/nix/store/\S+\.drv)' failed")
+# Nix 2.34+: "error: Cannot build '<drv>'.\n  Reason: builder failed ...".
+# The Reason line is load-bearing: dependency aggregates print the same
+# "Cannot build" header with "Reason: N dependency failed" and must not match.
+_CANNOT_BUILD = re.compile(
+    r"Cannot build '(/nix/store/\S+\.drv)'\.\s*\n\s*Reason: builder failed"
+)
 
 
 def extract_failed_drvs(output: str | None) -> list[str]:
-    """Leaf builder failures ('builder for ... failed'), deduped, in order.
-    Dependency-chain errors name aggregate drvs; the builder lines are the
-    actual failures."""
+    """Leaf builder failures, deduped, in order of appearance. Matches both
+    the pre-2.34 "builder for '<drv>' failed" line and the Nix 2.34
+    "Cannot build '<drv>'. / Reason: builder failed" block. Dependency-chain
+    errors name aggregate drvs; the builder lines are the actual failures."""
+    text = output or ""
+    found: list[tuple[int, str]] = []
+    for pattern in (_BUILDER_FAILED, _CANNOT_BUILD):
+        for match in pattern.finditer(text):
+            found.append((match.start(), match.group(1)))
     seen: list[str] = []
-    for match in _BUILDER_FAILED.finditer(output or ""):
-        drv = match.group(1)
+    for _, drv in sorted(found):
         if drv not in seen:
             seen.append(drv)
     return seen

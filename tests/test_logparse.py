@@ -103,6 +103,37 @@ def test_extract_failed_drvs_none():
     assert logparse.extract_failed_drvs("") == []
 
 
+# Nix 2.34 replaced the single-line "builder for '<drv>' failed" message
+# with a multi-line "Cannot build '<drv>'. / Reason: ..." block. Captured
+# from a real `nix build --keep-going` of a two-drv dependency chain on
+# Nix 2.34.7; the aggregate ("1 dependency failed") must stay excluded.
+NEW_NIX_BUILD_FAILURE = """\
+these 2 derivations will be built:
+  /nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv
+  /nix/store/mkf9jysj8xfphkj0dz7a5hbqrcjxkifl-top-depends-on-boom.drv
+building '/nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv'...
+error: Cannot build '/nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv'.
+       Reason: builder failed with exit code 1.
+       Output paths:
+         /nix/store/3cpb614z4ni5kbs9r1qri2q0l7sq6235-boom
+       Last 1 log lines:
+       > failing to build
+       For full logs, run:
+         nix log /nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv
+error: Cannot build '/nix/store/mkf9jysj8xfphkj0dz7a5hbqrcjxkifl-top-depends-on-boom.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/alk1hjx2sdyghhf5kjv3la4bd2fkl8gj-top-depends-on-boom
+error: Build failed due to failed dependency
+"""
+
+
+def test_extract_failed_drvs_new_nix_format():
+    assert logparse.extract_failed_drvs(NEW_NIX_BUILD_FAILURE) == [
+        "/nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv"
+    ]
+
+
 def test_tail_lines():
     text = "\n".join(f"line{i}" for i in range(100))
     out = logparse.tail_lines(text, n=40)

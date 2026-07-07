@@ -44,3 +44,9 @@ def test_builder_failure_fixture_extracts_drv():
     drvs = logparse.extract_failed_drvs(_read("builder-failure.txt"))
     assert len(drvs) == 1
     assert drvs[0].endswith(".drv")
+
+
+def test_builder_failure_exit_code_fixture_extracts_drv():
+    drvs = logparse.extract_failed_drvs(_read("builder-failure-exit-code.txt"))
+    assert len(drvs) == 1
+    assert drvs[0].endswith(".drv")
