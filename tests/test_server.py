@@ -11,10 +11,11 @@ EXPECTED_TOOLS = {
     "switch",
     "generations",
     "locate_option",
+    "inspect_flake",
 }
 
 
-def test_server_exposes_exactly_the_eight_tools():
+def test_server_exposes_exactly_the_nine_tools():
     server = build_server()
     tools = asyncio.run(server.list_tools())
     assert {t.name for t in tools} == EXPECTED_TOOLS

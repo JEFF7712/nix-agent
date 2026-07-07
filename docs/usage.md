@@ -2,7 +2,7 @@
 
 `nix-agent` is a local stdio MCP server that gives AI agents composable
 NixOS / Home Manager operations: eval, locate, lint, format, build, diff,
-switch, generations. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
+switch, generations, inspect. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 nix-agent operates on your actual configuration; `mcp-nixos` handles package
 and option discovery.
 
@@ -103,6 +103,7 @@ full mode-selection guidance.
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
 | `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
+| `inspect_flake(flake_uri?)` | Structured facts about a config repo in one call: `hosts`, `home_configurations`, integrated-vs-standalone Home Manager (`hm_integration`), `module_dirs`, `auto_import` mechanism, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence. Facts that cannot be determined are `null`/`"unknown"`, never guessed. Run this before onboarding a repo or when orienting in an unfamiliar config. |
 
 `summary.health` reports post-activation unit status and is success-only by
 design: a switch that leaves units newly failed still returns `status: "ok"`
@@ -125,6 +126,16 @@ top-level `health_note` replaces `summary.health`.
 
 Steps 3–5 are judgment calls, not gates — for a trivial change, going straight
 to `switch` is fine.
+
+### Onboarding a repo
+
+First time in an unfamiliar config? Call `inspect_flake()` once to get its
+hosts, HM mode, module layout, and tooling in one shot, then hand those facts
+to the `skills/nix-agent-init/` skill. It generates `AGENT_MAP.md`,
+`CLAUDE.md` (+ an `AGENTS.md` symlink), and a `.mcp.json`, all derived from
+what `inspect_flake` actually observed, never boilerplate. Re-runs only touch
+the marked sections it owns, and it refuses to clobber a hand-written file
+that lacks its marker, proposing a diff instead.
 
 ### Failure envelopes
 
