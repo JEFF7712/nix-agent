@@ -1,0 +1,16 @@
+error:
+       … while evaluating the file '/tmp/claude-1000/-home-rupan-projects-nix-agent/723ee437-ea9c-42dc-9e01-99c19205cbd0/scratchpad/broken.nix':
+
+       … while evaluating the attribute 'config.bar'
+         at /tmp/claude-1000/-home-rupan-projects-nix-agent/723ee437-ea9c-42dc-9e01-99c19205cbd0/scratchpad/broken.nix:2:9:
+            1| let
+            2|   m = { config = { foo = 1; }; };
+             |         ^
+            3| in
+
+       error: attribute 'bar' missing
+       at /tmp/claude-1000/-home-rupan-projects-nix-agent/723ee437-ea9c-42dc-9e01-99c19205cbd0/scratchpad/broken.nix:4:3:
+            3| in
+            4|   m.config.bar
+             |   ^
+            5|
