@@ -101,14 +101,24 @@ def _lint(target: Target) -> dict[str, object]:
     commands: list[list[str]] = []
     outputs: list[str] = []
     crashed: list[str] = []
+    raw_total = 0
 
     for name, argv, parse in (
         ("statix", [statix, "check", "-o", "json", target.flake_dir], _parse_statix),
-        ("deadnix", [deadnix, "--output-format", "json", target.flake_dir], _parse_deadnix),
+        (
+            "deadnix",
+            [deadnix, "--output-format", "json", target.flake_dir],
+            _parse_deadnix,
+        ),
     ):
         result = runner.run(argv)
         commands.append(result.command)
         outputs.append(result.output)
+        raw_total += (
+            result.raw_bytes
+            if result.raw_bytes is not None
+            else len(result.stdout) + len(result.stderr)
+        )
         if not result.ok and not result.stdout.strip():
             crashed.append(name)
             continue
@@ -116,24 +126,32 @@ def _lint(target: Target) -> dict[str, object]:
 
     output = "\n".join(o for o in outputs if o)
     if crashed:
-        return {
-            "status": "failed",
+        return runner.account(
+            {
+                "status": "failed",
+                "resolved_target": target.flake_dir,
+                "commands": commands,
+                "output": output,
+                "error": (
+                    f"linter crashed (non-zero exit, no output): {', '.join(crashed)}"
+                ),
+                "first_error": runner.extract_first_error(output),
+                "findings": findings,
+                "finding_count": len(findings),
+                "raw_bytes": raw_total,
+            }
+        )
+    return runner.account(
+        {
+            "status": "ok",
             "resolved_target": target.flake_dir,
             "commands": commands,
             "output": output,
-            "error": f"linter crashed (non-zero exit, no output): {', '.join(crashed)}",
-            "first_error": runner.extract_first_error(output),
             "findings": findings,
             "finding_count": len(findings),
+            "raw_bytes": raw_total,
         }
-    return {
-        "status": "ok",
-        "resolved_target": target.flake_dir,
-        "commands": commands,
-        "output": output,
-        "findings": findings,
-        "finding_count": len(findings),
-    }
+    )
 
 
 def check(
@@ -177,6 +195,4 @@ def check(
     result = runner.run(
         ["sudo", nixos_rebuild, "dry-activate", "--flake", target.flake_ref]
     )
-    return runner.envelope(
-        "ok" if result.ok else "failed", target.flake_ref, result
-    )
+    return runner.envelope("ok" if result.ok else "failed", target.flake_ref, result)

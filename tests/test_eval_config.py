@@ -237,3 +237,12 @@ def test_eval_batched_partial_failure(monkeypatch):
 def test_eval_batched_empty_list():
     out = eval_config([], flake_uri="/x#h")
     assert out["status"] == "invalid_attr"
+
+
+def test_eval_batched_envelope_accounted(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(["services.openssh.enable"], flake_uri="/x#h")
+    assert out["returned_bytes"] > 0

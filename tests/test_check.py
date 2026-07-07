@@ -143,13 +143,15 @@ def test_check_dry_activate_nixos(monkeypatch):
         return _result(True, command=argv)
 
     monkeypatch.setattr(check_mod.runner, "run", fake_run)
-    monkeypatch.setattr(
-        check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}"
-    )
+    monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
     out = check("dry-activate", flake_uri="/etc/nixos#zen")
     assert out["status"] == "ok"
     assert calls[0] == [
-        "sudo", "/bin/nixos-rebuild", "dry-activate", "--flake", "/etc/nixos#zen",
+        "sudo",
+        "/bin/nixos-rebuild",
+        "dry-activate",
+        "--flake",
+        "/etc/nixos#zen",
     ]
 
 
@@ -162,9 +164,7 @@ def test_check_dry_activate_hm_not_applicable():
 def test_check_lint_linter_crash_is_failed(monkeypatch):
     def fake_run(argv, cwd=None):
         if argv[0].endswith("statix"):
-            return _result(
-                False, stderr="error: invalid configuration", command=argv
-            )
+            return _result(False, stderr="error: invalid configuration", command=argv)
         return _result(True, stdout="", command=argv)
 
     monkeypatch.setattr(check_mod.runner, "run", fake_run)
@@ -185,3 +185,17 @@ def test_parse_statix_concatenated_stream():
     findings = _parse_statix(stream)
     assert len(findings) == 2
     assert all(f["tool"] == "statix" for f in findings)
+
+
+def test_check_lint_envelope_accounted(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if argv[0].endswith("statix"):
+            return _result(False, stdout=STATIX_FIXTURE, command=argv)
+        return _result(False, stdout=DEADNIX_FIXTURE, command=argv)
+
+    monkeypatch.setattr(check_mod.runner, "run", fake_run)
+    monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = check("lint", flake_uri="/x")
+    assert out["status"] == "ok"
+    assert out["raw_bytes"] == len(STATIX_FIXTURE) + len(DEADNIX_FIXTURE)
+    assert out["returned_bytes"] > 0

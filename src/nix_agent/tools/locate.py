@@ -127,11 +127,17 @@ def locate_option(
         if truncated:
             entry["truncated"] = True
         definitions.append(entry)
-    return {
+    response: dict[str, object] = {
         "status": "ok",
         "resolved_target": installable,
         "command": result.command,
         "attr": attr,
         "declarations": located.get("declarations", []),
         "definitions": definitions,
+        "raw_bytes": (
+            result.raw_bytes
+            if result.raw_bytes is not None
+            else len(result.stdout) + len(result.stderr)
+        ),
     }
+    return runner.account(response)

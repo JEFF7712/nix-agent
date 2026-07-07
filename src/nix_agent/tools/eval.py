@@ -102,8 +102,10 @@ def eval_config(
                 "error": "attr list must not be empty",
             }
         results = []
+        raw_total = 0
         for one in attr:
             envelope = _eval_one(target, candidates, one)
+            raw_total += envelope.get("raw_bytes") or 0
             entry: dict[str, object] = {
                 "attr": one,
                 "status": envelope["status"],
@@ -119,9 +121,14 @@ def eval_config(
                 if key in envelope:
                     entry[key] = envelope[key]
             results.append(entry)
-        return {
+        # Each _eval_one already ran through envelope(), which stamped
+        # raw_bytes on it; summing those per-attr sizes is essentially free,
+        # so the batched envelope reports a real (not omitted) raw_bytes.
+        response: dict[str, object] = {
             "status": "ok",
             "resolved_target": target.flake_ref,
             "results": results,
+            "raw_bytes": raw_total,
         }
+        return runner.account(response)
     return _eval_one(target, candidates, attr)

@@ -1,0 +1,11 @@
+this derivation will be built:
+  /nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv
+building '/nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv'...
+error: Cannot build '/nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv'.
+       Reason: builder failed with exit code 1.
+       Output paths:
+         /nix/store/3cpb614z4ni5kbs9r1qri2q0l7sq6235-boom
+       Last 1 log lines:
+       > failing to build
+       For full logs, run:
+         nix log /nix/store/j8j107ibik69yq6m1jc3gig3qa592yyr-boom.drv

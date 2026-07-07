@@ -1,0 +1,448 @@
+SDL2_image: [32;1m-78.7 KiB[0m
+SDL2_ttf: [32;1m-92.0 KiB[0m
+aardvark-dns: 1.17.1 → 2.0.0, [32;1m-290.2 KiB[0m
+acl: [31;1m125.2 KiB[0m
+ada: ∅ → 3.4.2, [31;1m1.3 MiB[0m
+alembic: [31;1m916.2 KiB[0m
+assimp: 6.0.4 → 6.0.5, [32;1m-12.3 KiB[0m
+ast-grep: 0.43.0, 0.43.0-fish → 0.44.0, 0.44.0-fish, [31;1m823.6 KiB[0m
+astal-astal3: 0-unstable-2025-11-26 → 0-unstable-2026-06-21
+astal-astal4: 0-unstable-2025-11-26 → 0-unstable-2026-06-21
+astal-gjs: 0-unstable-2025-11-26 → 0-unstable-2026-06-21
+astal-io: 0-unstable-2025-11-26 → 0-unstable-2026-06-21
+asusctl: [32;1m-9.1 KiB[0m
+at-spi2-core: 2.60.1 → 2.58.3, 2.60.4, [31;1m2.3 MiB[0m
+attr: [31;1m90.5 KiB[0m
+audit: [31;1m420.1 KiB[0m
+avahi: [31;1m1.6 MiB[0m
+bash-interactive: [31;1m7.1 MiB[0m
+bind: 9.20.23, 9.20.23-fish → 9.20.24, 9.20.24-fish, [31;1m9.2 KiB[0m
+bitwarden-desktop: 2026.5.0, 2026.5.0-fish → 2026.6.1, 2026.6.1-fish, [32;1m-224.6 MiB[0m
+blas: [31;1m8.8 KiB[0m
+brotli: [31;1m111.2 KiB[0m
+c-ares: [31;1m787.5 KiB[0m
+cairo: [31;1m2.1 MiB[0m
+check: ε → ∅
+claude-code: 2.1.185, 2.1.185-fish → 2.1.201, 2.1.201-fish, [31;1m16.9 MiB[0m
+cmark-gfm: ∅ → 0.29.0.gfm.13, [31;1m1.2 MiB[0m
+codex: 0.139.0 → 0.142.3, [31;1m27.5 MiB[0m
+com.vicinae.vicinae.json: ∅ → ε
+copy-extra: ε → ∅
+coreutils: ∅ → 9.10, [31;1m1.6 MiB[0m
+cracklib: [31;1m803.0 KiB[0m
+cryptsetup: ∅ → 2.8.4, [31;1m2.7 MiB[0m
+ctranslate2: 4.7.2 → 4.8.0, [31;1m2.0 MiB[0m
+cups: ∅ → 2.4.16, [31;1m13.5 MiB[0m
+cursor: 3.7.19, 3.7.19-fish → 3.9.16, 3.9.16-fish, [31;1m67.9 MiB[0m
+dart-sass: 1.100.0 → 1.101.0
+dav1d: [31;1m2.5 MiB[0m
+davinci-resolve: 20.3.3, 20.3.3-fhsenv, 20.3.3-fish → 21.0.1, 21.0.1-fhsenv, 21.0.1-fish, [31;1m246.7 MiB[0m
+db: [31;1m3.5 MiB[0m
+dbus: [31;1m1.1 MiB[0m
+dconf: [31;1m324.5 KiB[0m
+dejavu-fonts-minimal: [31;1m742.6 KiB[0m
+docker: 29.5.3 → 29.6.0, [31;1m303.5 KiB[0m
+docker-compose: 5.1.4 → 5.3.0, [32;1m-348.0 KiB[0m
+docker-containerd: 29.5.3 → 29.6.0
+docker-runc: 29.5.3 → 29.6.0, [31;1m8.5 KiB[0m
+docker-tini: 29.5.3 → 29.6.0
+double-conversion: [31;1m84.2 KiB[0m
+duktape: [31;1m1.2 MiB[0m
+e2fsprogs: 1.47.3 → 1.47.4
+eddie: [31;1m502.3 KiB[0m
+electron: 40.10.3, 41.7.2 → 40.10.5, 41.9.1
+electron-unwrapped: 40.10.3, 41.7.2 → 40.10.5, 41.9.1, [31;1m588.3 KiB[0m
+expand-response: [31;1m16.6 KiB[0m
+expat: 2.8.0 → ∅
+fastfetch: 2.64.2, 2.64.2-fish → 2.65.1, 2.65.1-fish, [32;1m-2.3 MiB[0m
+fastfetch-unwrapped: ∅ → 2.65.1, [31;1m5.0 MiB[0m
+ffmpeg: 4.4.7, 6.1.5, 7.1.4, 8.1, 8.1-fish → 4.4.8, 6.1.6, 7.1.5, 8.1.1, 8.1.1-fish, [31;1m53.0 KiB[0m
+ffmpeg-headless: 8.1 → 8.1.1
+fftw-double: ∅ → 3.3.11
+fftw-single: ∅ → 3.3.11
+firefox: 152.0, 152.0-fish → 152.0.4, 152.0.4-fish
+firefox-unwrapped: 152.0 → 152.0.4, [31;1m790.1 KiB[0m
+fish: 4.7.1, 4.7.1-fish → 4.8.0, 4.8.0-fish, [32;1m-4.6 MiB[0m
+flatpak: 1.16.6 → 1.18.0, [31;1m782.7 KiB[0m
+fontconfig: [31;1m1.8 MiB[0m
+freetype: 2.14.2 → 2.14.3, [31;1m2.1 MiB[0m
+fribidi: [31;1m162.5 KiB[0m
+gcc: [31;1m10.2 MiB[0m
+gd: [31;1m545.4 KiB[0m
+gdk-pixbuf: ∅ → 2.44.5, [31;1m2.8 MiB[0m
+getconf-glibc: 2.42-61 → 2.42-67
+getent-glibc: 2.42-61 → 2.42-51, 2.42-67
+gettext: ∅ → 0.26, [31;1m18.6 MiB[0m
+gh: 2.94.0, 2.94.0-fish → 2.96.0, 2.96.0-fish, [31;1m475.9 KiB[0m
+ghostscript-with-X: 10.07.0 → 10.07.1, [31;1m37.6 KiB[0m
+giflib: [31;1m407.5 KiB[0m
+glab: 1.101.0, 1.101.0-fish → 1.106.0, 1.106.0-fish, [31;1m408.9 KiB[0m
+glib: [31;1m15.1 MiB[0m
+glibc: 2.42-61 → 2.42-67, [31;1m42.5 KiB[0m
+glibc-locales: 2.42-61 → 2.42-67
+glibc-multi: 2.42-61 → 2.42-67
+globalprotect-openconnect: 2.6.2 → 2.6.4
+gmp-with-cxx: [31;1m765.1 KiB[0m
+gnome-user-share: 48.2 → 48.3
+gnugrep: [31;1m932.4 KiB[0m
+gnupg: [31;1m1.2 MiB[0m
+gnuplot: [31;1m3.1 MiB[0m
+gnused: [31;1m718.3 KiB[0m
+gnutar: [31;1m2.7 MiB[0m
+gnutls: ∅ → 3.8.12, [31;1m3.4 MiB[0m
+gobject-introspection: [31;1m1.2 MiB[0m
+google-chrome: 149.0.7827.114, 149.0.7827.114-fish → 150.0.7871.46, 150.0.7871.46-fish, [31;1m11.2 MiB[0m
+gpu-screen-recorder: 5.13.8, 5.13.8-fish → 5.13.9, 5.13.9-fish
+graphite2: [31;1m228.0 KiB[0m
+gsettings-desktop-schemas: [31;1m5.8 MiB[0m
+gtk+3: [31;1m41.2 MiB[0m
+gvfs: 1.60.0 → 1.60.1, [31;1m136.0 KiB[0m
+gzip: [31;1m156.1 KiB[0m
+harfbuzz: ∅ → 12.3.0, [31;1m3.6 MiB[0m
+hm_.configdesktopprofilescatppuccinvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilescatppuccinvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilescleanvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilescleanvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofileseverforestvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofileseverforestvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilesgruvboxvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilesgruvboxvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilesnoctaliavicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilesnoctaliavicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilesnordvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilesnordvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilesrosepinevicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilesrosepinevicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilessharpvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilessharpvicinaethemelight.toml: ∅ → ε
+hm_.configdesktopprofilestintedvicinaethemedark.toml: ∅ → ε
+hm_.configdesktopprofilestintedvicinaethemelight.toml: ∅ → ε
+hm___pycache__: ∅ → ε
+hm_lidcloseaction: ∅ → ε
+home-configuration-reference: [31;1m26.1 KiB[0m
+home-manager: [31;1m16.7 KiB[0m
+hwdata: ∅ → 0.404, [31;1m9.8 MiB[0m
+hwdb.bin: [31;1m113.3 KiB[0m
+icu4c: ∅ → 78.3, [31;1m89.4 MiB[0m
+ijs: 10.07.0 → 10.07.1
+imagemagick: 7.1.2-23, 7.1.2-23-fish → 7.1.2-24, 7.1.2-24-fish, [31;1m8.4 KiB[0m
+index-x86_64: [31;1m15.3 MiB[0m
+index-x86_64-linux: [31;1m202.4 KiB[0m
+initrd-linux: 6.18.35 → 6.18.38, [32;1m-49.8 KiB[0m
+install-systemd-boot.sh: ε → ∅
+intel-compute-runtime: 26.18.38308.1 → 26.22.38646.4, [31;1m1.4 MiB[0m
+intel-graphics-compiler: 2.34.4 → 2.36.3, [32;1m-166.4 KiB[0m
+iso-codes: [31;1m22.6 MiB[0m
+jasper: ∅ → 4.2.8, [31;1m463.0 KiB[0m
+json-glib: [31;1m662.9 KiB[0m
+just: 1.51.0, 1.51.0-fish → 1.55.1, 1.55.1-fish, [31;1m715.1 KiB[0m
+kbd: [31;1m2.7 MiB[0m
+kio: [31;1m35.3 KiB[0m
+kmod: [31;1m325.6 KiB[0m
+krb5: ∅ → 1.22.2
+kwallet: [31;1m14.1 KiB[0m
+lanzaboote-stub: ∅ → 1.1.0, [31;1m187.5 KiB[0m
+lapack: [31;1m8.8 KiB[0m
+layer-shell-qt: ∅ → 6.6.2, [31;1m242.7 KiB[0m
+lcms2: [31;1m484.3 KiB[0m
+lerc: [31;1m850.3 KiB[0m
+libadwaita: 1.9.0 → 1.9.1
+libaec: 1.1.6 → 1.1.7
+libaom: [31;1m8.4 MiB[0m
+libapparmor: ∅ → 4.1.3, [31;1m590.3 KiB[0m
+libarchive: ∅ → 3.8.4, [31;1m950.0 KiB[0m
+libassuan: [31;1m101.9 KiB[0m
+libavif: [31;1m1011.1 KiB[0m
+libb2: [31;1m134.5 KiB[0m
+libbpf: ∅ → 1.6.3, [31;1m2.1 MiB[0m
+libcap-ng: ∅ → 0.9, [31;1m125.0 KiB[0m
+libcbor: [31;1m83.6 KiB[0m
+libcerf: ∅ → 3.2, [31;1m192.2 KiB[0m
+libcupsfilters: [31;1m450.3 KiB[0m
+libdaemon: [31;1m41.0 KiB[0m
+libdatrie: [31;1m42.2 KiB[0m
+libde265: 1.0.18 → 1.0.16, 1.1.1, [31;1m1.3 MiB[0m
+libdeflate: [31;1m458.6 KiB[0m
+libdrm: ∅ → 2.4.131, [31;1m1.6 MiB[0m
+libepoxy: [31;1m1.7 MiB[0m
+libev: [31;1m225.9 KiB[0m
+libevent: [31;1m861.7 KiB[0m
+libfido2: [31;1m1.1 MiB[0m
+libgcrypt: ∅ → 1.12.2, [31;1m1.9 MiB[0m
+libglvnd: [31;1m2.5 MiB[0m
+libgpg-error: [31;1m860.0 KiB[0m
+libheif: 1.21.2 → 1.23.0, [31;1m2.7 MiB[0m
+libice: [31;1m125.8 KiB[0m
+libjpeg-turbo: ∅ → 3.1.3, [31;1m2.0 MiB[0m
+libkrun: 1.18.1 → 1.19.0, [31;1m98.4 KiB[0m
+libmicrohttpd: [31;1m260.4 KiB[0m
+libmng: [31;1m535.0 KiB[0m
+libnfs: 5.0.3 → 6.0.2, [32;1m-53.4 KiB[0m
+libpaper: [31;1m57.2 KiB[0m
+libpciaccess: [31;1m163.5 KiB[0m
+libpng: 1.6.56 → 1.6.58
+libpng-apng: ∅ → 1.6.55, 1.6.58, [31;1m269.3 KiB[0m
+libpq: ∅ → 18.1, [31;1m501.6 KiB[0m
+libproxy: [31;1m109.4 KiB[0m
+libpwquality: [31;1m382.5 KiB[0m
+libqalculate: ∅ → 5.9.0, [31;1m10.4 MiB[0m
+libseccomp: [31;1m193.8 KiB[0m
+libsecret: [31;1m672.1 KiB[0m
+libselinux: [31;1m687.0 KiB[0m
+libsm: [31;1m44.6 KiB[0m
+libsoup: ∅ → 3.6.5, [31;1m1.1 MiB[0m
+libsysprof-capture: 50.0 → ∅, [32;1m-271.8 KiB[0m
+libtasn1: [31;1m95.8 KiB[0m
+libthai: [31;1m637.0 KiB[0m
+libtiff: [31;1m739.2 KiB[0m
+libtpms: [31;1m1.1 MiB[0m
+libusb: [31;1m158.0 KiB[0m
+libuv: [31;1m380.9 KiB[0m
+libvlc: [32;1m-1.1 MiB[0m
+libvmaf: [31;1m2.7 MiB[0m
+libwebp: [31;1m3.4 MiB[0m
+libx11: [31;1m2.6 MiB[0m
+libxau: [31;1m27.1 KiB[0m
+libxcb: [31;1m1.4 MiB[0m
+libxcb-cursor: [31;1m28.7 KiB[0m
+libxcb-image: [31;1m27.0 KiB[0m
+libxcb-keysyms: [31;1m18.0 KiB[0m
+libxcb-render-util: [31;1m27.8 KiB[0m
+libxcb-util: [31;1m35.5 KiB[0m
+libxcb-wm: [31;1m111.2 KiB[0m
+libxcomposite: [31;1m25.1 KiB[0m
+libxcrypt: [31;1m141.0 KiB[0m
+libxcursor: [31;1m77.9 KiB[0m
+libxdamage: [31;1m17.9 KiB[0m
+libxdmcp: [31;1m31.2 KiB[0m
+libxext: [31;1m93.7 KiB[0m
+libxfixes: [31;1m33.9 KiB[0m
+libxft: [31;1m151.0 KiB[0m
+libxi: [31;1m87.7 KiB[0m
+libxinerama: [31;1m21.7 KiB[0m
+libxkbcommon: [31;1m1014.4 KiB[0m
+libxml2: 2.15.2 → 2.15.3, [31;1m1.4 MiB[0m
+libxpm: ∅ → 3.5.18, [31;1m87.9 KiB[0m
+libxrandr: [31;1m62.6 KiB[0m
+libxrender: [31;1m53.2 KiB[0m
+libxtst: [31;1m117.6 KiB[0m
+libyuv: [31;1m3.9 MiB[0m
+linux: 6.18.35 → 6.18.38, [31;1m67.4 KiB[0m
+linux-firmware: 20260519 → 20260622, [31;1m17.0 MiB[0m
+linux-pam: [31;1m1.8 MiB[0m
+live555: 2024.09.20 → 2026.01.12
+llhttp: ∅ → 9.3.0, [31;1m126.6 KiB[0m
+loader.conf: ∅ → ε
+lvm2: ∅ → 2.03.38, [31;1m418.0 KiB[0m
+lynx: 2.9.2 → 2.9.3, [31;1m57.3 KiB[0m
+lz4: [31;1m256.0 KiB[0m
+lzbt: ∅ → ε
+lzbt-systemd: ∅ → 1.1.0, [31;1m2.9 MiB[0m
+lzo: [31;1m159.7 KiB[0m
+man: [31;1m12.0 KiB[0m
+manifest.json: ∅ → ε
+mariadb-connector-c: [31;1m1.3 MiB[0m
+matugen: 4.0.0, 4.0.0-fish → 4.1.0, 4.1.0-fish, [31;1m3.4 MiB[0m
+md4c: [31;1m219.6 KiB[0m
+mdadm: 4.4 → 4.6, [31;1m13.8 KiB[0m
+mercurial: ∅ → 7.1.2, [31;1m34.2 MiB[0m
+mercury: 50fdbe9, 50fdbe9-fish → ∅, [32;1m-14.4 MiB[0m
+mercury-c30d652: ∅ → ε, [31;1m14.5 MiB[0m
+mercury-c30d652-fish: ∅ → ε
+mesa: 26.1.2 → 26.1.4, [31;1m905.1 KiB[0m
+mesa-libgbm: [31;1m58.2 KiB[0m
+minizip-ng-compat: ∅ → 4.2.1, [31;1m339.2 KiB[0m
+moby: 29.5.3 → 29.6.0, [31;1m1.5 MiB[0m
+mpfr: [31;1m803.3 KiB[0m
+mtdev: [31;1m58.5 KiB[0m
+nano: 9.0 → 9.1, [31;1m24.0 KiB[0m
+nautilus: 50.1 → 50.2.2, [31;1m156.5 KiB[0m
+ncompress: [31;1m74.8 KiB[0m
+netbird-client: 0.72.4, 0.72.4-wrapper → 0.74.2, 0.74.2-wrapper, [31;1m211.9 KiB[0m
+netbird-ui: 0.72.4 → 0.74.2, [31;1m54.2 KiB[0m
+nettle: [31;1m723.5 KiB[0m
+nghttp2: [31;1m3.0 MiB[0m
+nghttp3: [31;1m118.3 KiB[0m
+ngtcp2: 1.23.0 → 1.24.0, [31;1m271.4 KiB[0m
+nh: 4.3.2 → 4.4.0
+nh-unwrapped: 4.3.2 → 4.4.0, [31;1m1.0 MiB[0m
+nix-init: ∅ → 0.3.6, 0.3.6-fish, [31;1m22.3 MiB[0m
+nixos-configuration-reference: [31;1m17.9 KiB[0m
+nixos-manual: [31;1m570.4 KiB[0m
+nixos-system-laptop-nixos: 26.11.20260616.567a49d → 26.11.20260705.d407951
+nixos-system-laptop-nixos-performance: 26.11.20260616.567a49d → 26.11.20260705.d407951
+noctalia: [31;1m2.0 MiB[0m
+nodejs: 22.22.3, 24.15.0, 24.15.0-fish → 24.13.0, 24.16.0, 24.16.0-fish, [31;1m101.0 KiB[0m
+nodejs-slim: 22.22.3, 24.15.0 → 24.13.0, 24.16.0, [32;1m-913.6 KiB[0m
+noto-fonts: 2026.06.01, 2026.06.01-fish → 2026.07.01, 2026.07.01-fish
+npth: [31;1m56.0 KiB[0m
+nurl: ∅ → 0.4.0, 0.4.0-fish, [31;1m3.3 MiB[0m
+nvidia-container-toolkit: 1.18.2 → 1.19.1, [31;1m880.2 KiB[0m
+nvidia-open: 595.80-6.18.35 → 595.84-6.18.38, [31;1m8.6 KiB[0m
+nvidia-settings: 595.80 → 595.84
+nvidia-x11: 595.80 → 595.84, [31;1m896.1 KiB[0m
+ollama: 0.30.7 → 0.31.1, [31;1m1.9 MiB[0m
+onnxruntime: [31;1m1.6 MiB[0m
+openapv: 0.2.1.2 → 0.2.1.3
+openblas: 0.3.32 → 0.3.33
+opencode: 1.17.7, 1.17.7-fish → 1.17.12, 1.17.12-fish, [31;1m10.2 MiB[0m
+opencolorio: 2.5.1 → 2.5.2, [31;1m14.5 KiB[0m
+openexr: ∅ → 3.4.11
+openimageio: 3.1.14.0 → 3.1.15.0
+openshadinglanguage: 1.15.3.0 → 1.15.5.0, [31;1m23.8 KiB[0m
+openssl: [31;1m3.2 MiB[0m
+openvino: ∅ → 2026.2.1, [31;1m131.6 MiB[0m
+ovito: 3.15.4, 3.15.4-fish → 3.15.5, 3.15.5-fish, [31;1m1.8 MiB[0m
+p11-kit: ∅ → 0.26.1, [31;1m5.7 MiB[0m
+pandoc-cli: [31;1m24.0 KiB[0m
+pango: [31;1m907.9 KiB[0m
+parallel: 20260422 → ∅, [32;1m-790.7 KiB[0m
+pcre2: [31;1m2.0 MiB[0m
+pcsclite: [31;1m107.3 KiB[0m
+perl: [31;1m16.3 KiB[0m
+perl5.42.0-HTTP-Daemon: 6.16 → 6.17
+pipewire-extra: ε → ∅
+pixman: [31;1m858.3 KiB[0m
+pkg-config: [31;1m673.8 KiB[0m
+pkg-config-wrapper: [31;1m11.6 KiB[0m
+pnpm: 11.5.3, 11.5.3-fish → 11.9.0, 11.9.0-fish, [31;1m136.1 KiB[0m
+podman: 5.8.2 → 5.8.4, [31;1m57.2 KiB[0m
+polkitd.conf: ∅ → ε
+protonup-qt: 2.14.0, 2.14.0-fhsenv → 2.15.1, 2.15.1-fhsenv, [31;1m2.7 MiB[0m
+publicsuffix-list: 0-unstable-2026-03-26 → 0-unstable-2026-05-13
+pv: 1.10.5 → 1.11.0, [31;1m23.9 KiB[0m
+pybind11-setup: ∅ → ε
+pyright: 1.1.410 → 1.1.411, [31;1m267.7 KiB[0m
+pyright-internal: 1.1.410 → 1.1.411, [32;1m-10.1 MiB[0m
+pyside6: [31;1m13.6 KiB[0m
+python3.13-afdko: 4.0.2 → 5.0.1, [32;1m-4.0 MiB[0m
+python3.13-autocommand: 2.2.2 → ∅, [32;1m-92.1 KiB[0m
+python3.13-booleanoperations: 0.9.0 → 0.10.0
+python3.13-ctranslate2: 4.7.2 → 4.8.0, [31;1m33.6 KiB[0m
+python3.13-cyclopts: 4.18.0 → 4.20.0, [31;1m73.4 KiB[0m
+python3.13-debugpy: 1.8.20 → 1.8.21, [32;1m-440.9 KiB[0m
+python3.13-distutils: 80.10.1 → ∅, [32;1m-16.0 KiB[0m
+python3.13-fastmcp: 3.2.3 → 3.3.1, [32;1m-7.8 MiB[0m
+python3.13-fastmcp-slim: ∅ → 3.3.1, [31;1m8.1 MiB[0m
+python3.13-fontparts: 0.13.1 → 1.0.0, [31;1m819.2 KiB[0m
+python3.13-fontpens: 0.3.0 → 0.4.0, [31;1m16.1 KiB[0m
+python3.13-google-re2: ∅ → 1.1.20251105, [31;1m527.6 KiB[0m
+python3.13-griffelib: ∅ → 2.1.0, [31;1m2.0 MiB[0m
+python3.13-inflect: 7.5.0 → ∅, [32;1m-353.1 KiB[0m
+python3.13-jaraco-collections: 5.2.1 → ∅, [32;1m-112.5 KiB[0m
+python3.13-jaraco-text: 4.0.0 → ∅, [32;1m-90.8 KiB[0m
+python3.13-mcp: ∅ → 1.27.0, [32;1m-68.5 KiB[0m
+python3.13-onnxruntime: [31;1m1.6 MiB[0m
+python3.13-openusd: 25.05.01 → 26.03, [31;1m40.5 MiB[0m
+python3.13-pybind11: ∅ → 3.0.4, [31;1m11.6 MiB[0m
+python3.13-pyjwt: 2.12.1 → 2.13.0, [31;1m8.1 KiB[0m
+python3.13-python-multipart: 0.0.22 → 0.0.29, [32;1m-60.4 KiB[0m
+python3.13-python-xlib: ∅ → 0.33, [31;1m2.1 MiB[0m
+python3.13-rich-rst: ∅ → 2.0.2, [31;1m3.2 MiB[0m
+python3.13-starlette: ∅ → 1.1.0, [32;1m-27.8 KiB[0m
+python3.13-typeguard: 4.4.4 → ∅, [32;1m-436.8 KiB[0m
+python3.13-xlib: 0.33 → ∅, [32;1m-2.1 MiB[0m
+python3.13-xmltodict: 1.0.2 → 1.0.4
+qrencode: [31;1m62.6 KiB[0m
+qt3d: 6.11.0 → 6.11.1
+qt5compat: 6.11.0 → 6.11.1, [31;1m18.4 KiB[0m
+qtbase: 6.11.0, 6.11.0-only-plugins → 5.15.19, 6.11.1, 6.11.1-only-plugins, [31;1m83.1 MiB[0m
+qtcharts: 6.11.0 → 6.11.1
+qtconnectivity: 6.11.0 → 6.11.1, [31;1m19.0 KiB[0m
+qtdatavis3d: 6.11.0 → 6.11.1
+qtdeclarative: 6.11.0 → 5.15.19, 6.11.1, [31;1m165.4 MiB[0m
+qtgraphs: 6.11.0 → 6.11.1, [31;1m9.2 KiB[0m
+qthttpserver: 6.11.0 → 6.11.1
+qtimageformats: 6.11.0 → 6.10.2, 6.11.1, [31;1m448.6 KiB[0m
+qtkeychain: ∅ → 0.15.0, [31;1m376.8 KiB[0m
+qtlocation: 6.11.0 → 6.11.1, [31;1m13.1 KiB[0m
+qtmultimedia: 6.11.0 → 6.11.1, [31;1m120.3 KiB[0m
+qtnetworkauth: 6.11.0 → 6.11.1, [31;1m10.9 KiB[0m
+qtpositioning: 6.11.0 → 6.11.1
+qtquick3d: 6.11.0 → 6.11.1, [31;1m38.1 KiB[0m
+qtquickcontrols: ∅ → 5.15.19
+qtremoteobjects: 6.11.0 → 6.11.1, [31;1m10.7 KiB[0m
+qtscxml: 6.11.0 → 6.11.1
+qtsensors: 6.11.0 → 6.11.1
+qtserialbus: 6.11.0 → 6.11.1
+qtserialport: 6.11.0 → 6.11.1
+qtshadertools: 6.11.0 → 6.11.1
+qtspeech: 6.11.0 → 6.11.1
+qtsvg: 6.11.0 → 5.15.19, 6.11.1, [31;1m1.2 MiB[0m
+qttools: 6.11.0 → 5.15.19, 6.11.1, [31;1m66.3 KiB[0m
+qttranslations: 6.11.0 → 5.15.19, 6.11.1, [31;1m15.2 MiB[0m
+qtwayland: 6.11.0 → 5.15.19, 6.11.1, [31;1m6.4 MiB[0m
+qtwebchannel: 6.11.0 → 6.11.1
+qtwebengine: 6.11.0 → 6.11.1, [31;1m149.4 KiB[0m
+qtwebsockets: 6.11.0 → 6.11.1
+qtwebview: 6.11.0 → 6.11.1
+qtx11extras: 5.15.18 → 5.15.19
+re2: ∅ → 2025-11-05, [31;1m594.2 KiB[0m
+rsync: 3.4.1 → 3.4.4, [31;1m20.5 KiB[0m
+rtk: 0.42.3, 0.42.3-fish → 0.43.0, 0.43.0-fish, [31;1m81.4 KiB[0m
+ruff: 0.15.17, 0.15.17-fish → 0.15.20, 0.15.20-fish, [31;1m556.5 KiB[0m
+runc: 1.4.2 → 1.4.3, [31;1m8.7 KiB[0m
+rust-analyzer: 2026-06-01 → 2026-06-15
+rust-analyzer-unwrapped: 2026-06-01 → 2026-06-15, [32;1m-255.9 KiB[0m
+sbctl: ∅ → 0.18, [31;1m9.3 MiB[0m
+sbctl.conf: ∅ → ε
+sbsigntool: ∅ → 0.9.5, [31;1m439.4 KiB[0m
+scotch: 7.0.11 → 7.0.12
+sd-switch: 0.6.3 → 0.6.4, [31;1m49.9 KiB[0m
+sdl3: 3.4.8 → 3.4.10, [31;1m24.4 KiB[0m
+secrets.yaml: ∅ → ε
+security-wrapper-vicinae-input-server-x86_64-unknown-linux: ∅ → ε, [31;1m70.0 KiB[0m
+simdjson: 4.6.0 → 4.2.4, 4.6.4, [31;1m6.3 MiB[0m
+simdutf: ∅ → 8.0.0, [31;1m2.3 MiB[0m
+solid: [31;1m26.3 KiB[0m
+sops-install-secrets: ∅ → 0.0.1, [31;1m48.1 MiB[0m
+source: [31;1m2.2 MiB[0m
+spotify: 1.2.86.502.g8cd7fb22 → 1.2.90.451.gb094aab0, [31;1m16.7 MiB[0m
+sqlite: [31;1m2.8 MiB[0m
+ssh-to-age: ∅ → 1.3.0, [31;1m3.4 MiB[0m
+starship: 1.25.1, 1.25.1-fish → 1.26.0, 1.26.0-fish, [31;1m340.8 KiB[0m
+strace: 7.0 → 7.1, [31;1m17.5 KiB[0m
+stunnel: 5.76 → 5.79, [31;1m18.5 KiB[0m
+syntax-highlighting: ∅ → 6.23.0, [31;1m2.9 MiB[0m
+system: [31;1m26.8 KiB[0m
+systemd: 260.1 → 259, 260.2, [31;1m56.9 MiB[0m
+systemd-minimal: 260.1 → 259, 260.2, [31;1m19.2 MiB[0m
+systemd-minimal-libs: 260.1 → 259, 260.2, [31;1m3.7 MiB[0m
+telegram-desktop: 6.8.2, 6.8.2-fish → 6.9.3, 6.9.3-fish, [31;1m9.9 MiB[0m
+tinysparql: [31;1m4.7 MiB[0m
+tmux: 3.6a, 3.6a-fish → 3.7b, 3.7b-fish, [31;1m101.1 KiB[0m
+tor-browser: 15.0.15, 15.0.15-fish → 15.0.17, 15.0.17-fish, [32;1m-1.1 MiB[0m
+tpm2-tss: [31;1m3.2 MiB[0m
+unbound: 1.25.0 → 1.24.2, [31;1m1.1 MiB[0m
+unifont: 17.0.04 → 17.0.05
+unit-fwupd-efi.service: ∅ → ε
+unit-fwupd.service: ∅ → ε
+unit-generate-sb-keys.service: ∅ → ε
+unit-prepare-sb-auto-enroll.service: ∅ → ε
+unit-script-fwupd-efi: ∅ → ε
+unit-script-prepare-sb-auto-enroll: ∅ → ε
+unixODBC: [31;1m1.1 MiB[0m
+unrar: 7.2.6, 7.2.6-fish → 7.2.7, 7.2.7-fish
+user: [31;1m8.1 KiB[0m
+util-linux: ∅ → 2.41.3, [31;1m12.9 MiB[0m
+util-linux-minimal: [31;1m382.2 KiB[0m
+uv: 0.11.19, 0.11.19-fish → 0.11.25, 0.11.25-fish, [31;1m4.4 MiB[0m
+uvwasi: [31;1m238.0 KiB[0m
+vicinae: ∅ → 0.22.3, 0.22.3-configured-fish, [31;1m35.4 MiB[0m
+vicinae.service: ∅ → ε
+viskores: 1.1.0 → 1.1.1
+vlc: [32;1m-1.1 MiB[0m
+vscode: 1.124.2, 1.124.2-fish → 1.127.0, 1.127.0-fish, [31;1m94.2 MiB[0m
+vscode-extension-redhat-vscode-yaml: 1.24.2026062009 → 1.24.2026063009, [31;1m11.0 KiB[0m
+vscode-extension-rust-lang-rust-analyzer: 0.4.2944 → 0.4.2962, [32;1m-1.4 MiB[0m
+vulkan-loader: [31;1m683.8 KiB[0m
+wayland: [31;1m259.6 KiB[0m
+waypaper: 2.7-unstable-2026-01-13, 2.7-unstable-2026-01-13-fish → 2.8, 2.8-fish
+wireplumber: 0.5.14 → 0.5.15, [31;1m216.1 KiB[0m
+x265: [31;1m23.7 MiB[0m
+xkeyboard-config: [31;1m10.3 MiB[0m
+yyjson: 0.12.0 → ∅, [32;1m-639.4 KiB[0m
+zed-editor: 1.6.3, 1.6.3-fish → 1.9.0, 1.9.0-fish, [31;1m6.7 MiB[0m
+zlib: [31;1m259.0 KiB[0m
+zoxide: 0.9.9, 0.9.9-fish → 0.10.0, 0.10.0-fish, [31;1m73.0 KiB[0m
+zstd: [31;1m600.5 KiB[0m

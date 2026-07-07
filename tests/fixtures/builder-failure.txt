@@ -1,0 +1,4 @@
+this derivation will be built:
+  /nix/store/651v5ndffx16ck3245bwv7r11y0w4r6m-boom-no-output.drv
+building '/nix/store/651v5ndffx16ck3245bwv7r11y0w4r6m-boom-no-output.drv'...
+error: builder for '/nix/store/651v5ndffx16ck3245bwv7r11y0w4r6m-boom-no-output.drv' failed to produce output path for output 'out' at "/nix/store/651v5ndffx16ck3245bwv7r11y0w4r6m-boom-no-output.drv.chroot/root/nix/store/y47bm6sfci3lclp7fg6p1iha9w9424fr-boom-no-output"

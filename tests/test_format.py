@@ -45,9 +45,7 @@ def test_format_whole_flake_uses_nix_fmt(monkeypatch, tmp_path):
     assert calls[0] == (["nix", "fmt"], str(tmp_path))
 
 
-def test_format_falls_back_to_nixfmt_when_no_flake_formatter(
-    monkeypatch, tmp_path
-):
+def test_format_falls_back_to_nixfmt_when_no_flake_formatter(monkeypatch, tmp_path):
     (tmp_path / "flake.nix").write_text("{}")
     (tmp_path / "module.nix").write_text("{}")
     calls = []
@@ -137,3 +135,35 @@ def test_format_no_target(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
     out = format_nix()
     assert out["status"] == "no_target"
+
+
+def test_format_fallback_dir_envelope_accounted(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{}")
+
+    def fake_run(argv, cwd=None):
+        if argv[:2] == ["nix", "fmt"]:
+            return _result(
+                False,
+                stderr="error: flake does not provide attribute 'formatter'",
+                command=argv,
+            )
+        return _result(True, stdout="done\n", command=argv)
+
+    monkeypatch.setattr(fmt_mod.runner, "run", fake_run)
+    monkeypatch.setattr(fmt_mod.runner, "resolve_binary", lambda n: "/bin/nixfmt")
+    out = format_nix(flake_uri=str(tmp_path))
+    assert out["status"] == "ok"
+    assert out["raw_bytes"] == len("done\n")
+    assert out["returned_bytes"] > 0
+
+
+def test_format_explicit_paths_envelope_accounted(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="ok\n", command=argv)
+
+    monkeypatch.setattr(fmt_mod.runner, "run", fake_run)
+    monkeypatch.setattr(fmt_mod.runner, "resolve_binary", lambda n: "/bin/nixfmt")
+    out = format_nix(paths=["/x/a.nix", "/x/b.nix"])
+    assert out["status"] == "ok"
+    assert out["raw_bytes"] == 2 * len("ok\n")
+    assert out["returned_bytes"] > 0
