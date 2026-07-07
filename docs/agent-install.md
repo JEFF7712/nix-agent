@@ -142,11 +142,12 @@ cd /tmp/nix-agent-src
 ./install-skill.sh claude
 ```
 
-This copies each directory under `skills/` into:
+This copies each directory under `skills/` (currently `nix-agent` and
+`nix-agent-init`) into, one subdirectory per skill:
 
 - Codex: `$CODEX_HOME/skills/<skill>` if `CODEX_HOME` is set, otherwise `~/.codex/skills/<skill>`
-- opencode: `~/.config/opencode/skills/nix-agent`
-- Claude Code: `~/.claude/skills/nix-agent`
+- opencode: `~/.config/opencode/skills/<skill>`
+- Claude Code: `~/.claude/skills/<skill>`
 
 For other hosts, copy each directory under `skills/` into that host's
 skills directory manually.
@@ -243,12 +244,14 @@ default.
       "Bash(sudo nixos-rebuild switch --flake *)",
       "Bash(sudo nixos-rebuild switch --rollback)",
       "mcp__nix-agent__eval_config",
+      "mcp__nix-agent__locate_option",
       "mcp__nix-agent__check",
       "mcp__nix-agent__format",
       "mcp__nix-agent__build",
       "mcp__nix-agent__diff",
       "mcp__nix-agent__switch",
-      "mcp__nix-agent__generations"
+      "mcp__nix-agent__generations",
+      "mcp__nix-agent__inspect_flake"
     ],
     "deny": [
       "Read(~/.ssh/**)",
@@ -300,7 +303,7 @@ The intent:
 
 - **allow**: the `nixos-rebuild` commands `nix-agent` drives via
   sudo (so `switch` does not prompt on every call), the rollback escape
-  hatch, and the seven `nix-agent` MCP tools themselves.
+  hatch, and the nine `nix-agent` MCP tools themselves.
 - **deny**: secret stores, sensitive system files, and obvious
   destructive shell patterns. `nix-agent` writes to `/etc/nixos/**` —
   that path is intentionally **not** denied.

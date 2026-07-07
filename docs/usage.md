@@ -1,8 +1,8 @@
 # nix-agent usage
 
 `nix-agent` is a local stdio MCP server that gives AI agents composable
-NixOS / Home Manager operations: eval, locate, lint, format, build, diff,
-switch, generations, inspect. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
+NixOS / Home Manager operations: eval, locate, inspect, lint, format, build,
+diff, switch, generations. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 nix-agent operates on your actual configuration; `mcp-nixos` handles package
 and option discovery.
 
@@ -11,7 +11,7 @@ and option discovery.
 - a runnable stdio MCP server
 - a Nix flake package and app (wrapper bundles statix/deadnix/nixfmt/nvd)
 - a NixOS module at `nixosModules.default`
-- a companion agent skill in `skills/nix-agent/`
+- companion agent skills in `skills/nix-agent/` (workflow) and `skills/nix-agent-init/` (onboarding)
 - example MCP host configs in `examples/`
 
 ## Install
@@ -67,8 +67,10 @@ See `examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
 
 ## Companion skill
 
-The MCP exposes the tools; the skill teaches the correct workflow. Install or
-copy `skills/nix-agent/` into your agent's skill directory:
+The MCP exposes the tools; the skills teach the correct workflow. The
+installer copies every directory under `skills/` (the `nix-agent` workflow
+skill and the `nix-agent-init` onboarding skill) into your agent's skill
+directory:
 
 ```bash
 ./install-skill.sh codex
