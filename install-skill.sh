@@ -8,6 +8,9 @@ skills_dir="$repo_root/skills"
 target=${1:-opencode}
 
 case "$target" in
+  codex)
+    skills_root="${CODEX_HOME:-$HOME/.codex}/skills"
+    ;;
   opencode)
     skills_root="$HOME/.config/opencode/skills"
     ;;
@@ -15,7 +18,7 @@ case "$target" in
     skills_root="$HOME/.claude/skills"
     ;;
   *)
-    printf 'Usage: %s [opencode|claude]\n' "$(basename "$0")" >&2
+    printf 'Usage: %s [codex|opencode|claude]\n' "$(basename "$0")" >&2
     exit 1
     ;;
 esac

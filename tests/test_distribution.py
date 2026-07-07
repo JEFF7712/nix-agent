@@ -39,3 +39,9 @@ def test_opencode_example_uses_packaged_binary():
     example_text = Path("examples/opencode-mcp.json").read_text()
 
     assert '"command": "nix-agent"' in example_text
+
+
+def test_codex_example_uses_packaged_binary():
+    example_text = Path("examples/codex-config.toml").read_text()
+
+    assert 'command = "nix-agent"' in example_text

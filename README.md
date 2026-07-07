@@ -15,7 +15,7 @@ so the token savings are visible per call, not just claimed.
 
 ## Install
 
-Paste this to a coding agent (Claude Code, opencode, …) and it does the install:
+Paste this to a coding agent (Codex, Claude Code, opencode, ...) and it does the install:
 
 ```
 Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.

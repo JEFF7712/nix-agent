@@ -62,7 +62,8 @@ Point your MCP host at:
 }
 ```
 
-See `examples/claude-code-mcp.json` and `examples/opencode-mcp.json`.
+See `examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
+`examples/opencode-mcp.json`.
 
 ## Companion skill
 
@@ -70,7 +71,9 @@ The MCP exposes the tools; the skill teaches the correct workflow. Install or
 copy `skills/nix-agent/` into your agent's skill directory:
 
 ```bash
+./install-skill.sh codex
 ./install-skill.sh opencode
+./install-skill.sh claude
 ```
 
 ## Tool surface

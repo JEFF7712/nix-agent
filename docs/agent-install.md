@@ -2,7 +2,7 @@
 
 This document is the canonical, ordered checklist for installing
 [`nix-agent`](https://github.com/JEFF7712/nix-agent) on a NixOS machine and
-wiring it into an MCP-capable coding agent (Claude Code, opencode, etc.).
+wiring it into an MCP-capable coding agent (Codex, Claude Code, opencode, etc.).
 
 It is written for an autonomous agent. Follow every step in order. Do not
 skip steps. Stop and report to the user if any step fails.
@@ -126,7 +126,7 @@ re-check steps 1–3.
 
 ## 5. Install the companion skill
 
-The skill teaches the host agent the correct workflow. Pick the target
+The skills teach the host agent the correct workflow. Pick the target
 that matches the user's coding agent:
 
 ```bash
@@ -134,19 +134,22 @@ that matches the user's coding agent:
 git clone https://github.com/JEFF7712/nix-agent /tmp/nix-agent-src
 cd /tmp/nix-agent-src
 
-# opencode
+# Codex
+./install-skill.sh codex
+# or opencode
 ./install-skill.sh opencode
 # or Claude Code
 ./install-skill.sh claude
 ```
 
-This copies `skills/nix-agent/` into:
+This copies each directory under `skills/` into:
 
+- Codex: `$CODEX_HOME/skills/<skill>` if `CODEX_HOME` is set, otherwise `~/.codex/skills/<skill>`
 - opencode: `~/.config/opencode/skills/nix-agent`
 - Claude Code: `~/.claude/skills/nix-agent`
 
-For other hosts, copy `skills/nix-agent/` into that host's skills
-directory manually.
+For other hosts, copy each directory under `skills/` into that host's
+skills directory manually.
 
 ---
 
@@ -162,6 +165,17 @@ Server entry:
   "command": "nix-agent",
   "args": []
 }
+```
+
+### Codex
+
+File: `$CODEX_HOME/config.toml` if `CODEX_HOME` is set, otherwise
+`~/.codex/config.toml`. Add:
+
+```toml
+[mcp_servers.nix-agent]
+command = "nix-agent"
+args = []
 ```
 
 ### Claude Code
@@ -195,8 +209,9 @@ File: `~/.config/opencode/opencode.json`. Merge under `mcp`:
 }
 ```
 
-If the file already has an `mcpServers` / `mcp` block, merge — do not
-overwrite. Reference samples live in `examples/claude-code-mcp.json` and
+If the file already has an `mcp_servers`, `mcpServers`, or `mcp` block,
+merge, do not overwrite. Reference samples live in
+`examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
 `examples/opencode-mcp.json` in the repo.
 
 ---

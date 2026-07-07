@@ -1,0 +1,3 @@
+[mcp_servers.nix-agent]
+command = "nix-agent"
+args = []
