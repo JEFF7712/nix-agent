@@ -46,6 +46,33 @@ def test_run_timeout_returns_failed_result(monkeypatch):
     assert "timed out after 0.01 seconds" in result.output
 
 
+def test_run_uses_timeout_from_environment(monkeypatch):
+    seen = []
+
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
+        seen.append(timeout)
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setenv("NIX_AGENT_COMMAND_TIMEOUT", "12.5")
+    result = runner.run(["nix", "build"])
+    assert result.ok
+    assert seen == [12.5]
+
+
+def test_invalid_timeout_environment_falls_back(monkeypatch):
+    seen = []
+
+    def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
+        seen.append(timeout)
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setenv("NIX_AGENT_COMMAND_TIMEOUT", "not-a-number")
+    runner.run(["nix", "build"])
+    assert seen == [runner.COMMAND_TIMEOUT]
+
+
 def test_truncate_output_keeps_head_and_tail():
     text = "a" * 50_000 + "MIDDLE" + "b" * 50_000
     out = runner.truncate_output(text, cap=10_000)

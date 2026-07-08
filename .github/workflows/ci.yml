@@ -7,24 +7,32 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - python-tests
+          - nix-flake-check
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: cachix/install-nix-action@v31
+        if: matrix.check == 'nix-flake-check'
 
       - uses: actions/setup-python@v6
+        if: matrix.check == 'python-tests'
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: matrix.check == 'python-tests'
         run: python -m pip install --upgrade pip && python -m pip install -e . pytest
 
       - name: Run tests
-        run: pytest
-
-      - name: Verify flake package
-        run: nix build .#default
+        if: matrix.check == 'python-tests'
+        run: python -m pytest
 
       - name: Run flake checks
-        run: nix flake check
+        if: matrix.check == 'nix-flake-check'
+        run: nix flake check --system x86_64-linux

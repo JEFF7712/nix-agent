@@ -1,0 +1,31 @@
+{
+  "build_ok": {
+    "command": [
+      "str"
+    ],
+    "output": "str",
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "status": "str",
+    "store_path": "str"
+  },
+  "check_invalid_level": {
+    "error": "str",
+    "status": "str"
+  },
+  "eval_invalid_attr": {
+    "error": "str",
+    "status": "str"
+  },
+  "generations_invalid_action": {
+    "error": "str",
+    "status": "str"
+  },
+  "locate_not_an_option": {
+    "attr": "str",
+    "hint": "str",
+    "resolved_target": "str",
+    "status": "str"
+  }
+}

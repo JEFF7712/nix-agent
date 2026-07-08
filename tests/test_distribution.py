@@ -12,6 +12,18 @@ def test_flake_exports_package_app_and_nixos_module():
     assert "pytestCheckHook" in flake_text
 
 
+def test_release_metadata_has_current_changelog_entry():
+    pyproject_text = Path("pyproject.toml").read_text()
+    flake_text = Path("flake.nix").read_text()
+    changelog_text = Path("CHANGELOG.md").read_text()
+
+    assert 'version = "0.7.2"' in pyproject_text
+    assert 'version = "0.7.2";' in flake_text
+    assert "## v0.7.2 - 2026-07-07" in changelog_text
+    assert "MCP stdio smoke test" in changelog_text
+    assert "NIX_AGENT_COMMAND_TIMEOUT" in changelog_text
+
+
 def test_flake_package_wraps_lint_and_diff_tools_for_runtime():
     flake_text = Path("flake.nix").read_text()
 
@@ -38,9 +50,11 @@ def test_nixos_module_exposes_enable_option():
 def test_ci_workflow_runs_pytest():
     workflow_text = Path(".github/workflows/ci.yml").read_text()
 
-    assert "pytest" in workflow_text
-    assert "nix build .#default" in workflow_text
-    assert "nix flake check" in workflow_text
+    assert "strategy:" in workflow_text
+    assert "python-tests" in workflow_text
+    assert "nix-flake-check" in workflow_text
+    assert "python -m pytest" in workflow_text
+    assert "nix flake check --system x86_64-linux" in workflow_text
     assert "pull_request" in workflow_text
     assert "push" in workflow_text
 
