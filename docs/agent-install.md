@@ -24,8 +24,8 @@ Verify all of the following before touching anything:
 
 Record:
 
-- `FLAKE_DIR` — directory containing `flake.nix`
-- `HOSTNAME` — value of `hostname` (must match a key under
+- `FLAKE_DIR`, directory containing `flake.nix`
+- `HOSTNAME`, value of `hostname` (must match a key under
   `nixosConfigurations.<host>` in the flake)
 
 ### Secrets manager detection (informational, do not install)
@@ -38,10 +38,10 @@ grep -RIl --include='*.nix' -E 'sops-nix|agenix' "${FLAKE_DIR}" || true
 
 - If a match is found, record which one and continue.
 - If **no** match is found, surface this notice to the user verbatim
-  before continuing — do not install anything yourself:
+  before continuing, do not install anything yourself:
 
   > No secrets manager (`sops-nix` or `agenix`) was detected in your
-  > flake. `nix-agent` does not write files — it only provides Nix
+  > flake. `nix-agent` does not write files, it only provides Nix
   > operations. Do not write secret payloads into configs; reference
   > secrets via sops-nix or agenix only. If you plan to manage
   > secrets on this machine, set up `sops-nix`
@@ -119,7 +119,7 @@ command -v nix-agent
 nix-agent --help 2>&1 | head -n 5 || true
 ```
 
-`command -v` must print a path. If not, the module did not take effect —
+`command -v` must print a path. If not, the module did not take effect;
 re-check steps 1–3.
 
 ---
@@ -232,7 +232,7 @@ if no equivalent exists, skip.
 
 Edit `~/.claude/settings.json` (create the file with `{}` if it does
 not exist). Merge the following into the top-level `permissions` object,
-preserving any existing entries — append to the arrays, do not replace
+preserving any existing entries, append to the arrays, do not replace
 them. Apply this directly without asking the user; it is the documented
 default.
 
@@ -305,7 +305,7 @@ The intent:
   sudo (so `switch` does not prompt on every call), the rollback escape
   hatch, and the nine `nix-agent` MCP tools themselves.
 - **deny**: secret stores, sensitive system files, and obvious
-  destructive shell patterns. `nix-agent` writes to `/etc/nixos/**` —
+  destructive shell patterns. `nix-agent` writes to `/etc/nixos/**`:
   that path is intentionally **not** denied.
 
 ---

@@ -85,14 +85,15 @@ order: `$NIX_AGENT_FLAKE` (or `$NIX_AGENT_HM_FLAKE` for HM), then the first
 existing `flake.nix` among `/etc/nixos`, `~/nixos`, `~/.config/nixos`,
 `~/nix-config`, `~/nixos-config` for NixOS (`~/.config/home-manager`,
 `~/.config/nixpkgs` for Home Manager). The hostname / `user@host` attribute is
-picked automatically. Every result echoes back `resolved_target` and the exact
-`command` run. Exception: calling `format` with explicit `paths` returns
-per-file `results` instead.
+picked automatically. Single-command results echo back `resolved_target` and
+the exact `command` run. Exceptions: `format` with explicit `paths` returns
+per-file `results`, `inspect_flake` reports `flake_dir`, and a batched
+`eval_config` folds its per-attr commands into `results`.
 
 `mode` defaults to `"nixos"`. Use `"home-manager"` only for a **standalone** HM
 flake (its own `homeConfigurations`, applied with `home-manager switch`). When
 HM is integrated as a NixOS module (built into the system closure), keep
-`mode="nixos"` and switch the whole system — there is no separate HM switch. On
+`mode="nixos"` and switch the whole system, there is no separate HM switch. On
 a machine that has both a NixOS flake and a leftover `~/.config/home-manager`
 flake, pin the target with `$NIX_AGENT_FLAKE` or an explicit `flake_uri` so
 resolution can't pick the wrong one. See `skills/nix-agent/SKILL.md` for the
@@ -123,13 +124,13 @@ top-level `health_note` replaces `summary.health`.
 
 1. Discovery: query `mcp-nixos` for packages/options; use `eval_config` to see what the user's machine currently resolves.
 2. Edit `.nix` files with the agent's native file tools (Read/Edit/Write).
-3. `format()` then `check("lint")` — fix findings worth fixing.
-4. `check("dry-build")` — catches eval/build errors cheaply.
-5. `diff()` — show the user what will change.
-6. `switch()` — activate; reports `rollback_generation`.
+3. `format()` then `check("lint")`, fix findings worth fixing.
+4. `check("dry-build")`, catches eval/build errors cheaply.
+5. `diff()`, show the user what will change.
+6. `switch()`, activate; reports `rollback_generation`.
 7. On regret: `generations(action="rollback")`.
 
-Steps 3–5 are judgment calls, not gates — for a trivial change, going straight
+Steps 3–5 are judgment calls, not gates. For a trivial change, going straight
 to `switch` is fine.
 
 ### Onboarding a repo
@@ -204,9 +205,12 @@ a separate `nix log` and scanning a much longer derivation log by hand.
   around them.
 - No in-MCP approval gates. Path restrictions belong to the host's
   permission system; rollback safety belongs to Nix generations.
-- Every response echoes `resolved_target` and the exact `command` run —
-  nothing is silently implicit.
-- Do not write secret payloads into configs — reference secrets via
+- Responses that resolve a target and run one command echo
+  `resolved_target` and the exact `command` run, so nothing is silently
+  implicit. Aggregators differ by design: `inspect_flake` reports
+  `flake_dir`, and a batched `eval_config` reports the resolved target
+  once with the individual commands folded into its per-attr `results`.
+- Do not write secret payloads into configs, reference secrets via
   sops-nix or agenix.
 - Fully non-interactive switch requires privileged automation; see
   [privileged-automation.md](privileged-automation.md).
