@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 export const INSTALL_PROMPT =
-  "Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.";
+  "Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skills, and register nix-agent in my MCP settings for this machine.";
 
 function copyWithTextarea() {
   const previouslyFocused =

@@ -14,7 +14,7 @@ export default function Home() {
               <span>for your AI agent.</span>
             </h1>
             <p className="hero-description">
-              Inspect, validate, preview, and switch your NixOS or Home Manager configuration.
+              Evaluate, inspect, validate, format, preview, activate, and roll back your NixOS or Home Manager configuration.
             </p>
           </div>
           <p className="install-instruction">send this to your coding agent.</p>

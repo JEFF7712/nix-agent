@@ -14,6 +14,18 @@ and option discovery.
 - companion agent skills in `skills/nix-agent/` (workflow) and `skills/nix-agent-init/` (onboarding)
 - example MCP host configs in `examples/`
 
+The packaged wrapper supplies `statix`, `deadnix`, `nixfmt`, and `nvd`.
+
+The host must supply Nix and the commands needed by the operations it uses:
+`nixos-rebuild` for NixOS, `home-manager` for standalone Home Manager,
+`sudo` for privileged activation, and `systemctl`/`journalctl` for
+post-activation health reporting and logs.
+
+Commands time out after 30 minutes by default. Set
+`NIX_AGENT_COMMAND_TIMEOUT` to a positive number of seconds to override that
+limit; an unset, invalid or nonpositive value falls back to the 30-minute
+default.
+
 ## Install
 
 Add the flake input and module to your NixOS config:
@@ -109,7 +121,7 @@ full mode-selection guidance.
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
 | `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
-| `inspect_flake(flake_uri?)` | Structured facts about a config repo in one call: `hosts`, `home_configurations`, integrated-vs-standalone Home Manager (`hm_integration`), `module_dirs`, `auto_import` mechanism, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence. Facts that cannot be determined are `null`/`"unknown"`, never guessed. Run this before onboarding a repo or when orienting in an unfamiliar config. |
+| `inspect_flake(flake_uri?)` | Structured facts about a config repo in one call: `hosts`, `home_configurations`, integrated-vs-standalone Home Manager (`hm_integration`), `module_dirs`, `auto_import` mechanism, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence. Evaluated facts become `null` or `"unknown"` when flake-show fails. Repository layout, auto-import, and integrated Home Manager detection are best-effort presence/absence heuristics, and may reflect unreadable or unmatched files as absence. Run this before onboarding a repo or when orienting in an unfamiliar config. |
 
 `summary.health` reports post-activation unit status and is success-only by
 design: a switch that leaves units newly failed still returns `status: "ok"`
@@ -150,6 +162,12 @@ On failure, the response carries the full log plus:
 - `first_error`: the first actionable error line from Nix's output. Present on failure envelopes produced through the standard path (most failures).
 - `error_detail`: `{message, file, line, column, trace}` when the output matched Nix's eval-error shape, a direct file:line:column edit target. Omitted otherwise.
 - `failed_derivation`: on a failed build, diff, or switch, `{drv, log_tail}` with the last 40 lines of the failing builder's `nix log` (or `{drv, note}` when the log is unavailable). Omitted when the failure has no failing derivation (a pure eval error or a sudo auth failure, for example).
+
+The command runner truncates each stdout and stderr stream independently at
+64,000 Python characters. A successful `switch` is more compact: it returns a
+2,000-character tail of the activation log by default. Pass `full_log=True` to
+return the full successful switch log, still subject to the runner's
+per-stream limit.
 
 ### Byte accounting
 
@@ -200,9 +218,10 @@ a separate `nix log` and scanning a much longer derivation log by hand.
 
 ## Design notes
 
-- nix-agent does no file I/O. The host agent's own file tools are better
-  at reading and editing; nix-agent only provides the Nix operations
-  around them.
+- nix-agent provides no general-purpose file reading or editing. `format` writes
+  formatted files, and `inspect_flake` reads flake metadata and the
+  repository layout needed for its best-effort inspection. Use the host
+  agent's own file tools for ordinary reading and editing.
 - No in-MCP approval gates. Path restrictions belong to the host's
   permission system; rollback safety belongs to Nix generations.
 - Responses that resolve a target and run one command echo

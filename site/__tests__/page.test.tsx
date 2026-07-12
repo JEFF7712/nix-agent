@@ -8,7 +8,7 @@ describe("Home", () => {
 
     expect(screen.getByText("nix-agent / local MCP server")).toBeVisible();
     expect(screen.getByRole("heading", { level: 1, name: "NixOS operations for your AI agent." })).toBeVisible();
-    expect(screen.getByText("Inspect, validate, preview, and switch your NixOS or Home Manager configuration.")).toBeVisible();
+    expect(screen.getByText("Evaluate, inspect, validate, format, preview, activate, and roll back your NixOS or Home Manager configuration.")).toBeVisible();
     const installInstruction = screen.getByText("send this to your coding agent.");
 
     expect(installInstruction).toBeVisible();

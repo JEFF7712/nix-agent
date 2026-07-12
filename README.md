@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="nix-agent: composable NixOS operations for AI agents" width="100%">
+  <img src="assets/banner.png" alt="nix-agent: composable NixOS and Home Manager operations for AI agents" width="100%">
 </p>
 
 A local MCP server that gives AI agents composable NixOS / Home Manager
@@ -18,7 +18,7 @@ so the token savings are visible per call, not just claimed.
 Paste this to a coding agent (Codex, Claude Code, opencode, ...) and it does the install:
 
 ```
-Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skill, and register nix-agent in my MCP settings for this machine.
+Read https://raw.githubusercontent.com/JEFF7712/nix-agent/main/docs/agent-install.md and follow every step to install nix-agent on this NixOS system, install the companion skills, and register nix-agent in my MCP settings for this machine.
 ```
 
 Or do it by hand, see [docs/usage.md](docs/usage.md#install).
