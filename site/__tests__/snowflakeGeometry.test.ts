@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_EYE,
+  AGENT_MOUTH,
+  AGENT_PUPIL,
   DENSITY_TIERS,
+  buildAgentFacePoints,
   buildGlyphPointData,
+  concatGlyphPointData,
   seededNoise,
   selectDensityTier,
+  snowflakeHorizontalOffset,
 } from "../lib/snowflakeGeometry";
 import { GLYPH_CHARACTERS } from "../lib/glyphCharacters";
 
@@ -18,6 +24,13 @@ describe("snowflake density", () => {
     expect(selectDensityTier(2200)).toBe(DENSITY_TIERS.high);
     expect(selectDensityTier(2200, 2)).toBe(DENSITY_TIERS.mobile);
     expect(selectDensityTier(2200, 4)).toBe(DENSITY_TIERS.desktop);
+  });
+});
+
+describe("snowflake framing", () => {
+  it("centers the mobile composition and shifts the desktop composition right", () => {
+    expect(snowflakeHorizontalOffset(390)).toBe(0);
+    expect(snowflakeHorizontalOffset(1280)).toBe(0.72);
   });
 });
 
@@ -176,5 +189,67 @@ describe("buildGlyphPointData", () => {
     expect(data.brightness).toHaveLength(data.count);
     expect(data.phase).toHaveLength(data.count);
     expect(data.baseSize).toHaveLength(data.count);
+  });
+});
+
+describe("buildAgentFacePoints", () => {
+  it("emits symmetric eyes and a dimmer mouth within the flake center", () => {
+    const face = buildAgentFacePoints(0x4e4958);
+    const flags = Array.from(face.agent);
+    const eyeXs = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_EYE)
+      .map((i) => face.positions[i * 3]);
+
+    expect(face.count).toBeGreaterThan(0);
+    expect(flags).toContain(AGENT_EYE);
+    expect(flags).toContain(AGENT_MOUTH);
+    expect(eyeXs.some((x) => x < 0)).toBe(true);
+    expect(eyeXs.some((x) => x > 0)).toBe(true);
+    expect(Math.max(...face.positions.map((v) => Math.abs(v)))).toBeLessThan(1);
+    expect(face.agent).toHaveLength(face.count);
+    expect(face.positions).toHaveLength(face.count * 3);
+  });
+
+  it("is deterministic for a given seed", () => {
+    expect(buildAgentFacePoints(7).positions).toEqual(buildAgentFacePoints(7).positions);
+    expect(buildAgentFacePoints(7).glyphIndices).toEqual(buildAgentFacePoints(7).glyphIndices);
+  });
+
+  it("records eye-local Y for eyes and zeroes it for the mouth", () => {
+    const face = buildAgentFacePoints(0x4e4958);
+    expect(face.eyeLocalY).toHaveLength(face.count);
+
+    const eyeLocals = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_EYE || face.agent[i] === AGENT_PUPIL)
+      .map((i) => face.eyeLocalY[i]);
+    const mouthLocals = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_MOUTH)
+      .map((i) => face.eyeLocalY[i]);
+
+    expect(mouthLocals.every((y) => y === 0)).toBe(true);
+    expect(eyeLocals.some((y) => y < 0)).toBe(true);
+    expect(eyeLocals.some((y) => y > 0)).toBe(true);
+    expect(Math.max(...eyeLocals.map(Math.abs))).toBeLessThanOrEqual(0.05 + 1e-6);
+  });
+});
+
+describe("concatGlyphPointData", () => {
+  it("appends face points after the flake and zeroes the flake agent flags", () => {
+    const flake = buildGlyphPointData({
+      alpha: filledMask(4, 4),
+      width: 4,
+      height: 4,
+      tier: { ...DENSITY_TIERS.mobile, pointCap: 16 },
+    });
+    const face = buildAgentFacePoints(3);
+    const merged = concatGlyphPointData(flake, face);
+
+    expect(merged.count).toBe(flake.count + face.count);
+    expect(merged.positions).toHaveLength(merged.count * 3);
+    expect(Array.from(merged.agent.subarray(0, flake.count)).every((v) => v === 0)).toBe(true);
+    expect(merged.agent.subarray(flake.count)).toEqual(face.agent);
+    expect(Array.from(merged.eyeLocalY.subarray(0, flake.count)).every((v) => v === 0)).toBe(true);
+    expect(merged.eyeLocalY.subarray(flake.count)).toEqual(face.eyeLocalY);
+    expect(merged.positions.subarray(flake.count * 3)).toEqual(face.positions);
   });
 });

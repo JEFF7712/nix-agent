@@ -10,11 +10,16 @@ import { startGlyphRenderLifecycle } from "../lib/glyphRenderLifecycle";
 import { validateAndRevealGlyphRenderer } from "../lib/shaderValidation";
 import {
   type DensityTier,
+  buildAgentFacePoints,
   buildGlyphPointData,
+  concatGlyphPointData,
   seededNoise,
   selectDensityTier,
+  snowflakeHorizontalOffset,
 } from "../lib/snowflakeGeometry";
 import { fragmentShader, vertexShader } from "../lib/shaders";
+
+export const SNOWFLAKE_CLEAR_COLOR = 0x000000;
 
 const MASK_SIZE = 768;
 type Mask = { alpha: Uint8ClampedArray; width: number; height: number };
@@ -32,8 +37,8 @@ export function shouldRebuildDensity(previous: DensityTier, next: DensityTier) {
   return previous.name !== next.name;
 }
 
-export function shouldHandlePointerWave(pointerType: string, reducedMotion: boolean) {
-  return !reducedMotion && pointerType !== "touch";
+export function shouldHandlePointerReaction(pointerType: string, reducedMotion: boolean) {
+  return !reducedMotion && pointerType === "mouse";
 }
 
 export function createStaticGlyphFallback(
@@ -98,12 +103,15 @@ async function loadCanonicalMask(signal: AbortSignal): Promise<Mask> {
 }
 
 function replaceGeometryAttributes(geometry: THREE.BufferGeometry, mask: Mask, tier: DensityTier) {
-  const points = buildGlyphPointData({ ...mask, tier, seed: 0x4e4958, alphaThreshold: 18 });
+  const flake = buildGlyphPointData({ ...mask, tier, seed: 0x4e4958, alphaThreshold: 18 });
+  const points = concatGlyphPointData(flake, buildAgentFacePoints(0x4e4958));
   geometry.setAttribute("position", new THREE.BufferAttribute(points.positions, 3));
   geometry.setAttribute("glyph", new THREE.BufferAttribute(points.glyphIndices, 1, false));
   geometry.setAttribute("brightness", new THREE.BufferAttribute(points.brightness, 1));
   geometry.setAttribute("phase", new THREE.BufferAttribute(points.phase, 1));
   geometry.setAttribute("baseSize", new THREE.BufferAttribute(points.baseSize, 1));
+  geometry.setAttribute("agent", new THREE.BufferAttribute(points.agent, 1));
+  geometry.setAttribute("eyeLocalY", new THREE.BufferAttribute(points.eyeLocalY, 1));
   geometry.setDrawRange(0, points.count);
   geometry.computeBoundingSphere();
 }
@@ -144,7 +152,7 @@ export function GlyphSnowflake() {
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.needsUpdate = true;
         const renderer = new THREE.WebGLRenderer({ canvas: probe, context, alpha: true, antialias: true });
-        renderer.setClearColor(0x080808, 1);
+        renderer.setClearColor(SNOWFLAKE_CLEAR_COLOR, 1);
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
         const scene = new THREE.Scene();
@@ -171,7 +179,8 @@ export function GlyphSnowflake() {
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         });
-        scene.add(createGlyphPoints(geometry, material));
+        const points = createGlyphPoints(geometry, material);
+        scene.add(points);
         let resourcesDisposed = false;
         cleanup = () => {
           if (resourcesDisposed) return;
@@ -189,6 +198,7 @@ export function GlyphSnowflake() {
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
+          points.position.x = snowflakeHorizontalOffset(width);
           uniforms.uPointScale.value = Math.min(width, height) * 0.038;
           uniforms.uResolution.value.set(width, height);
           const nextTier = selectDensityTier(width, deviceMemory());
@@ -198,7 +208,7 @@ export function GlyphSnowflake() {
           }
         };
         const pointerMove = (event: PointerEvent) => {
-          if (!shouldHandlePointerWave(event.pointerType, reducedMotion)) return;
+          if (!shouldHandlePointerReaction(event.pointerType, reducedMotion)) return;
           const bounds = host.getBoundingClientRect();
           uniforms.uPointer.value.set(
             ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
@@ -221,6 +231,7 @@ export function GlyphSnowflake() {
               camera,
               reducedMotion,
               resize,
+              pointerTarget: window,
               animate: (time) => { uniforms.uTime.value = time / 1000; },
               pointerMove,
               pointerLeave,
