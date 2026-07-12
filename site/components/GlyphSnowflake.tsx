@@ -221,7 +221,8 @@ export function GlyphSnowflake() {
         let winceAge = -1;
         let winceCooldown = 0;
         let lastInteract = performance.now();
-        const startedAt = performance.now();
+        let startedAt = 0;
+        let animOriginMs: number | null = null;
         const noteInteract = () => {
           lastInteract = performance.now();
         };
@@ -358,6 +359,8 @@ export function GlyphSnowflake() {
           dispose: cleanup,
           ready: () => {
             if (disposed) return;
+            startedAt = performance.now();
+            animOriginMs = null;
             const lifecycleCleanup = startGlyphRenderLifecycle({
               host,
               renderer,
@@ -367,9 +370,12 @@ export function GlyphSnowflake() {
               resize,
               pointerTarget: window,
               animate: (time) => {
-                const seconds = time / 1000;
+                // Local clock from first frame — absolute rAF time jumps after async
+                // load and made the flake snap through a fast rotation on reveal.
+                if (animOriginMs == null) animOriginMs = time;
+                const seconds = (time - animOriginMs) / 1000;
                 const previous = uniforms.uTime.value;
-                const dt = previous > 0 ? Math.min(seconds - previous, 0.05) : 0;
+                const dt = previous > 0 || seconds > 0 ? Math.min(Math.max(seconds - previous, 0), 0.05) : 0;
                 uniforms.uTime.value = seconds;
                 const wakeAge = (performance.now() - startedAt) / 1000;
                 uniforms.uWake.value = reducedMotion

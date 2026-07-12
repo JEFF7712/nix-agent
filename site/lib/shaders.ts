@@ -161,7 +161,8 @@ void main() {
   facePosition.xy += vec2(gaze.x, gaze.y) * 0.007 * isFace * nearFace * (1.0 - sleepy) * motionEnabled;
 
   float xAngle = 0.42 + sin(uTime * 0.19) * 0.10 * motionEnabled;
-  float yAngle = -0.32 + sin(uTime * 0.16 + 0.7) * 0.20 * motionEnabled;
+  // No phase offset — keeps orientation continuous when the local clock starts at 0.
+  float yAngle = -0.32 + sin(uTime * 0.16) * 0.20 * motionEnabled;
   vec3 rotatedPosition = rotationY(yAngle) * rotationX(xAngle) * facePosition;
   float breathing = 1.0 + sin(uTime * 0.42 + phase) * 0.012 * motionEnabled;
   vec3 basePosition = rotatedPosition * breathing;
