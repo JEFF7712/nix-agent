@@ -58,6 +58,7 @@ export interface GlyphPointData {
 
 export interface AgentFaceData extends GlyphPointData {
   readonly agent: Float32Array;
+  readonly eyeLocalX: Float32Array;
   readonly eyeLocalY: Float32Array;
 }
 
@@ -65,6 +66,7 @@ export const AGENT_FLAKE = 0;
 export const AGENT_MOUTH = 0.5;
 export const AGENT_EYE = 1;
 export const AGENT_PUPIL = 2;
+export const AGENT_BROW = 3;
 
 // Face geometry in flake-local space (origin = flake center, +y up, extent ~[-1, 1]).
 // Tunable: nudge these to reposition the eyes/mouth over the rendered flake.
@@ -77,6 +79,10 @@ const EYE_CENTERS: readonly (readonly [number, number])[] = [
 const EYE_STEP = EYE_RADIUS / 11;
 const PUPIL_RADIUS = 0.022;
 const PUPIL_STEP = PUPIL_RADIUS / 6;
+const BROW_HALF_WIDTH = 0.048;
+const BROW_Y_OFFSET = 0.078;
+const BROW_ARCH = 0.012;
+const BROW_SAMPLES = 32;
 const MOUTH_HALF_WIDTH = 0.13;
 const MOUTH_Y = -0.07;
 const MOUTH_CURVE = 0.045;
@@ -93,6 +99,7 @@ function pushDisc(
   ys: number[],
   zs: number[],
   flags: number[],
+  localXs: number[],
   localYs: number[],
 ) {
   for (let gx = -radius; gx <= radius + 1e-6; gx += step) {
@@ -102,8 +109,30 @@ function pushDisc(
       ys.push(cy + gy);
       zs.push(z);
       flags.push(flag);
+      localXs.push(gx);
       localYs.push(gy);
     }
+  }
+}
+
+function pushBrowArc(
+  cx: number,
+  cy: number,
+  xs: number[],
+  ys: number[],
+  zs: number[],
+  flags: number[],
+  localXs: number[],
+  localYs: number[],
+) {
+  for (let i = 0; i < BROW_SAMPLES; i += 1) {
+    const t = (i / (BROW_SAMPLES - 1)) * 2 - 1;
+    xs.push(cx + t * BROW_HALF_WIDTH);
+    ys.push(cy + BROW_Y_OFFSET + BROW_ARCH * (1 - t * t) - 0.006 * Math.abs(t));
+    zs.push(EYE_Z);
+    flags.push(AGENT_BROW);
+    localXs.push(t);
+    localYs.push(0);
   }
 }
 
@@ -112,11 +141,13 @@ export function buildAgentFacePoints(seed = 0): AgentFaceData {
   const ys: number[] = [];
   const zs: number[] = [];
   const flags: number[] = [];
+  const localXs: number[] = [];
   const localYs: number[] = [];
 
   for (const [cx, cy] of EYE_CENTERS) {
-    pushDisc(cx, cy, EYE_RADIUS, EYE_STEP, EYE_Z, AGENT_EYE, xs, ys, zs, flags, localYs);
-    pushDisc(cx, cy, PUPIL_RADIUS, PUPIL_STEP, EYE_Z + 0.01, AGENT_PUPIL, xs, ys, zs, flags, localYs);
+    pushDisc(cx, cy, EYE_RADIUS, EYE_STEP, EYE_Z, AGENT_EYE, xs, ys, zs, flags, localXs, localYs);
+    pushDisc(cx, cy, PUPIL_RADIUS, PUPIL_STEP, EYE_Z + 0.01, AGENT_PUPIL, xs, ys, zs, flags, localXs, localYs);
+    pushBrowArc(cx, cy, xs, ys, zs, flags, localXs, localYs);
   }
 
   for (let i = 0; i < MOUTH_SAMPLES; i += 1) {
@@ -125,6 +156,7 @@ export function buildAgentFacePoints(seed = 0): AgentFaceData {
     ys.push(MOUTH_Y + MOUTH_CURVE * t * t);
     zs.push(EYE_Z * 0.8);
     flags.push(AGENT_MOUTH);
+    localXs.push(t);
     localYs.push(0);
   }
 
@@ -135,6 +167,7 @@ export function buildAgentFacePoints(seed = 0): AgentFaceData {
   const phase = new Float32Array(count);
   const baseSize = new Float32Array(count);
   const agent = new Float32Array(count);
+  const eyeLocalX = new Float32Array(count);
   const eyeLocalY = new Float32Array(count);
 
   for (let i = 0; i < count; i += 1) {
@@ -146,12 +179,17 @@ export function buildAgentFacePoints(seed = 0): AgentFaceData {
     glyphIndices[i] = Math.floor(seededNoise(key, keyY, seed) * GLYPH_CHARACTERS.length);
     brightness[i] = 1;
     phase[i] = seededNoise(key, keyY, seed + 1) * 2 * Math.PI;
-    baseSize[i] = flags[i] === AGENT_PUPIL ? 0.6 : flags[i] === AGENT_EYE ? 0.7 : 0.62;
+    baseSize[i] =
+      flags[i] === AGENT_PUPIL ? 0.6
+      : flags[i] === AGENT_EYE ? 0.7
+      : flags[i] === AGENT_BROW ? 0.52
+      : 0.62;
     agent[i] = flags[i];
+    eyeLocalX[i] = localXs[i];
     eyeLocalY[i] = localYs[i];
   }
 
-  return { count, positions, glyphIndices, brightness, phase, baseSize, agent, eyeLocalY };
+  return { count, positions, glyphIndices, brightness, phase, baseSize, agent, eyeLocalX, eyeLocalY };
 }
 
 export function concatGlyphPointData(flake: GlyphPointData, face: AgentFaceData): AgentFaceData {
@@ -162,6 +200,7 @@ export function concatGlyphPointData(flake: GlyphPointData, face: AgentFaceData)
   const phase = new Float32Array(count);
   const baseSize = new Float32Array(count);
   const agent = new Float32Array(count);
+  const eyeLocalX = new Float32Array(count);
   const eyeLocalY = new Float32Array(count);
 
   positions.set(flake.positions.subarray(0, flake.count * 3), 0);
@@ -175,9 +214,10 @@ export function concatGlyphPointData(flake: GlyphPointData, face: AgentFaceData)
   baseSize.set(flake.baseSize.subarray(0, flake.count), 0);
   baseSize.set(face.baseSize.subarray(0, face.count), flake.count);
   agent.set(face.agent.subarray(0, face.count), flake.count);
+  eyeLocalX.set(face.eyeLocalX.subarray(0, face.count), flake.count);
   eyeLocalY.set(face.eyeLocalY.subarray(0, face.count), flake.count);
 
-  return { count, positions, glyphIndices, brightness, phase, baseSize, agent, eyeLocalY };
+  return { count, positions, glyphIndices, brightness, phase, baseSize, agent, eyeLocalX, eyeLocalY };
 }
 
 function extrusionSign(centeredX: number, centeredY: number): -1 | 0 | 1 {

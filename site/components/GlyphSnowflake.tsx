@@ -6,6 +6,20 @@ import * as THREE from "three";
 import { createReadyGlyphAtlas } from "../lib/glyphAtlas";
 import { GLYPH_CHARACTERS } from "../lib/glyphCharacters";
 import { CANONICAL_GLYPH_FALLBACK } from "../lib/glyphFallback";
+import {
+  FACE_HAPPY_EVENT,
+  PULSE_SLOT_COUNT,
+  advanceWince,
+  clickSpamAnger,
+  combineFaceAnger,
+  faceAngerFromPointer,
+  faceCenterNdc,
+  findFreePulseSlot,
+  pulseFaceDistance,
+  pulseLifeForScale,
+  shouldTriggerWince,
+  smoothEmotion,
+} from "../lib/faceMood";
 import { startGlyphRenderLifecycle } from "../lib/glyphRenderLifecycle";
 import { validateAndRevealGlyphRenderer } from "../lib/shaderValidation";
 import {
@@ -111,6 +125,7 @@ function replaceGeometryAttributes(geometry: THREE.BufferGeometry, mask: Mask, t
   geometry.setAttribute("phase", new THREE.BufferAttribute(points.phase, 1));
   geometry.setAttribute("baseSize", new THREE.BufferAttribute(points.baseSize, 1));
   geometry.setAttribute("agent", new THREE.BufferAttribute(points.agent, 1));
+  geometry.setAttribute("eyeLocalX", new THREE.BufferAttribute(points.eyeLocalX, 1));
   geometry.setAttribute("eyeLocalY", new THREE.BufferAttribute(points.eyeLocalY, 1));
   geometry.setDrawRange(0, points.count);
   geometry.computeBoundingSphere();
@@ -170,6 +185,18 @@ export function GlyphSnowflake() {
           uResolution: { value: new THREE.Vector2(1, 1) },
           uAtlas: { value: texture },
           uAtlasGrid: { value: new THREE.Vector2(atlas.columns, atlas.rows) },
+          uAnger: { value: 0 },
+          uHappy: { value: 0 },
+          uHappyBlink: { value: -1 },
+          uSleepy: { value: 0 },
+          uWake: { value: 0 },
+          uPointerBlend: { value: 0 },
+          uWinceAge: { value: -1 },
+          uPulseOrigins: {
+            value: Array.from({ length: PULSE_SLOT_COUNT }, () => new THREE.Vector2()),
+          },
+          uPulseAges: { value: Array.from({ length: PULSE_SLOT_COUNT }, () => -1) },
+          uPulseScales: { value: Array.from({ length: PULSE_SLOT_COUNT }, () => 1) },
         };
         const material = new THREE.ShaderMaterial({
           uniforms,
@@ -182,6 +209,22 @@ export function GlyphSnowflake() {
         const points = createGlyphPoints(geometry, material);
         scene.add(points);
         let resourcesDisposed = false;
+        let lastPointer = { x: 20, y: 20, time: performance.now() };
+        let pointerSpeed = 0;
+        let clickTimes: number[] = [];
+        let pulseClickTimes: number[] = [];
+        let spamAnger = 0;
+        let angerTarget = 0;
+        let happyTarget = 0;
+        let happyHold = 0;
+        let pointerBlendTarget = 0;
+        let winceAge = -1;
+        let winceCooldown = 0;
+        let lastInteract = performance.now();
+        const startedAt = performance.now();
+        const noteInteract = () => {
+          lastInteract = performance.now();
+        };
         cleanup = () => {
           if (resourcesDisposed) return;
           resourcesDisposed = true;
@@ -207,15 +250,106 @@ export function GlyphSnowflake() {
             replaceGeometryAttributes(geometry, mask, tier);
           }
         };
+        const pointerNdc = (event: PointerEvent) => {
+          const bounds = host.getBoundingClientRect();
+          return {
+            x: ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+            y: -(((event.clientY - bounds.top) / bounds.height) * 2 - 1),
+          };
+        };
+        const updateAnger = (pointerX: number, pointerY: number) => {
+          if (reducedMotion) {
+            angerTarget = 0;
+            uniforms.uAnger.value = 0;
+            return;
+          }
+          const face = faceCenterNdc(host.clientWidth);
+          const pointerAnger = faceAngerFromPointer({
+            pointerX,
+            pointerY,
+            faceX: face.x,
+            faceY: face.y,
+            speedNdc: pointerSpeed,
+          });
+          angerTarget = combineFaceAnger(pointerAnger, spamAnger);
+        };
         const pointerMove = (event: PointerEvent) => {
           if (!shouldHandlePointerReaction(event.pointerType, reducedMotion)) return;
-          const bounds = host.getBoundingClientRect();
-          uniforms.uPointer.value.set(
-            ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-            -(((event.clientY - bounds.top) / bounds.height) * 2 - 1),
-          );
+          const { x: pointerX, y: pointerY } = pointerNdc(event);
+          const now = performance.now();
+          const dt = Math.max((now - lastPointer.time) / 1000, 1 / 120);
+          const dx = pointerX - lastPointer.x;
+          const dy = pointerY - lastPointer.y;
+          pointerSpeed = Math.hypot(dx, dy) / dt;
+          lastPointer = { x: pointerX, y: pointerY, time: now };
+          uniforms.uPointer.value.set(pointerX, pointerY);
+          pointerBlendTarget = 1;
+          noteInteract();
+          updateAnger(pointerX, pointerY);
         };
-        const pointerLeave = () => uniforms.uPointer.value.set(20, 20);
+        const pointerLeave = () => {
+          // Keep last pointer for a soft gaze crossfade; kill interactivity via blend.
+          pointerSpeed = 0;
+          pointerBlendTarget = 0;
+          lastPointer = { ...lastPointer, time: performance.now() };
+          angerTarget = 0;
+          spamAnger = 0;
+        };
+        const documentPointerLeave = (event: PointerEvent) => {
+          if (event.relatedTarget == null) pointerLeave();
+        };
+        const pointerDown = (event: PointerEvent) => {
+          if (!shouldHandlePointerReaction(event.pointerType, reducedMotion)) return;
+          if (event.button !== 0) return;
+          const { x, y } = pointerNdc(event);
+          const now = performance.now();
+          uniforms.uPointer.value.set(x, y);
+          noteInteract();
+          clickTimes = [...clickTimes.filter((time) => now - time <= 1800), now];
+          pulseClickTimes = [...pulseClickTimes.filter((time) => now - time <= 520), now];
+          const streak = pulseClickTimes.length;
+          const scale = Math.min(6, 1.28 ** (streak - 1));
+          const slot = findFreePulseSlot(uniforms.uPulseAges.value);
+          if (slot >= 0) {
+            uniforms.uPulseOrigins.value[slot].set(x, y);
+            uniforms.uPulseAges.value[slot] = 0;
+            uniforms.uPulseScales.value[slot] = scale;
+          }
+          const face = faceCenterNdc(host.clientWidth);
+          const aspect = Math.max(host.clientWidth, 1) / Math.max(host.clientHeight, 1);
+          if (
+            shouldTriggerWince({
+              pulseScale: scale,
+              distance: pulseFaceDistance(x, y, face.x, face.y, aspect),
+              winceAge,
+              winceCooldown,
+            })
+          ) {
+            winceAge = 0;
+            uniforms.uWinceAge.value = 0;
+          }
+          spamAnger = clickSpamAnger(clickTimes, now);
+          lastPointer = { x, y, time: now };
+          pointerBlendTarget = 1;
+          updateAnger(x, y);
+        };
+        const onHappy = () => {
+          if (reducedMotion) return;
+          happyTarget = 1;
+          uniforms.uHappyBlink.value = 0;
+          happyHold = 0.75;
+          noteInteract();
+        };
+        window.addEventListener(FACE_HAPPY_EVENT, onHappy);
+        window.addEventListener("pointerdown", pointerDown);
+        document.documentElement.addEventListener("pointerleave", documentPointerLeave);
+        const previousCleanup = cleanup;
+        cleanup = () => {
+          window.removeEventListener(FACE_HAPPY_EVENT, onHappy);
+          window.removeEventListener("pointerdown", pointerDown);
+          document.documentElement.removeEventListener("pointerleave", documentPointerLeave);
+          previousCleanup();
+        };
         await validateAndRevealGlyphRenderer({
           renderer,
           scene,
@@ -224,7 +358,7 @@ export function GlyphSnowflake() {
           dispose: cleanup,
           ready: () => {
             if (disposed) return;
-            cleanup = startGlyphRenderLifecycle({
+            const lifecycleCleanup = startGlyphRenderLifecycle({
               host,
               renderer,
               scene,
@@ -232,19 +366,93 @@ export function GlyphSnowflake() {
               reducedMotion,
               resize,
               pointerTarget: window,
-              animate: (time) => { uniforms.uTime.value = time / 1000; },
+              animate: (time) => {
+                const seconds = time / 1000;
+                const previous = uniforms.uTime.value;
+                const dt = previous > 0 ? Math.min(seconds - previous, 0.05) : 0;
+                uniforms.uTime.value = seconds;
+                const wakeAge = (performance.now() - startedAt) / 1000;
+                uniforms.uWake.value = reducedMotion
+                  ? 1
+                  : Math.min(1, Math.max(0, (wakeAge - 0.25) / 0.55));
+                const idleSec = (performance.now() - lastInteract) / 1000;
+                const sleepyTarget = reducedMotion
+                  ? 0
+                  : Math.min(1, Math.max(0, (idleSec - 14) / 8));
+                uniforms.uSleepy.value = smoothEmotion(
+                  uniforms.uSleepy.value,
+                  sleepyTarget,
+                  dt,
+                  1.2,
+                  3.5,
+                );
+                uniforms.uPointerBlend.value = smoothEmotion(
+                  uniforms.uPointerBlend.value,
+                  pointerBlendTarget,
+                  dt,
+                  9,
+                  0.75,
+                );
+                if (happyHold > 0) {
+                  happyHold = Math.max(0, happyHold - dt);
+                  happyTarget = 1;
+                } else if (happyTarget > 0) {
+                  happyTarget = Math.max(0, happyTarget - dt * 0.28);
+                }
+                uniforms.uHappy.value = smoothEmotion(
+                  uniforms.uHappy.value,
+                  happyTarget,
+                  dt,
+                  2.4,
+                  1.5,
+                );
+                if (uniforms.uHappyBlink.value >= 0) {
+                  uniforms.uHappyBlink.value += dt;
+                  if (uniforms.uHappyBlink.value > 0.45) uniforms.uHappyBlink.value = -1;
+                }
+                uniforms.uAnger.value = smoothEmotion(uniforms.uAnger.value, angerTarget, dt, 9, 1.8);
+                ({ age: winceAge, cooldown: winceCooldown } = advanceWince(winceAge, winceCooldown, dt));
+                uniforms.uWinceAge.value = winceAge;
+                for (let i = 0; i < PULSE_SLOT_COUNT; i += 1) {
+                  const age = uniforms.uPulseAges.value[i];
+                  if (age < 0) continue;
+                  const nextAge = age + dt;
+                  if (nextAge > pulseLifeForScale(uniforms.uPulseScales.value[i])) {
+                    uniforms.uPulseAges.value[i] = -1;
+                  } else {
+                    uniforms.uPulseAges.value[i] = nextAge;
+                  }
+                }
+                pointerSpeed *= Math.exp(-dt * 4);
+                const now = performance.now();
+                clickTimes = clickTimes.filter((stamp) => now - stamp <= 1800);
+                pulseClickTimes = pulseClickTimes.filter((stamp) => now - stamp <= 520);
+                spamAnger = clickSpamAnger(clickTimes, now);
+                if (lastPointer.x <= 2) {
+                  updateAnger(lastPointer.x, lastPointer.y);
+                }
+              },
               pointerMove,
               pointerLeave,
               contextLost: () => setReady(false),
               dispose: () => {
                 if (resourcesDisposed) return;
                 resourcesDisposed = true;
+                window.removeEventListener(FACE_HAPPY_EVENT, onHappy);
+                window.removeEventListener("pointerdown", pointerDown);
+                document.documentElement.removeEventListener("pointerleave", documentPointerLeave);
                 geometry.dispose();
                 material.dispose();
                 texture.dispose();
                 renderer.dispose();
               },
             }).cleanup;
+            cleanup = () => {
+              window.removeEventListener(FACE_HAPPY_EVENT, onHappy);
+              window.removeEventListener("pointerdown", pointerDown);
+              document.documentElement.removeEventListener("pointerleave", documentPointerLeave);
+              lifecycleCleanup();
+            };
             setReady(true);
           },
         });

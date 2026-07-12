@@ -23,7 +23,7 @@ const mono = localFont({
 export const metadata: Metadata = {
   title: "nix-agent",
   description: "NixOS operations for your AI agent.",
-  icons: { icon: "/nix-snowflake.svg" },
+  icons: { icon: "/nix-agent-mark.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

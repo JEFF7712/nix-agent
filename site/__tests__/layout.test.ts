@@ -7,7 +7,7 @@ vi.mock("next/font/local", () => ({
 import { metadata } from "../app/layout";
 
 describe("site metadata", () => {
-  it("uses the exported snowflake asset as its favicon", () => {
-    expect(metadata.icons).toEqual({ icon: "/nix-snowflake.svg" });
+  it("uses the nix-agent chevron mark as its favicon", () => {
+    expect(metadata.icons).toEqual({ icon: "/nix-agent-mark.svg" });
   });
 });

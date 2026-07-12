@@ -4,16 +4,21 @@ import * as THREE from "three";
 
 import {
   GlyphSnowflake,
+  SNOWFLAKE_CLEAR_COLOR,
   createGlyphPoints,
   createStaticGlyphFallback,
   getAnimationActivity,
-  shouldHandlePointerWave,
+  shouldHandlePointerReaction,
   shouldRebuildDensity,
 } from "../components/GlyphSnowflake";
 import { CANONICAL_GLYPH_FALLBACK } from "../lib/glyphFallback";
 import { DENSITY_TIERS } from "../lib/snowflakeGeometry";
 
 describe("GlyphSnowflake lifecycle helpers", () => {
+  it("clears the renderer to the same pure black as the page", () => {
+    expect(SNOWFLAKE_CLEAR_COLOR).toBe(0x000000);
+  });
+
   it("only animates while visible and the document is visible", () => {
     expect(getAnimationActivity(true, "visible")).toBe(true);
     expect(getAnimationActivity(false, "visible")).toBe(false);
@@ -25,11 +30,11 @@ describe("GlyphSnowflake lifecycle helpers", () => {
     expect(shouldRebuildDensity(DENSITY_TIERS.desktop, DENSITY_TIERS.high)).toBe(true);
   });
 
-  it("updates the local wave for mouse or pen pointers but never touch steering", () => {
-    expect(shouldHandlePointerWave("mouse", false)).toBe(true);
-    expect(shouldHandlePointerWave("pen", false)).toBe(true);
-    expect(shouldHandlePointerWave("touch", false)).toBe(false);
-    expect(shouldHandlePointerWave("mouse", true)).toBe(false);
+  it("handles the pointer repulsion for mouse movement only", () => {
+    expect(shouldHandlePointerReaction("mouse", false)).toBe(true);
+    expect(shouldHandlePointerReaction("pen", false)).toBe(false);
+    expect(shouldHandlePointerReaction("touch", false)).toBe(false);
+    expect(shouldHandlePointerReaction("mouse", true)).toBe(false);
   });
 
   it("creates a dense deterministic ASCII fallback from a canonical alpha mask", () => {

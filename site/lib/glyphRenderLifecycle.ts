@@ -17,6 +17,7 @@ export interface GlyphRenderLifecycleOptions {
   readonly animate?: (time: number) => void;
   readonly pointerMove?: (event: PointerEvent) => void;
   readonly pointerLeave?: () => void;
+  readonly pointerTarget?: Pick<EventTarget, "addEventListener" | "removeEventListener">;
   readonly contextLost?: (event: Event) => void;
   readonly createResizeObserver?: (callback: () => void) => Pick<ResizeObserver, "observe" | "disconnect">;
   readonly createIntersectionObserver?: (
@@ -35,6 +36,7 @@ export function startGlyphRenderLifecycle(options: GlyphRenderLifecycleOptions) 
     animate = () => {}, pointerMove = () => {}, pointerLeave = () => {},
     contextLost = () => {},
   } = options;
+  const pointerTarget = options.pointerTarget ?? (typeof window === "undefined" ? host : window);
   let intersecting = true;
   let cleaned = false;
   const render = () => renderer.render(scene, camera);
@@ -78,8 +80,8 @@ export function startGlyphRenderLifecycle(options: GlyphRenderLifecycleOptions) 
 
   renderer.domElement.dataset.glyphCanvas = "";
   host.appendChild(renderer.domElement);
-  host.addEventListener("pointermove", pointerMove, { passive: true });
-  host.addEventListener("pointerleave", pointerLeave);
+  pointerTarget.addEventListener("pointermove", pointerMove as EventListener, { passive: true });
+  pointerTarget.addEventListener("pointerleave", pointerLeave as EventListener);
   renderer.domElement.addEventListener("webglcontextlost", lost);
   document.addEventListener("visibilitychange", visibility);
   resizeObserver?.observe(host);
@@ -93,8 +95,8 @@ export function startGlyphRenderLifecycle(options: GlyphRenderLifecycleOptions) 
     renderer.setAnimationLoop(null);
     resizeObserver?.disconnect();
     intersection?.disconnect();
-    host.removeEventListener("pointermove", pointerMove);
-    host.removeEventListener("pointerleave", pointerLeave);
+    pointerTarget.removeEventListener("pointermove", pointerMove as EventListener);
+    pointerTarget.removeEventListener("pointerleave", pointerLeave as EventListener);
     renderer.domElement.removeEventListener("webglcontextlost", lost);
     document.removeEventListener("visibilitychange", visibility);
     dispose();

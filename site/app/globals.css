@@ -26,6 +26,7 @@ input {
 }
 
 .hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
   width: min(100%, 100rem);
@@ -35,8 +36,10 @@ input {
 }
 
 .hero-copy {
+  z-index: 1;
   container-type: inline-size;
   display: flex;
+  grid-column: 1;
   min-width: 0;
   padding: clamp(2rem, 6vw, 6rem) clamp(1.5rem, 4vw, 4.5rem);
   flex-direction: column;
@@ -44,11 +47,115 @@ input {
 }
 
 .eyebrow {
+  display: flex;
   margin: 0 0 clamp(3rem, 9vh, 6.5rem);
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  color: var(--blue);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.wordmark-prompt {
+  color: var(--blue);
+}
+
+.wordmark-caret {
+  width: 0.55ch;
+  height: 1.15em;
+  background: var(--blue);
+  animation: caret-blink 1.06s steps(1) infinite;
+}
+
+.wordmark-sub {
   color: var(--blue-soft);
-  font-size: 0.67rem;
+  font-size: 0.62rem;
   letter-spacing: 0.13em;
   text-transform: uppercase;
+}
+
+@keyframes caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.8rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.eyebrow,
+.hero-introduction,
+.install-instruction,
+.install-prompt,
+.icon-links {
+  animation: enter-up 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.eyebrow {
+  animation-delay: 60ms;
+}
+
+.hero-introduction {
+  animation-delay: 160ms;
+}
+
+.install-instruction {
+  animation-delay: 280ms;
+}
+
+.install-prompt {
+  animation-delay: 340ms;
+}
+
+.icon-links {
+  animation-delay: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-caret {
+    animation: none;
+  }
+
+  .eyebrow,
+  .hero-introduction,
+  .install-instruction,
+  .install-prompt,
+  .icon-links,
+  .snowflake-region {
+    animation: none;
+  }
 }
 
 .hero-introduction h1 {
@@ -101,6 +208,7 @@ input {
   outline: 0;
   background: rgb(8 8 8 / 28%);
   font-size: 0.7rem;
+  transition: border-color 140ms ease;
   white-space: nowrap;
 }
 
@@ -115,6 +223,16 @@ input {
   border-radius: 0;
   background: rgb(8 8 8 / 28%);
   cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.install-prompt:hover .install-prompt-field,
+.install-prompt:hover .copy-button {
+  border-color: rgb(95 184 242 / 55%);
+}
+
+.install-prompt-field:focus {
+  border-color: rgb(95 184 242 / 55%);
 }
 
 .copy-button svg,
@@ -127,7 +245,7 @@ input {
 .icon-links {
   display: flex;
   gap: 1.2rem;
-  margin-top: 1.65rem;
+  margin-top: 0.85rem;
 }
 
 .icon-links a {
@@ -170,16 +288,19 @@ input {
 }
 
 .copy-button:focus-visible,
-.icon-links a:focus-visible,
-.install-prompt-field:focus-visible {
+.icon-links a:focus-visible {
   outline: 1px solid var(--blue);
   outline-offset: 0.25rem;
 }
 
 .snowflake-region {
-  position: relative;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
   min-width: 0;
   background: var(--black);
+  animation: enter-fade 0.7s ease both;
+  animation-delay: 320ms;
 }
 
 .glyph-snowflake {
@@ -242,6 +363,8 @@ input {
   }
 
   .snowflake-region {
+    position: relative;
+    inset: auto;
     min-height: 60svh;
   }
 }

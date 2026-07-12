@@ -7,7 +7,14 @@ export default function Home() {
     <main>
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <p className="eyebrow">nix-agent / local MCP server</p>
+          <p className="eyebrow">
+            <span className="wordmark">
+              <span aria-hidden="true" className="wordmark-prompt">❯</span>
+              <span>nix-agent</span>
+              <span aria-hidden="true" className="wordmark-caret" />
+            </span>
+            <span className="wordmark-sub">local MCP server</span>
+          </p>
           <div className="hero-introduction">
             <h1 aria-label="NixOS operations for your AI agent." id="hero-title">
               <span>NixOS operations</span>
@@ -17,7 +24,7 @@ export default function Home() {
               Evaluate, inspect, validate, format, preview, activate, and roll back your NixOS or Home Manager configuration.
             </p>
           </div>
-          <p className="install-instruction">send this to your coding agent.</p>
+          <p className="install-instruction">Send this to your coding agent.</p>
           <InstallPrompt />
           <IconLinks />
         </div>

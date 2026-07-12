@@ -72,7 +72,9 @@ describe("startGlyphRenderLifecycle", () => {
     const add = vi.spyOn(host, "addEventListener");
     const remove = vi.spyOn(host, "removeEventListener");
     const state = mocks(false);
-    const lifecycle = startGlyphRenderLifecycle({ host, ...state, scene: {}, camera: {} });
+    const lifecycle = startGlyphRenderLifecycle({
+      host, ...state, scene: {}, camera: {}, pointerTarget: host,
+    });
 
     expect(host.querySelectorAll("canvas")).toHaveLength(1);
     expect(add).toHaveBeenCalledWith("pointermove", expect.any(Function), { passive: true });
@@ -83,6 +85,22 @@ describe("startGlyphRenderLifecycle", () => {
     expect(state.intersectionObserver.disconnect).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledWith("pointermove", expect.any(Function));
     expect(host.querySelectorAll("canvas")).toHaveLength(0);
+  });
+
+  it("tracks the pointer on the window by default so the whole viewport drives gaze", () => {
+    const host = document.createElement("div");
+    const hostAdd = vi.spyOn(host, "addEventListener");
+    const windowAdd = vi.spyOn(window, "addEventListener");
+    const state = mocks(false);
+    const lifecycle = startGlyphRenderLifecycle({ host, ...state, scene: {}, camera: {} });
+
+    expect(windowAdd).toHaveBeenCalledWith("pointermove", expect.any(Function), { passive: true });
+    expect(hostAdd).not.toHaveBeenCalledWith(
+      "pointermove",
+      expect.any(Function),
+      expect.anything(),
+    );
+    lifecycle.cleanup();
   });
 
   it("is StrictMode-remount safe without duplicate canvases or leaked ownership", () => {

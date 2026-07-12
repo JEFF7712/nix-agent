@@ -25,7 +25,7 @@ describe("glyph shaders", () => {
 
     expect(vertexShader).toContain("uniform vec2 uResolution");
     expect(vertexShader).toMatch(/baseNdc[\s\S]*baseClipPosition\.xy\s*\/\s*baseClipPosition\.w/);
-    expect(vertexShader).toMatch(/uResolution\.x\s*\/\s*uResolution\.y/);
+    expect(vertexShader).toMatch(/uResolution\.x\s*\/\s*(max\()?uResolution\.y/);
     expect(projection).toBeGreaterThan(0);
     expect(distance).toBeGreaterThan(projection);
   });
@@ -50,9 +50,9 @@ describe("glyph shaders", () => {
     expect(vertexShader).toMatch(/transformed\.xy\s*\+=\s*repelDir\s*\*\s*repel/);
   });
 
-  it("applies the repulsion field to every point including the agent face", () => {
-    expect(vertexShader).toMatch(/float\s+repel\s*=\s*repelField\s*;/);
-    expect(vertexShader).not.toMatch(/isFace/);
+  it("exempts the agent face from the repulsion field", () => {
+    expect(vertexShader).toMatch(/isFace\s*=\s*step\(0\.25,\s*agent\)/);
+    expect(vertexShader).toMatch(/repel\s*=\s*repelField\s*\*\s*\(1\.0\s*-\s*isFace\)/);
   });
 
   it("brightens the pushed rim without recoloring it", () => {
@@ -88,5 +88,55 @@ describe("glyph shaders", () => {
     expect(fragmentShader).toContain("varying float vAgent");
     expect(fragmentShader).toMatch(/lit\s*=\s*mix\(vBrightness \* depthLight,\s*vAgentBright,\s*isAgent\)/);
     expect(fragmentShader).not.toMatch(/amber/i);
+  });
+
+  it("squashes sclera toward gaze and shades brows separately from the mouth", () => {
+    expect(vertexShader).toContain("attribute float eyeLocalX");
+    expect(vertexShader).toMatch(/interestLocal[\s\S]*isSclera/);
+    expect(vertexShader).toMatch(/isBrow/);
+    expect(vertexShader).toMatch(/isBrow\s*\*\s*0\.72/);
+    expect(vertexShader).toMatch(/isMouth\s*\*\s*0\.42/);
+  });
+
+  it("morphs brows and mouth from anger and happy uniforms", () => {
+    expect(vertexShader).toContain("uniform float uAnger");
+    expect(vertexShader).toContain("uniform float uHappy");
+    expect(vertexShader).toMatch(/innerBrow[\s\S]*anger/);
+    expect(vertexShader).toMatch(/isMouth[\s\S]*happy/);
+    expect(vertexShader).toMatch(/anger\s*=\s*clamp\(uAnger[\s\S]*uHappy/);
+  });
+
+  it("expands overlapping click pulse rings through the snowflake glyphs", () => {
+    expect(vertexShader).toContain("uniform vec2 uPulseOrigins[8]");
+    expect(vertexShader).toContain("uniform float uPulseAges[8]");
+    expect(vertexShader).toContain("uniform float uPulseScales[8]");
+    expect(vertexShader).toMatch(/for\s*\(\s*int\s+i\s*=\s*0;\s*i\s*<\s*8;\s*i\+\+\)/);
+    expect(vertexShader).toMatch(/radius\s*=\s*pulseAge\s*\*\s*0\.7\s*\*\s*pulseScale/);
+    expect(vertexShader).toMatch(/pulsePush\s*\+=\s*pulseDir/);
+    expect(vertexShader).toMatch(/transformed\.xy\s*\+=\s*pulsePush/);
+    expect(fragmentShader).toContain("varying float vPulse");
+    expect(fragmentShader).toMatch(/vPulse/);
+  });
+
+  it("adds copy-happy sparkle and double-blink", () => {
+    expect(vertexShader).toContain("uniform float uHappyBlink");
+    expect(vertexShader).toMatch(/happyDoubleBlink/);
+    expect(vertexShader).toMatch(/sparkle/);
+    expect(vertexShader).toMatch(/glint/);
+    expect(vertexShader).not.toMatch(/happyShimmer/);
+    expect(fragmentShader).not.toMatch(/vHappyShimmer/);
+  });
+
+  it("supports idle gaze, curious tilt, sleepy lids, pulse wince, and wake-in", () => {
+    expect(vertexShader).toContain("uniform float uSleepy");
+    expect(vertexShader).toContain("uniform float uWake");
+    expect(vertexShader).toContain("uniform float uPointerBlend");
+    expect(vertexShader).toMatch(/idleGaze/);
+    expect(vertexShader).toMatch(/tilt/);
+    expect(vertexShader).toMatch(/wince/);
+    expect(vertexShader).toContain("uniform float uWinceAge");
+    expect(vertexShader).toMatch(/One-shot flinch|uWinceAge/);
+    expect(vertexShader).toMatch(/settle/);
+    expect(vertexShader).toMatch(/agentBlinkAmount\([\s\S]*sleepy/);
   });
 });

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="32" height="32" viewBox="0 0 501.56251 501.56249">
+  <defs>
+    <linearGradient id="ngLight">
+      <stop offset="0" stop-color="#699ad7"/>
+      <stop offset="0.24345198" stop-color="#7eb1dd"/>
+      <stop offset="1" stop-color="#7ebae4"/>
+    </linearGradient>
+    <linearGradient id="ngDark">
+      <stop offset="0" stop-color="#415e9a"/>
+      <stop offset="0.23168644" stop-color="#4a6baf"/>
+      <stop offset="1" stop-color="#5277c3"/>
+    </linearGradient>
+    <linearGradient xlink:href="#ngLight" id="ngLightU" gradientUnits="userSpaceOnUse" gradientTransform="translate(70.650339,-1055.1511)" x1="200.59668" y1="351.41116" x2="290.08701" y2="506.18814"/>
+    <linearGradient xlink:href="#ngDark" id="ngDarkU" gradientUnits="userSpaceOnUse" gradientTransform="translate(864.69589,-1491.3405)" x1="-584.19934" y1="782.33563" x2="-496.29703" y2="937.71399"/>
+  </defs>
+  <rect x="0" y="0" width="501.56251" height="501.56249" rx="56" fill="#000000"/>
+  <g transform="translate(-156.41121,933.30685)">
+    <g transform="matrix(0.99994059,0,0,0.99994059,-0.06321798,33.188377)">
+      <path id="armLight" d="m 309.54892,-710.38827 122.19683,211.67512 -56.15706,0.5268 -32.6236,-56.8692 -32.85645,56.5653 -27.90237,-0.011 -14.29086,-24.6896 46.81047,-80.4901 -33.22946,-57.8257 z" fill="url(#ngLightU)" fill-rule="evenodd"/>
+      <use transform="rotate(60,407.11155,-715.78724)" xlink:href="#armLight"/>
+      <use transform="rotate(-60,407.31177,-715.70016)" xlink:href="#armLight"/>
+      <use transform="rotate(180,407.41868,-715.7565)" xlink:href="#armLight"/>
+      <path id="armDark" d="m 309.54892,-710.38827 122.19683,211.67512 -56.15706,0.5268 -32.6236,-56.8692 -32.85645,56.5653 -27.90237,-0.011 -14.29086,-24.6896 46.81047,-80.4901 -33.22946,-57.8256 z" fill="url(#ngDarkU)" fill-rule="evenodd"/>
+      <use transform="rotate(120,407.33916,-716.08356)" xlink:href="#armDark"/>
+      <use transform="rotate(-120,407.28823,-715.86995)" xlink:href="#armDark"/>
+    </g>
+  </g>
+  <g fill="#cfe8fc">
+    <circle cx="218.78" cy="220.78" r="16"/>
+    <circle cx="282.78" cy="220.78" r="16"/>
+  </g>
+  <path d="M220.78 258 Q250.78 284 280.78 258" fill="none" stroke="#cfe8fc" stroke-width="9" stroke-linecap="round"/>
+</svg>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_BROW,
   AGENT_EYE,
   AGENT_MOUTH,
   AGENT_PUPIL,
@@ -202,6 +203,7 @@ describe("buildAgentFacePoints", () => {
 
     expect(face.count).toBeGreaterThan(0);
     expect(flags).toContain(AGENT_EYE);
+    expect(flags).toContain(AGENT_BROW);
     expect(flags).toContain(AGENT_MOUTH);
     expect(eyeXs.some((x) => x < 0)).toBe(true);
     expect(eyeXs.some((x) => x > 0)).toBe(true);
@@ -218,18 +220,42 @@ describe("buildAgentFacePoints", () => {
   it("records eye-local Y for eyes and zeroes it for the mouth", () => {
     const face = buildAgentFacePoints(0x4e4958);
     expect(face.eyeLocalY).toHaveLength(face.count);
+    expect(face.eyeLocalX).toHaveLength(face.count);
 
     const eyeLocals = Array.from({ length: face.count }, (_, i) => i)
       .filter((i) => face.agent[i] === AGENT_EYE || face.agent[i] === AGENT_PUPIL)
       .map((i) => face.eyeLocalY[i]);
     const mouthLocals = Array.from({ length: face.count }, (_, i) => i)
       .filter((i) => face.agent[i] === AGENT_MOUTH)
-      .map((i) => face.eyeLocalY[i]);
+      .map((i) => ({ x: face.eyeLocalX[i], y: face.eyeLocalY[i] }));
+    const browLocals = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_BROW)
+      .map((i) => ({ x: face.eyeLocalX[i], y: face.eyeLocalY[i] }));
 
-    expect(mouthLocals.every((y) => y === 0)).toBe(true);
+    expect(mouthLocals.every(({ y }) => y === 0)).toBe(true);
+    expect(mouthLocals.some(({ x }) => x < 0)).toBe(true);
+    expect(mouthLocals.some(({ x }) => x > 0)).toBe(true);
+    expect(browLocals.every(({ y }) => y === 0)).toBe(true);
+    expect(browLocals.some(({ x }) => x < 0)).toBe(true);
+    expect(browLocals.some(({ x }) => x > 0)).toBe(true);
     expect(eyeLocals.some((y) => y < 0)).toBe(true);
     expect(eyeLocals.some((y) => y > 0)).toBe(true);
     expect(Math.max(...eyeLocals.map(Math.abs))).toBeLessThanOrEqual(0.05 + 1e-6);
+  });
+
+  it("places thin brows above both eyes", () => {
+    const face = buildAgentFacePoints(0x4e4958);
+    const brows = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_BROW)
+      .map((i) => ({ x: face.positions[i * 3], y: face.positions[i * 3 + 1] }));
+    const eyeYs = Array.from({ length: face.count }, (_, i) => i)
+      .filter((i) => face.agent[i] === AGENT_EYE)
+      .map((i) => face.positions[i * 3 + 1]);
+
+    expect(brows.length).toBeGreaterThan(0);
+    expect(brows.some((p) => p.x < 0)).toBe(true);
+    expect(brows.some((p) => p.x > 0)).toBe(true);
+    expect(Math.min(...brows.map((p) => p.y))).toBeGreaterThan(Math.min(...eyeYs));
   });
 });
 
@@ -250,6 +276,8 @@ describe("concatGlyphPointData", () => {
     expect(merged.agent.subarray(flake.count)).toEqual(face.agent);
     expect(Array.from(merged.eyeLocalY.subarray(0, flake.count)).every((v) => v === 0)).toBe(true);
     expect(merged.eyeLocalY.subarray(flake.count)).toEqual(face.eyeLocalY);
+    expect(Array.from(merged.eyeLocalX.subarray(0, flake.count)).every((v) => v === 0)).toBe(true);
+    expect(merged.eyeLocalX.subarray(flake.count)).toEqual(face.eyeLocalX);
     expect(merged.positions.subarray(flake.count * 3)).toEqual(face.positions);
   });
 });

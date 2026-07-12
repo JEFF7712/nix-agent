@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { INSTALL_PROMPT, InstallPrompt } from "../components/InstallPrompt";
@@ -6,6 +6,7 @@ import { INSTALL_PROMPT, InstallPrompt } from "../components/InstallPrompt";
 describe("InstallPrompt", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("renders the complete prompt in one readonly field", () => {
@@ -19,6 +20,8 @@ describe("InstallPrompt", () => {
   it("copies the complete prompt and announces success", async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const happy = vi.fn();
+    window.addEventListener("nix-agent-face-happy", happy);
     render(<InstallPrompt />);
 
     const button = screen.getByRole("button", { name: "Copy install prompt" });
@@ -28,6 +31,24 @@ describe("InstallPrompt", () => {
     expect(writeText).toHaveBeenCalledWith(INSTALL_PROMPT);
     expect(screen.getByRole("status")).toHaveTextContent("Install prompt copied.");
     expect(screen.getByRole("status")).not.toHaveClass("sr-only");
+    expect(happy).toHaveBeenCalledOnce();
+    window.removeEventListener("nix-agent-face-happy", happy);
+  });
+
+  it("clears the success announcement after a few seconds", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    render(<InstallPrompt />);
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Copy install prompt" }).click();
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Install prompt copied.");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1800);
+    });
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("announces clipboard failure", async () => {
