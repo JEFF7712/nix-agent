@@ -20,7 +20,7 @@
     <linearGradient xlink:href="#nix-dark" id="nix-dark-u" gradientUnits="userSpaceOnUse" gradientTransform="translate(864.69589,-1491.3405)" x1="-584.19934" y1="782.33563" x2="-496.29703" y2="937.71399"/>
 
     <!-- Nix snowflake (NixOS/nixos-artwork, CC-BY 4.0) -->
-    <g id="snow" transform="translate(-156.41121,933.30685)">
+    <g id="snow-geometry" transform="translate(-156.41121,933.30685)">
       <g transform="matrix(0.99994059,0,0,0.99994059,-0.06321798,33.188377)">
         <path id="nix-l" d="m 309.54892,-710.38827 122.19683,211.67512 -56.15706,0.5268 -32.6236,-56.8692 -32.85645,56.5653 -27.90237,-0.011 -14.29086,-24.6896 46.81047,-80.4901 -33.22946,-57.8257 z" style="fill:url(#nix-light-u);fill-rule:evenodd;stroke:none"/>
         <use transform="rotate(60,407.11155,-715.78724)" xlink:href="#nix-l"/>
@@ -31,13 +31,21 @@
         <use transform="rotate(-120,407.28823,-715.86995)" xlink:href="#nix-d"/>
       </g>
     </g>
+    <g id="snow">
+      <use xlink:href="#snow-geometry"/>
+      <g fill="#cfe8fc">
+        <circle cx="218.78" cy="220.78" r="16"/>
+        <circle cx="282.78" cy="220.78" r="16"/>
+      </g>
+      <path d="M220.78 258 Q250.78 284 280.78 258" fill="none" stroke="#cfe8fc" stroke-width="9" stroke-linecap="round"/>
+    </g>
   </defs>
 
   <rect width="1280" height="320" fill="#0B1020"/>
   <rect width="1280" height="320" fill="url(#bg)"/>
   <rect x="0.5" y="0.5" width="1279" height="319" fill="none" stroke="#2A3656" stroke-opacity="0.6"/>
 
-  <!-- faint watermark snowflake, right side -->
+  <!-- faint nix-agent mark, right side -->
   <use xlink:href="#snow" transform="translate(1120,150) scale(0.78) translate(-250.781,-250.781)" opacity="0.06"/>
 
   <!-- mark -->

@@ -33,4 +33,4 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 
 ---
 
-The banner uses the Nix snowflake from [NixOS/nixos-artwork](https://github.com/NixOS/nixos-artwork), licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The nix-agent logo adapts the Nix snowflake from [NixOS/nixos-artwork](https://github.com/NixOS/nixos-artwork), licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
