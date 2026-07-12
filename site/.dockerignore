@@ -1,0 +1,14 @@
+.git
+.github
+.next
+out
+node_modules
+coverage
+__tests__
+docs
+.vscode
+.idea
+.DS_Store
+*.tsbuildinfo
+*.log
+README.md

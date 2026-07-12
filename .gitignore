@@ -4,3 +4,12 @@ CLAUDE.md
 uv.lock
 result
 docs/superpowers
+.superpowers/
+research_nextjs_static_3d/
+research_nix_snowflake_ascii/
+site/.next/
+site/out/
+site/node_modules/
+site/coverage/
+site/*.tsbuildinfo
+site/docs/
