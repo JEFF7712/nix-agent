@@ -1,0 +1,247 @@
+:root {
+  color-scheme: dark;
+  --black: #000;
+  --blue: #5fb8f2;
+  --blue-faint: rgb(95 184 242 / 16%);
+  --blue-soft: rgb(95 184 242 / 72%);
+  background: var(--black);
+  color: var(--blue);
+  font-family: var(--font-ibm-plex-mono), monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--black);
+}
+
+button,
+input {
+  color: inherit;
+  font: inherit;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  width: min(100%, 100rem);
+  min-height: 100svh;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.hero-copy {
+  container-type: inline-size;
+  display: flex;
+  min-width: 0;
+  padding: clamp(2rem, 6vw, 6rem) clamp(1.5rem, 4vw, 4.5rem);
+  flex-direction: column;
+  justify-content: center;
+}
+
+.eyebrow {
+  margin: 0 0 clamp(3rem, 9vh, 6.5rem);
+  color: var(--blue-soft);
+  font-size: 0.67rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.hero-introduction h1 {
+  max-width: 17ch;
+  margin: 0;
+  font-size: clamp(1.8rem, 9.5cqi, 5.2rem);
+  font-weight: 500;
+  letter-spacing: -0.075em;
+  line-height: 0.98;
+}
+
+.hero-introduction h1 span {
+  display: block;
+  white-space: nowrap;
+}
+
+.hero-description {
+  max-width: 40rem;
+  margin: 1.75rem 0 0;
+  color: var(--blue-soft);
+  font-size: clamp(0.78rem, 1.1vw, 0.94rem);
+  line-height: 1.75;
+}
+
+.install-instruction {
+  max-width: 42rem;
+  margin: clamp(2.2rem, 5vh, 3.5rem) 0 0.65rem;
+  color: var(--blue-soft);
+  font-size: 0.67rem;
+  letter-spacing: 0.02em;
+}
+
+.install-prompt {
+  position: relative;
+  display: flex;
+  max-width: 42rem;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.install-prompt-field {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  overflow-x: auto;
+  border: 1px solid rgb(95 184 242 / 30%);
+  border-right: 0;
+  border-radius: 0;
+  outline: 0;
+  background: rgb(8 8 8 / 28%);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.copy-button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgb(95 184 242 / 30%);
+  border-radius: 0;
+  background: rgb(8 8 8 / 28%);
+  cursor: pointer;
+}
+
+.copy-button svg,
+.icon-links svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.icon-links {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 1.65rem;
+}
+
+.icon-links a {
+  position: relative;
+  display: grid;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  color: var(--blue-soft);
+  place-items: center;
+}
+
+.icon-links a::after {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--blue-faint);
+  background: var(--black);
+  color: var(--blue);
+  content: attr(data-tooltip);
+  font-size: 0.62rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.2rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.icon-links a:hover::after,
+.icon-links a:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.copy-button:hover,
+.copy-button:focus-visible,
+.icon-links a:hover,
+.icon-links a:focus-visible {
+  color: var(--blue);
+}
+
+.copy-button:focus-visible,
+.icon-links a:focus-visible,
+.install-prompt-field:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 0.25rem;
+}
+
+.snowflake-region {
+  position: relative;
+  min-width: 0;
+  background: var(--black);
+}
+
+.glyph-snowflake {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.glyph-snowflake canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.glyph-snowflake-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  overflow: hidden;
+  color: var(--blue);
+  font: 500 clamp(0.22rem, 0.52vw, 0.48rem) / 0.8 var(--font-ibm-plex-mono), monospace;
+  opacity: 0.78;
+  place-content: center;
+  white-space: pre;
+}
+
+.glyph-snowflake-fallback[hidden] {
+  display: none;
+}
+
+.copy-status {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  color: var(--blue-soft);
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 48rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-copy {
+    min-height: 100svh;
+  }
+
+  .snowflake-region {
+    min-height: 60svh;
+  }
+}
