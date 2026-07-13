@@ -17,11 +17,11 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.7.2"' in pyproject_text
-    assert 'version = "0.7.2";' in flake_text
-    assert "## v0.7.2 - 2026-07-07" in changelog_text
-    assert "MCP stdio smoke test" in changelog_text
-    assert "NIX_AGENT_COMMAND_TIMEOUT" in changelog_text
+    assert 'version = "0.8.0"' in pyproject_text
+    assert 'version = "0.8.0";' in flake_text
+    assert "## v0.8.0 - 2026-07-12" in changelog_text
+    assert "from nine tools to seven" in changelog_text
+    assert "nix-agent inspect-flake" in changelog_text
 
 
 def test_flake_package_wraps_lint_and_diff_tools_for_runtime():

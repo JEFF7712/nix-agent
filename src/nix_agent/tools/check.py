@@ -4,7 +4,7 @@ from nix_agent import runner
 from nix_agent.target import Target, TargetError, resolve_target
 from nix_agent.tools.build import build_closure
 
-LEVELS = ("lint", "flake", "dry-build", "dry-activate")
+LEVELS = ("lint", "dry-build", "dry-activate")
 
 
 def _parse_statix(stdout: str) -> list[dict[str, object]]:
@@ -159,9 +159,9 @@ def check(
     flake_uri: str | None = None,
     mode: str = "nixos",
 ) -> dict[str, object]:
-    """Validation ladder, fast to slow: lint -> flake -> dry-build ->
-    dry-activate. Linters exiting non-zero just means findings exist;
-    status stays 'ok' with structured findings attached."""
+    """Validation ladder, fast to slow: lint -> dry-build -> dry-activate.
+    Linters exiting non-zero just means findings exist; status stays 'ok'
+    with structured findings attached."""
     if level not in LEVELS:
         return {
             "status": "invalid_level",
@@ -174,12 +174,6 @@ def check(
 
     if level == "lint":
         return _lint(target)
-
-    if level == "flake":
-        result = runner.run(["nix", "flake", "check", target.flake_dir])
-        return runner.envelope(
-            "ok" if result.ok else "failed", target.flake_dir, result
-        )
 
     if level == "dry-build":
         return build_closure(target, dry_run=True)

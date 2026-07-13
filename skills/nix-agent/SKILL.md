@@ -8,10 +8,10 @@ description: Use when a user wants to change NixOS packages, options, modules, o
 ## Overview
 
 `nix-agent` is a pure Nix operations toolbox. It does NOT read or write
-files. It evaluates the live config, lints, formats, validates, builds,
-diffs, switches, and manages generations, handing every result back as a
-compact JSON envelope. Read the envelope: it already holds what you would
-otherwise re-fetch by hand.
+files. It builds, diffs, switches, and manages generations (the operational
+core), and evaluates, locates, and lints the live config (introspection),
+handing every result back as a compact JSON envelope. Read the envelope: it
+already holds what you would otherwise re-fetch by hand.
 
 Division of labor:
 - **Your native tools** (Read/Edit/Write) edit `.nix` files.
@@ -20,11 +20,24 @@ Division of labor:
 
 ## Tool Surface
 
-All tools auto-resolve the target when `flake_uri` is omitted and echo
-back what they resolved and ran (`resolved_target` and `command`;
-`inspect_flake` reports `flake_dir`), plus `raw_bytes`/`returned_bytes`
-accounting (see Token discipline).
+Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
+omitted and echo back what they resolved and ran (`resolved_target` and
+`command`), plus `raw_bytes`/`returned_bytes` accounting (see Token
+discipline).
 
+Operational core:
+- `build(flake_uri?, mode?)`: build the closure, no activation. A failed
+  build carries `failed_derivation`.
+- `diff(flake_uri?, mode?)`: what a switch would change (adds/removes/
+  version bumps), plus a structured `packages` object when it parses.
+  Show this before switching.
+- `switch(flake_uri?, mode?, validate?, full_log?)`: activate. Records
+  `rollback_generation`, returns a `summary` (units changed, derivations
+  built, `packages` vs the rollback generation, `health`), and trims the
+  log to a tail on success. `validate=True` gates on `check("dry-build")`.
+- `generations(action="list"|"rollback", mode?)`: list or roll back.
+
+Config introspection:
 - `eval_config(attr, flake_uri?, mode?)`: final merged value of any
   config attribute on THIS machine, after all modules/overlays.
   `mcp-nixos` says what an option means; this says what it is. Pass a
@@ -37,23 +50,13 @@ accounting (see Token discipline).
   plain config values (use `eval_config` there). For integrated HM,
   spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`.
 - `check(level, flake_uri?, mode?)`: validation ladder, fast to slow:
-  `"lint"` (statix + deadnix, structured `findings`), `"flake"`,
-  `"dry-build"`, `"dry-activate"` (NixOS only).
-- `format(paths?, flake_uri?, mode?)`: `nix fmt` / nixfmt. Explicit
-  `paths` return per-file `results`.
-- `build(flake_uri?, mode?)`: build the closure, no activation. A failed
-  build carries `failed_derivation`.
-- `diff(flake_uri?, mode?)`: what a switch would change (adds/removes/
-  version bumps), plus a structured `packages` object when it parses.
-  Show this before switching.
-- `switch(flake_uri?, mode?, validate?, full_log?)`: activate. Records
-  `rollback_generation`, returns a `summary` (units changed, derivations
-  built, `packages` vs the rollback generation, `health`), and trims the
-  log to a tail on success. `validate=True` gates on `check("dry-build")`.
-- `generations(action="list"|"rollback", mode?)`: list or roll back.
-- `inspect_flake(flake_uri?)`: structured facts about a config repo in
-  one call (hosts, HM integration, module dirs, formatter, lint tools).
-  Run it when orienting in an unfamiliar config; it feeds onboarding.
+  `"lint"` (statix + deadnix, structured `findings`), `"dry-build"`,
+  `"dry-activate"` (NixOS only).
+
+Formatting is not a tool: format edited files with the flake's own
+formatter (`nix fmt`, or `nixfmt` on the files) via your Bash tool. Repo
+onboarding is the `nix-agent inspect-flake` CLI subcommand, not a tool; the
+`nix-agent-init` skill drives it.
 
 ## Picking `mode` (read before any HM change)
 
@@ -90,7 +93,7 @@ an attribute this flake does not define. Fix it with an explicit
    `eval_config` for what the machine currently resolves; `locate_option`
    for which file to open.
 2. Edit `.nix` files with your native file tools.
-3. `format()` then `check("lint")`: fix findings worth fixing.
+3. Format with the flake's formatter (`nix fmt`, or `nixfmt` on the edited files) via Bash, then `check("lint")`: fix findings worth fixing.
 4. `check("dry-build")`: catches eval/build errors cheaply.
 5. `diff()`: show the user what will change.
 6. `switch()`: report the result and `rollback_generation`.
@@ -131,8 +134,8 @@ do not re-fetch.
 
 ## Onboarding a repo
 
-First time in an unfamiliar config? Run `/nix-agent-init`: it calls
-`inspect_flake()` once and generates `AGENT_MAP.md`, `CLAUDE.md`, and
+First time in an unfamiliar config? Run `/nix-agent-init`: it runs
+`nix-agent inspect-flake` once and generates `AGENT_MAP.md`, `CLAUDE.md`, and
 `.mcp.json` from the observed facts, never boilerplate.
 
 ## Hard Rules

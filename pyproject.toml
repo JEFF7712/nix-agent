@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nix-agent"
-version = "0.7.2"
-description = "MCP server exposing composable NixOS/Home Manager operations: eval, locate, inspect, lint, format, build, diff, switch, generations."
+version = "0.8.0"
+description = "MCP server exposing composable NixOS/Home Manager operations: build, diff, switch, generations, plus eval, locate, and lint for config introspection."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

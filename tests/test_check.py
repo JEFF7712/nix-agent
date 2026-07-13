@@ -109,19 +109,6 @@ def test_check_lint_missing_binaries(monkeypatch):
     assert set(out["missing"]) == {"statix", "deadnix"}
 
 
-def test_check_flake(monkeypatch):
-    calls = []
-
-    def fake_run(argv, cwd=None):
-        calls.append(argv)
-        return _result(True, command=argv)
-
-    monkeypatch.setattr(check_mod.runner, "run", fake_run)
-    out = check("flake", flake_uri="/etc/nixos#zen")
-    assert out["status"] == "ok"
-    assert calls[0] == ["nix", "flake", "check", "/etc/nixos"]
-
-
 def test_check_dry_build_delegates_to_build_closure(monkeypatch):
     seen = {}
 

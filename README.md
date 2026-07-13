@@ -3,8 +3,8 @@
 </p>
 
 A local MCP server that gives AI agents composable NixOS / Home Manager
-operations: eval, locate, inspect, lint, format, build, diff, switch,
-generations.
+operations: build, diff, switch, and generations for the operational core,
+plus eval, locate, and lint for config introspection.
 
 It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos). nix-agent
 operates on your actual configuration, `mcp-nixos` handles package and option

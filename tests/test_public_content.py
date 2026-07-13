@@ -11,15 +11,13 @@ INSTALL_PROMPT_COMPONENT = (
 ).read_text()
 
 EXPECTED_TOOLS = {
-    "eval_config",
-    "locate_option",
-    "check",
-    "format",
     "build",
     "diff",
     "switch",
     "generations",
-    "inspect_flake",
+    "eval_config",
+    "locate_option",
+    "check",
 }
 
 
@@ -59,7 +57,7 @@ def test_readme_banner_describes_both_configuration_types():
 
 
 def test_svg_banner_covers_the_public_scope_and_exact_tool_surface():
-    tool_line = re.search(r">(eval_config .+ generations)</text>", BANNER).group(1)
+    tool_line = re.search(r">(build .+ check)</text>", BANNER).group(1)
     documented_tools = set(tool_line.split(" · "))
 
     assert "NixOS and Home Manager" in BANNER
@@ -105,22 +103,22 @@ def test_usage_documents_output_caps_and_full_switch_log_escape_hatch():
 
 def test_usage_qualifies_inspection_as_best_effort_and_file_access_precisely():
     tool_surface = _usage_section("Tool surface")
-    inspect_entry = next(
-        line for line in tool_surface.splitlines() if line.startswith("| `inspect_flake")
+    inspect_entry = re.sub(
+        r"\s+", " ", _paragraph_containing(tool_surface, "inspect-flake [flake_uri]")
     )
     inspect_entry_lower = inspect_entry.lower()
     design_notes = _usage_section("Design notes")
 
+    assert "not a runtime tool" in inspect_entry
     assert "flake-show fails" in inspect_entry
-    assert "evaluated facts" in inspect_entry_lower
-    assert "`null` or `\"unknown\"`" in inspect_entry
+    assert '`null` or `"unknown"`' in inspect_entry
     assert "best-effort presence/absence heuristics" in inspect_entry
     assert "repository layout" in inspect_entry_lower
     assert "auto-import" in inspect_entry_lower
     assert "integrated home manager detection" in inspect_entry_lower
     assert "unreadable or unmatched files as absence" in inspect_entry
     assert "never guessed" not in inspect_entry
-    assert "no general-purpose file reading or editing" in design_notes
-    assert "`format` writes" in design_notes
-    assert "`inspect_flake` reads" in design_notes
+    assert "do no file editing or formatting" in design_notes
+    assert "`nix-agent inspect-flake` CLI subcommand" in design_notes
+    assert "`format`" not in USAGE
     assert "nix-agent does no file I/O" not in USAGE

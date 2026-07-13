@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.8.0 - 2026-07-12
+
+- Trim the runtime tool surface from nine tools to seven, split into two
+  tiers: an operational core (`build`, `diff`, `switch`, `generations`) and
+  config introspection (`eval_config`, `locate_option`, `check`).
+- Remove the `format` tool. Format edited files with the flake's own
+  formatter (`nix fmt` / `nixfmt`) via the host's shell; the wrapper still
+  bundles `nixfmt` for that step.
+- Remove `inspect_flake` from the MCP surface. Onboarding now runs it as the
+  `nix-agent inspect-flake [flake_uri]` CLI subcommand, which the
+  `nix-agent-init` skill drives.
+- Drop the `flake` level from `check`; the ladder is now `lint` ->
+  `dry-build` -> `dry-activate`. Use `dry-build` for cheap eval/build
+  validation.
+
 ## v0.7.2 - 2026-07-07
 
 - Add a CI matrix with separate plain Python tests and `nix flake check --system x86_64-linux`.

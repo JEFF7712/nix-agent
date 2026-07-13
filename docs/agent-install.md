@@ -243,15 +243,13 @@ default.
       "Bash(sudo nixos-rebuild dry-activate --flake *)",
       "Bash(sudo nixos-rebuild switch --flake *)",
       "Bash(sudo nixos-rebuild switch --rollback)",
-      "mcp__nix-agent__eval_config",
-      "mcp__nix-agent__locate_option",
-      "mcp__nix-agent__check",
-      "mcp__nix-agent__format",
       "mcp__nix-agent__build",
       "mcp__nix-agent__diff",
       "mcp__nix-agent__switch",
       "mcp__nix-agent__generations",
-      "mcp__nix-agent__inspect_flake"
+      "mcp__nix-agent__eval_config",
+      "mcp__nix-agent__locate_option",
+      "mcp__nix-agent__check"
     ],
     "deny": [
       "Read(~/.ssh/**)",

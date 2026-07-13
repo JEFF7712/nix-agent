@@ -3,19 +3,17 @@ import asyncio
 from nix_agent.server import build_server
 
 EXPECTED_TOOLS = {
-    "eval_config",
-    "check",
-    "format",
     "build",
     "diff",
     "switch",
     "generations",
+    "eval_config",
     "locate_option",
-    "inspect_flake",
+    "check",
 }
 
 
-def test_server_exposes_exactly_the_nine_tools():
+def test_server_exposes_exactly_the_expected_tools():
     server = build_server()
     if hasattr(server, "list_tools"):
         tools = asyncio.run(server.list_tools())

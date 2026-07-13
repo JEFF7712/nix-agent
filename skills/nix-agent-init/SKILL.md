@@ -7,9 +7,9 @@ description: Use when the user wants to make a NixOS/Home Manager config repo ag
 
 ## Overview
 
-Make a NixOS/Home Manager config repo agent-ready in one pass. Call
-`inspect_flake()` once, then generate three artifacts, each derived from
-the returned facts and the files you actually read:
+Make a NixOS/Home Manager config repo agent-ready in one pass. Run
+`nix-agent inspect-flake` once, then generate three artifacts, each derived
+from the returned facts and the files you actually read:
 
 - `AGENT_MAP.md`: task-routing table plus search shortcuts.
 - `CLAUDE.md` (+ `AGENTS.md`): a one-screen repo brief.
@@ -20,14 +20,15 @@ gets a short map; a rich repo gets a longer one. Never pad with generic
 NixOS advice, aspirational structure, or rules the facts do not support.
 If a fact is null or "unknown", say so or omit the row. Do not invent.
 
-You do not run `nix flake show` yourself: `inspect_flake()` does. You do
-read the repo's own files (module dirs, flake.nix) with your native tools
-to name real files in the tables.
+You do not run `nix flake show` yourself: `nix-agent inspect-flake` does.
+You do read the repo's own files (module dirs, flake.nix) with your native
+tools to name real files in the tables.
 
 ## Step 1: Inspect
 
-Call `inspect_flake()`. With no argument it auto-resolves the target; if
-the user named a repo, pass `inspect_flake(flake_uri="/path/to/repo")`.
+Run `nix-agent inspect-flake` (via Bash); it prints the fact bundle as JSON.
+With no argument it auto-resolves the target; if the user named a repo, pass
+the path: `nix-agent inspect-flake /path/to/repo`.
 
 The returned facts drive every decision below:
 
@@ -186,5 +187,5 @@ This is exact and testable. Follow it verbatim.
   `AGENT_MAP.md` are proposed-as-diff only, never overwritten.
 - No secrets in `.mcp.json`. Reference them via sops-nix/agenix elsewhere;
   this file holds only the flake pin and server names.
-- No boilerplate. Every line traces to a fact from `inspect_flake()` or a
-  file you read. When a fact is missing, omit the line.
+- No boilerplate. Every line traces to a fact from `nix-agent inspect-flake`
+  or a file you read. When a fact is missing, omit the line.

@@ -1,8 +1,9 @@
 # nix-agent usage
 
 `nix-agent` is a local stdio MCP server that gives AI agents composable
-NixOS / Home Manager operations: eval, locate, inspect, lint, format, build,
-diff, switch, generations. It works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
+NixOS / Home Manager operations: build, diff, switch, and generations for the
+operational core, plus eval, locate, and lint for config introspection. It
+works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 nix-agent operates on your actual configuration; `mcp-nixos` handles package
 and option discovery.
 
@@ -98,9 +99,8 @@ existing `flake.nix` among `/etc/nixos`, `~/nixos`, `~/.config/nixos`,
 `~/nix-config`, `~/nixos-config` for NixOS (`~/.config/home-manager`,
 `~/.config/nixpkgs` for Home Manager). The hostname / `user@host` attribute is
 picked automatically. Single-command results echo back `resolved_target` and
-the exact `command` run. Exceptions: `format` with explicit `paths` returns
-per-file `results`, `inspect_flake` reports `flake_dir`, and a batched
-`eval_config` folds its per-attr commands into `results`.
+the exact `command` run. Exception: a batched `eval_config` folds its per-attr
+commands into `results`.
 
 `mode` defaults to `"nixos"`. Use `"home-manager"` only for a **standalone** HM
 flake (its own `homeConfigurations`, applied with `home-manager switch`). When
@@ -111,17 +111,37 @@ flake, pin the target with `$NIX_AGENT_FLAKE` or an explicit `flake_uri` so
 resolution can't pick the wrong one. See `skills/nix-agent/SKILL.md` for the
 full mode-selection guidance.
 
+The surface is two tiers. The **operational core** produces structured
+operational signal and rollback safety that ad-hoc shell cannot reproduce
+reliably. **Config introspection** tools each earn their slot by capping or
+structuring Nix output the host would otherwise pay for in raw context.
+
+Operational core:
+
+| Tool | What it does |
+|------|-------------|
+| `build(flake_uri?, mode?)` | Build the closure, no activation. A failed build carries `failed_derivation` (`{drv, log_tail}`). |
+| `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
+| `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
+| `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
+
+Config introspection:
+
 | Tool | What it does |
 |------|-------------|
 | `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. |
 | `locate_option(attr, flake_uri?, mode?)` | Where this configuration sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it; large values degrade under the same size guard as `eval_config`, marked `truncated: true` per entry). For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`. |
-| `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"flake"`, `"dry-build"`, `"dry-activate"` (NixOS only). |
-| `format(paths?, flake_uri?, mode?)` | `nix fmt` / nixfmt. With explicit `paths`, returns per-file `results`. |
-| `build(flake_uri?, mode?)` | Build the closure, no activation. |
-| `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
-| `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
-| `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
-| `inspect_flake(flake_uri?)` | Structured facts about a config repo in one call: `hosts`, `home_configurations`, integrated-vs-standalone Home Manager (`hm_integration`), `module_dirs`, `auto_import` mechanism, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence. Evaluated facts become `null` or `"unknown"` when flake-show fails. Repository layout, auto-import, and integrated Home Manager detection are best-effort presence/absence heuristics, and may reflect unreadable or unmatched files as absence. Run this before onboarding a repo or when orienting in an unfamiliar config. |
+| `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"dry-build"`, `"dry-activate"` (NixOS only). |
+
+Repo onboarding is a CLI subcommand, not a runtime tool: `nix-agent
+inspect-flake [flake_uri]` prints structured facts about a config repo as JSON
+(`hosts`, `home_configurations`, integrated-vs-standalone Home Manager
+(`hm_integration`), `module_dirs`, `auto_import` mechanism, `formatter`,
+`lint_tools`, and justfile/CI/`.mcp.json` presence). Evaluated facts become
+`null` or `"unknown"` when flake-show fails; repository layout, auto-import,
+and integrated Home Manager detection are best-effort presence/absence
+heuristics that may reflect unreadable or unmatched files as absence. The
+`skills/nix-agent-init/` skill invokes it during onboarding.
 
 `summary.health` reports post-activation unit status and is success-only by
 design: a switch that leaves units newly failed still returns `status: "ok"`
@@ -136,7 +156,7 @@ top-level `health_note` replaces `summary.health`.
 
 1. Discovery: query `mcp-nixos` for packages/options; use `eval_config` to see what the user's machine currently resolves.
 2. Edit `.nix` files with the agent's native file tools (Read/Edit/Write).
-3. `format()` then `check("lint")`, fix findings worth fixing.
+3. Format with the flake's formatter (`nix fmt`, or `nixfmt` on the edited files) then `check("lint")`, fix findings worth fixing.
 4. `check("dry-build")`, catches eval/build errors cheaply.
 5. `diff()`, show the user what will change.
 6. `switch()`, activate; reports `rollback_generation`.
@@ -147,11 +167,11 @@ to `switch` is fine.
 
 ### Onboarding a repo
 
-First time in an unfamiliar config? Call `inspect_flake()` once to get its
-hosts, HM mode, module layout, and tooling in one shot, then hand those facts
-to the `skills/nix-agent-init/` skill. It generates `AGENT_MAP.md`,
+First time in an unfamiliar config? Run `nix-agent inspect-flake` once to get
+its hosts, HM mode, module layout, and tooling in one shot, then hand those
+facts to the `skills/nix-agent-init/` skill. It generates `AGENT_MAP.md`,
 `CLAUDE.md` (+ an `AGENTS.md` symlink), and a `.mcp.json`, all derived from
-what `inspect_flake` actually observed, never boilerplate. Re-runs only touch
+what `inspect-flake` actually observed, never boilerplate. Re-runs only touch
 the marked sections it owns, and it refuses to clobber a hand-written file
 that lacks its marker, proposing a diff instead.
 
@@ -177,18 +197,16 @@ so the token savings are visible per call, not just claimed:
 - `raw_bytes` is the underlying command output size (combined
   stdout+stderr, in bytes, before any truncation). Tools whose work is
   several co-equal runs sum them: `check("lint")` sums statix+deadnix,
-  `format` with explicit `paths` sums the per-file runs, batched
-  `eval_config` sums the per-attr evals. Tools with auxiliary probes
+  batched `eval_config` sums the per-attr evals. Tools with auxiliary probes
   count only the primary operation: `switch`'s post-activation
   health/diff probes are not included.
 - `returned_bytes` is the serialized size of the envelope actually handed
   back, computed last, and excludes the ~30 bytes of the two accounting
   fields themselves.
 - An envelope whose operation never produced command output omits
-  `raw_bytes` but keeps `returned_bytes` (e.g. `format` when every given
-  path was skipped). Statuses that never ran a command (`no_target`,
-  `invalid_attr`, `invalid_level`, `not_an_option`, `tool_missing`,
-  `not_applicable`) carry neither field.
+  `raw_bytes` but keeps `returned_bytes`. Statuses that never ran a command
+  (`no_target`, `invalid_attr`, `invalid_level`, `not_an_option`,
+  `tool_missing`, `not_applicable`) carry neither field.
 
 ### Measured on a real config
 
@@ -200,7 +218,6 @@ operations against a live config (`/home/rupan/nixos#laptop`):
 | `diff` | 338 | 1431 | the underlying package diff was tiny (one internal package removed); envelope metadata and the structured `packages` breakout dominate on a near-empty diff, the win grows with the diff |
 | `eval_config("environment.systemPackages")` | 13,500 | 394 | the raw value is a huge list of store paths; the size guard collapses it to a length + head slice instead of returning it whole |
 | `locate_option("environment.systemPackages")` | 24,066 | 20,396 | 95 defining files, each already close to its per-entry size guard; savings here are modest because the option is genuinely defined in many places |
-| `inspect_flake` | 805 | 381 | a full `nix flake show` collapsed to the structured facts an onboarding agent actually needs |
 
 `switch` carries the same `raw_bytes`/`returned_bytes` pair on its envelope;
 its log is trimmed to a tail on success by design, so the win there tracks
@@ -218,17 +235,18 @@ a separate `nix log` and scanning a much longer derivation log by hand.
 
 ## Design notes
 
-- nix-agent provides no general-purpose file reading or editing. `format` writes
-  formatted files, and `inspect_flake` reads flake metadata and the
-  repository layout needed for its best-effort inspection. Use the host
-  agent's own file tools for ordinary reading and editing.
+- The nix-agent MCP tools do no file editing or formatting. Use the host
+  agent's own file tools for reading and editing `.nix` files, and the flake's
+  formatter (`nix fmt` / `nixfmt`) to format them. The one reader is the
+  `nix-agent inspect-flake` CLI subcommand, which reads flake metadata and
+  repository layout for its best-effort onboarding inspection.
 - No in-MCP approval gates. Path restrictions belong to the host's
   permission system; rollback safety belongs to Nix generations.
 - Responses that resolve a target and run one command echo
   `resolved_target` and the exact `command` run, so nothing is silently
-  implicit. Aggregators differ by design: `inspect_flake` reports
-  `flake_dir`, and a batched `eval_config` reports the resolved target
-  once with the individual commands folded into its per-attr `results`.
+  implicit. A batched `eval_config` differs by design: it reports the
+  resolved target once with the individual commands folded into its
+  per-attr `results`.
 - Do not write secret payloads into configs, reference secrets via
   sops-nix or agenix.
 - Fully non-interactive switch requires privileged automation; see

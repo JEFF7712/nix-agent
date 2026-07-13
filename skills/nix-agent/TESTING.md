@@ -17,7 +17,7 @@
 
 ### Inspecting a repo
 
-- Call `inspect_flake()` on a config repo and verify the fact bundle: `hosts`, `hm_integration`, `module_dirs`, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence.
+- Run `nix-agent inspect-flake` on a config repo and verify the JSON fact bundle: `hosts`, `hm_integration`, `module_dirs`, `formatter`, `lint_tools`, and justfile/CI/`.mcp.json` presence.
 - Confirm undecidable facts come back `null`/`"unknown"`, never guessed.
 
 ### Linting
@@ -32,13 +32,6 @@
 - Call `check("dry-build")` and confirm `first_error` surfaces the actionable error line, and `error_detail` (`{message, file, line, column, trace}`) is present when the output is an eval error.
 - Call `build()` on a working config and verify it completes with a store path.
 - Introduce a builder failure (a package whose build phase exits non-zero) and confirm the failed `build()` carries `failed_derivation` (`{drv, log_tail}`) instead of forcing a separate `nix log`.
-
-### Formatting
-
-- Edit a `.nix` file with poor spacing.
-- Call `format(paths=["/path/to/file"])` and verify the file is formatted;
-  the response carries per-file `results` (no `resolved_target`/`command`).
-- Or call `format()` with no paths to format the entire flake.
 
 ### Diffing and switching
 

@@ -8,15 +8,13 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
 EXPECTED_TOOLS = {
-    "eval_config",
-    "check",
-    "format",
     "build",
     "diff",
     "switch",
     "generations",
+    "eval_config",
     "locate_option",
-    "inspect_flake",
+    "check",
 }
 
 

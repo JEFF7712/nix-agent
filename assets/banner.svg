@@ -60,5 +60,5 @@
   <text x="304" y="226" font-family="DejaVu Sans, sans-serif" font-size="27" fill="#8B98B0">composable NixOS and Home Manager operations for AI agents</text>
 
   <!-- tool chips -->
-  <text x="304" y="272" font-family="DejaVu Sans Mono, monospace" font-size="16" fill="#5C6F9E" letter-spacing="0.2">eval_config · locate_option · inspect_flake · check · format · build · diff · switch · generations</text>
+  <text x="304" y="272" font-family="DejaVu Sans Mono, monospace" font-size="16" fill="#5C6F9E" letter-spacing="0.2">build · diff · switch · generations · eval_config · locate_option · check</text>
 </svg>
