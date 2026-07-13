@@ -13,3 +13,5 @@ site/node_modules/
 site/coverage/
 site/*.tsbuildinfo
 site/docs/
+
+.worktrees/
