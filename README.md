@@ -26,7 +26,7 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 ## Docs
 
 - [docs/usage.md](docs/usage.md): install, MCP host config, tool surface, workflow, design notes
-- [docs/agent-install.md](docs/agent-install.md): one-shot agent install guide
+- [docs/agent-install.md](docs/agent-install.md): install guide for agents
 - [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive switch
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion workflow skill
 - [skills/nix-agent-init/SKILL.md](skills/nix-agent-init/SKILL.md): repo onboarding skill
