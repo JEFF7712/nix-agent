@@ -4,6 +4,9 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "predev": "node scripts/sync-docs-assets.mjs",
+    "prebuild": "node scripts/sync-docs-assets.mjs",
+    "pretest": "node scripts/sync-docs-assets.mjs",
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
