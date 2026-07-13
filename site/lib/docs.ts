@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ALL_DOC_PAGES, DOC_PAGES, OVERVIEW_PAGE, type DocPage } from "./docsCatalog";
+import { DOC_PAGES, OVERVIEW_PAGE, type DocPage } from "./docsCatalog";
 import { renderMarkdownToHtml } from "./docsMarkdown";
 
 export function repoRoot(): string {
@@ -9,8 +9,8 @@ export function repoRoot(): string {
     : path.resolve(process.cwd(), "..");
 }
 
-export function listDocSlugs(): (string | null)[] {
-  return ALL_DOC_PAGES.map((page) => page.slug);
+export function listDocSlugs(): string[] {
+  return DOC_PAGES.flatMap((page) => (page.slug === null ? [] : [page.slug]));
 }
 
 function findDocPage(slug: string | null): DocPage {

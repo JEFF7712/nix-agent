@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadDocHtml, repoRoot } from "../lib/docs";
+import { loadDocHtml, listDocSlugs, repoRoot } from "../lib/docs";
 
 describe("docs markdown pipeline", () => {
   afterEach(() => {
@@ -23,6 +23,10 @@ describe("docs markdown pipeline", () => {
     const override = path.resolve(process.cwd(), "..");
     vi.stubEnv("NIX_AGENT_REPO_ROOT", override);
     expect(repoRoot()).toBe(override);
+  });
+
+  it("lists only slug pages for static params", () => {
+    expect(listDocSlugs()).toEqual(["usage", "agent-install", "privileged-automation"]);
   });
 
   it("renders the usage doc heading and rewrites a relative doc link", async () => {
