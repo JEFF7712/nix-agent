@@ -62,7 +62,10 @@ def test_ci_workflow_runs_pytest():
 def test_opencode_example_uses_packaged_binary():
     example_text = Path("examples/opencode-mcp.json").read_text()
 
-    assert '"command": "nix-agent"' in example_text
+    assert '"command": ["nix-agent"]' in example_text
+    assert '"type": "local"' in example_text
+    assert '"mcp"' in example_text
+    assert "mcpServers" not in example_text
 
 
 def test_codex_example_uses_packaged_binary():

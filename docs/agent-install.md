@@ -17,8 +17,11 @@ Verify all of the following before touching anything:
 - The system is managed by a flake. Locate the flake directory. Common
   locations:
   - `/etc/nixos/flake.nix`
+  - `~/nixos/flake.nix`
+  - `~/.config/nixos/flake.nix`
+  - `~/nix-config/flake.nix`
   - `~/nixos-config/flake.nix`
-  - ask the user if neither exists.
+  - ask the user if none of these exist.
 - The user has `sudo` and is willing to run `nixos-rebuild switch`.
 - `git` is available.
 
@@ -41,8 +44,8 @@ grep -RIl --include='*.nix' -E 'sops-nix|agenix' "${FLAKE_DIR}" || true
   before continuing, do not install anything yourself:
 
   > No secrets manager (`sops-nix` or `agenix`) was detected in your
-  > flake. `nix-agent` does not write files, it only provides Nix
-  > operations. Do not write secret payloads into configs; reference
+  > flake. The nix-agent MCP tools do not write files; they only provide
+  > Nix operations. Do not write secret payloads into configs; reference
   > secrets via sops-nix or agenix only. If you plan to manage
   > secrets on this machine, set up `sops-nix`
   > (<https://github.com/Mic92/sops-nix>) or `agenix`
@@ -124,7 +127,7 @@ re-check steps 1–3.
 
 ---
 
-## 5. Install the companion skill
+## 5. Install the companion skills
 
 The skills teach the host agent the correct workflow. Pick the target
 that matches the user's coding agent:
@@ -299,36 +302,44 @@ Rules of the merge:
 
 The intent:
 
-- **allow**: the `nixos-rebuild` commands `nix-agent` drives via
-  sudo (so `switch` does not prompt on every call), the rollback escape
-  hatch, and the nine `nix-agent` MCP tools themselves.
+- **allow**: the seven `nix-agent` MCP tools (so calling them does not
+  prompt for approval), plus the matching `nixos-rebuild` Bash forms for
+  when the agent shells out directly (including the rollback escape hatch).
+  MCP-driven `switch` still needs passwordless sudo (step 8) to avoid a
+  sudo password hang inside the MCP server process; Claude's Bash allows
+  do not cover that.
 - **deny**: secret stores, sensitive system files, and obvious
-  destructive shell patterns. `nix-agent` writes to `/etc/nixos/**`:
-  that path is intentionally **not** denied.
+  destructive shell patterns. Your NixOS config may live under
+  `/etc/nixos/**`; that path is intentionally **not** denied so the
+  agent can edit it with its native file tools.
 
 ---
 
 ## 8. Enable passwordless `nixos-rebuild` (ask the user first)
 
-`nix-agent`'s `check("dry-activate")`, `build`, and `switch` tools
-shell out to `sudo nixos-rebuild`. If the user has not configured
-passwordless sudo for those exact commands, every invocation will hang
-on a password prompt the agent cannot answer.
+`nix-agent`'s `check("dry-activate")`, `switch`, and
+`generations(action="rollback")` tools shell out to `sudo nixos-rebuild`.
+(`build`, `diff`, and `check("dry-build")` use `nix build` and do not
+need sudo.) If the user has not configured passwordless sudo for those
+exact commands, every privileged invocation will hang on a password
+prompt the agent cannot answer.
 
 **Ask the user this question verbatim and wait for an answer:**
 
-> nix-agent can run `nixos-rebuild dry-activate` and `nixos-rebuild
-> switch` non-interactively if I add a narrow passwordless-sudo rule
-> for just those two commands (scoped to your user). Without it,
-> every build or switch will pause waiting for your sudo password. Do
-> you want me to configure this now? (yes / no)
+> nix-agent can run `nixos-rebuild dry-activate`, `nixos-rebuild
+> switch`, and `nixos-rebuild switch --rollback` non-interactively if I
+> add a narrow passwordless-sudo rule for just those commands (scoped to
+> your user). Without it, every dry-activate, switch, or rollback will
+> pause waiting for your sudo password. Do you want me to configure this
+> now? (yes / no)
 
 ### If the user says no
 
 - Record "privileged automation: skipped".
-- Warn the user that `check("dry-activate")` and `switch` will require
-  them to enter their sudo password in the terminal where the MCP
-  server runs, and continue to the next step.
+- Warn the user that `check("dry-activate")`, `switch`, and
+  `generations(action="rollback")` will require them to enter their
+  sudo password in the terminal where the MCP server runs, and continue
+  to the next step.
 - Do not edit anything.
 
 ### If the user says yes
@@ -351,6 +362,10 @@ on a password prompt the agent cannot answer.
              command = "${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake *";
              options = [ "NOPASSWD" ];
            }
+           {
+             command = "${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --rollback";
+             options = [ "NOPASSWD" ];
+           }
          ];
        }
      ];
@@ -363,10 +378,12 @@ on a password prompt the agent cannot answer.
    sudo nixos-rebuild switch --flake .#${HOSTNAME}
    ```
 
-4. Verify the rule took effect:
+4. Verify the rule took effect. nix-agent invokes sudo with the
+   **resolved store path** of `nixos-rebuild`, so check that form:
 
    ```bash
-   sudo -n nixos-rebuild dry-activate --flake "${FLAKE_DIR}#${HOSTNAME}" >/dev/null && echo OK
+   NIXOS_REBUILD="$(realpath "$(command -v nixos-rebuild)")"
+   sudo -n "$NIXOS_REBUILD" dry-activate --flake "${FLAKE_DIR}#${HOSTNAME}" >/dev/null && echo OK
    ```
 
    If this prints `OK`, record "privileged automation: enabled" and

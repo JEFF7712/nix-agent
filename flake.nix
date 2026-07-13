@@ -1,5 +1,5 @@
 {
-  description = "MCP server and companion skill exposing composable NixOS operations";
+  description = "MCP server and companion skills exposing composable NixOS and Home Manager operations";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

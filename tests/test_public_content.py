@@ -122,3 +122,28 @@ def test_usage_qualifies_inspection_as_best_effort_and_file_access_precisely():
     assert "`nix-agent inspect-flake` CLI subcommand" in design_notes
     assert "`format`" not in USAGE
     assert "nix-agent does no file I/O" not in USAGE
+
+
+def test_agent_install_matches_current_tool_surface_and_sudo_needs():
+    install = (REPOSITORY_ROOT / "docs/agent-install.md").read_text()
+    privileged = (REPOSITORY_ROOT / "docs/privileged-automation.md").read_text()
+
+    assert "nine `nix-agent` MCP tools" not in install
+    assert "the seven `nix-agent` MCP tools" in install
+    assert "`nix-agent` writes to `/etc/nixos/**`" not in install
+    assert "every build or switch will pause" not in install
+    assert '`check("dry-activate")`, `build`, and `switch`' not in install
+    assert "switch --rollback" in install
+    assert "switch --rollback" in privileged
+    assert "resolved store path" in install
+    assert "resolved store path" in privileged
+    assert "Standalone Home Manager" in privileged
+    assert "preflight_failed" in USAGE
+    assert "returns `commands`" in USAGE
+    assert "statix and deadnix" in USAGE
+    assert "omit both `raw_bytes` and `returned_bytes`" in USAGE
+    assert "never produced command output omits" not in USAGE
+    assert "$NIX_AGENT_HM_FLAKE" in USAGE
+    assert "falling\nback to `$NIX_AGENT_FLAKE`" in USAGE
+    for tool in EXPECTED_TOOLS:
+        assert f"mcp__nix-agent__{tool}" in install

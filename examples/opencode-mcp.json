@@ -1,8 +1,8 @@
 {
-  "mcpServers": {
+  "mcp": {
     "nix-agent": {
-      "command": "nix-agent",
-      "args": []
+      "type": "local",
+      "command": ["nix-agent"]
     }
   }
 }

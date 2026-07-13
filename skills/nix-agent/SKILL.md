@@ -7,11 +7,11 @@ description: Use when a user wants to change NixOS packages, options, modules, o
 
 ## Overview
 
-`nix-agent` is a pure Nix operations toolbox. It does NOT read or write
-files. It builds, diffs, switches, and manages generations (the operational
-core), and evaluates, locates, and lints the live config (introspection),
-handing every result back as a compact JSON envelope. Read the envelope: it
-already holds what you would otherwise re-fetch by hand.
+`nix-agent` MCP tools do NOT read or write files. They build, diff, switch,
+and manage generations (the operational core), and evaluate, locate, and
+check the live config (introspection), handing every result back as a
+compact JSON envelope. Read the envelope: it already holds what you would
+otherwise re-fetch by hand.
 
 Division of labor:
 - **Your native tools** (Read/Edit/Write) edit `.nix` files.
@@ -22,8 +22,8 @@ Division of labor:
 
 Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
 omitted and echo back what they resolved and ran (`resolved_target` and
-`command`), plus `raw_bytes`/`returned_bytes` accounting (see Token
-discipline).
+`command`, or `commands` for `check("lint")`), plus `raw_bytes`/
+`returned_bytes` accounting when present (see Token discipline).
 
 Operational core:
 - `build(flake_uri?, mode?)`: build the closure, no activation. A failed
@@ -79,8 +79,9 @@ running generation was built from) before mutating. When in doubt,
 `mode="nixos"` is the safer guess.
 
 For nonstandard or multi-flake layouts, do not rely on auto-resolution:
-set `NIX_AGENT_FLAKE` (or `NIX_AGENT_HM_FLAKE`) once, or pass an explicit
-`flake_uri` like `/home/you/nixos#host`. Either pins the target exactly.
+set `NIX_AGENT_FLAKE` once (or `NIX_AGENT_HM_FLAKE` for standalone HM,
+which falls back to `NIX_AGENT_FLAKE`), or pass an explicit `flake_uri`
+like `/home/you/nixos#host`. Either pins the target exactly.
 
 **Wrong-host symptom:** a `failed` envelope whose `first_error` names a
 missing `nixosConfigurations."<hostname>"` means auto-resolution picked
@@ -126,8 +127,9 @@ do not re-fetch.
   you need, NOT retry for full output.
 - **`locate_option` before grepping.** It answers "which file sets this"
   in one call; a tree-wide grep does not.
-- **`raw_bytes`/`returned_bytes`** on every envelope that ran a command tell you how much log
-  the trimming saved. They are diagnostics, not knobs.
+- **`raw_bytes`/`returned_bytes`** when present tell you how much log
+  the trimming saved. They are diagnostics, not knobs. Early-exit
+  statuses omit them.
 - **Escape hatches are deliberate last resorts.** `full_log=True` and the
   raw `output` field exist for the rare case the trimmed view genuinely
   lacks what you need; reaching for them by default defeats the server.
@@ -135,8 +137,9 @@ do not re-fetch.
 ## Onboarding a repo
 
 First time in an unfamiliar config? Run `/nix-agent-init`: it runs
-`nix-agent inspect-flake` once and generates `AGENT_MAP.md`, `CLAUDE.md`, and
-`.mcp.json` from the observed facts, never boilerplate.
+`nix-agent inspect-flake` once and generates `AGENT_MAP.md`, `CLAUDE.md`
+(+ an `AGENTS.md` symlink), and `.mcp.json` from the observed facts, never
+boilerplate.
 
 ## Hard Rules
 

@@ -4,12 +4,12 @@
 
 A local MCP server that gives AI agents composable NixOS / Home Manager
 operations: build, diff, switch, and generations for the operational core,
-plus eval, locate, and lint for config introspection.
+plus eval, locate, and check for config introspection.
 
 It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos). nix-agent
 operates on your actual configuration, `mcp-nixos` handles package and option
-discovery. Every response that ran a command reports raw vs returned bytes,
-so the token savings are visible per call, not just claimed.
+discovery. Responses report raw vs returned bytes so token savings are
+visible per call, not just claimed.
 
 > **Experimental and a work in progress.** Feedback and contributions welcome.
 
@@ -27,7 +27,7 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 
 - [docs/usage.md](docs/usage.md): install, MCP host config, tool surface, workflow, design notes
 - [docs/agent-install.md](docs/agent-install.md): install guide for agents
-- [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive switch
+- [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive dry-activate, switch, and rollback
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion workflow skill
 - [skills/nix-agent-init/SKILL.md](skills/nix-agent-init/SKILL.md): repo onboarding skill
 

@@ -2,7 +2,7 @@
 
 `nix-agent` is a local stdio MCP server that gives AI agents composable
 NixOS / Home Manager operations: build, diff, switch, and generations for the
-operational core, plus eval, locate, and lint for config introspection. It
+operational core, plus eval, locate, and check for config introspection. It
 works alongside [`mcp-nixos`](https://github.com/utensils/mcp-nixos):
 nix-agent operates on your actual configuration; `mcp-nixos` handles package
 and option discovery.
@@ -78,7 +78,7 @@ Point your MCP host at:
 See `examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
 `examples/opencode-mcp.json`.
 
-## Companion skill
+## Companion skills
 
 The MCP exposes the tools; the skills teach the correct workflow. The
 installer copies every directory under `skills/` (the `nix-agent` workflow
@@ -94,13 +94,15 @@ directory:
 ## Tool surface
 
 All tools auto-resolve the target when `flake_uri` is omitted. Resolution
-order: `$NIX_AGENT_FLAKE` (or `$NIX_AGENT_HM_FLAKE` for HM), then the first
-existing `flake.nix` among `/etc/nixos`, `~/nixos`, `~/.config/nixos`,
-`~/nix-config`, `~/nixos-config` for NixOS (`~/.config/home-manager`,
-`~/.config/nixpkgs` for Home Manager). The hostname / `user@host` attribute is
-picked automatically. Single-command results echo back `resolved_target` and
-the exact `command` run. Exception: a batched `eval_config` folds its per-attr
-commands into `results`.
+order: `$NIX_AGENT_FLAKE` (for Home Manager: `$NIX_AGENT_HM_FLAKE`, falling
+back to `$NIX_AGENT_FLAKE`), then the first existing `flake.nix` among
+`/etc/nixos`, `~/nixos`, `~/.config/nixos`, `~/nix-config`, `~/nixos-config`
+for NixOS (`~/.config/home-manager`, `~/.config/nixpkgs` for Home Manager).
+The hostname / `user@host` attribute is picked automatically. Single-command
+results echo back `resolved_target` and the exact `command` run. Exceptions:
+a batched `eval_config` folds its per-attr commands into `results`;
+`check("lint")` returns `commands` (the statix and deadnix argv list)
+instead of a single `command`.
 
 `mode` defaults to `"nixos"`. Use `"home-manager"` only for a **standalone** HM
 flake (its own `homeConfigurations`, applied with `home-manager switch`). When
@@ -183,6 +185,10 @@ On failure, the response carries the full log plus:
 - `error_detail`: `{message, file, line, column, trace}` when the output matched Nix's eval-error shape, a direct file:line:column edit target. Omitted otherwise.
 - `failed_derivation`: on a failed build, diff, or switch, `{drv, log_tail}` with the last 40 lines of the failing builder's `nix log` (or `{drv, note}` when the log is unavailable). Omitted when the failure has no failing derivation (a pure eval error or a sudo auth failure, for example).
 
+`switch(validate=True)` is a special case: if the dry-build preflight fails, the
+envelope status is `preflight_failed` (not `failed`), with the check result
+nested under `preflight` and no activation attempted.
+
 The command runner truncates each stdout and stderr stream independently at
 64,000 Python characters. A successful `switch` is more compact: it returns a
 2,000-character tail of the activation log by default. Pass `full_log=True` to
@@ -192,7 +198,8 @@ per-stream limit.
 ### Byte accounting
 
 Every response that ran a command carries `raw_bytes` and `returned_bytes`
-so the token savings are visible per call, not just claimed:
+so the token savings are visible per call, not just claimed (early-exit
+statuses listed below are the exception):
 
 - `raw_bytes` is the underlying command output size (combined
   stdout+stderr, in bytes, before any truncation). Tools whose work is
@@ -203,10 +210,10 @@ so the token savings are visible per call, not just claimed:
 - `returned_bytes` is the serialized size of the envelope actually handed
   back, computed last, and excludes the ~30 bytes of the two accounting
   fields themselves.
-- An envelope whose operation never produced command output omits
-  `raw_bytes` but keeps `returned_bytes`. Statuses that never ran a command
-  (`no_target`, `invalid_attr`, `invalid_level`, `not_an_option`,
-  `tool_missing`, `not_applicable`) carry neither field.
+- Early-exit statuses
+  (`no_target`, `invalid_attr`, `invalid_action`, `invalid_level`,
+  `not_an_option`, `tool_missing`, `not_applicable`, `preflight_failed`)
+  omit both `raw_bytes` and `returned_bytes`.
 
 ### Measured on a real config
 
@@ -244,10 +251,13 @@ a separate `nix log` and scanning a much longer derivation log by hand.
   permission system; rollback safety belongs to Nix generations.
 - Responses that resolve a target and run one command echo
   `resolved_target` and the exact `command` run, so nothing is silently
-  implicit. A batched `eval_config` differs by design: it reports the
-  resolved target once with the individual commands folded into its
-  per-attr `results`.
+  implicit. Multi-command tools differ by design: a batched `eval_config`
+  reports the resolved target once with individual commands folded into
+  its per-attr `results`; `check("lint")` returns `commands` for the two
+  linters.
 - Do not write secret payloads into configs, reference secrets via
   sops-nix or agenix.
-- Fully non-interactive switch requires privileged automation; see
-  [privileged-automation.md](privileged-automation.md).
+- Fully non-interactive NixOS dry-activate, switch, and rollback require
+  privileged automation; see
+  [privileged-automation.md](privileged-automation.md). Standalone Home
+  Manager activation does not use sudo.
