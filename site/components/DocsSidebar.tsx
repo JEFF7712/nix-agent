@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ALL_DOC_PAGES } from "../lib/docsCatalog";
 
 export function DocsSidebar({ currentHref }: { currentHref: string }) {
@@ -8,9 +9,9 @@ export function DocsSidebar({ currentHref }: { currentHref: string }) {
           const active = page.href === currentHref;
           return (
             <li key={page.href}>
-              <a aria-current={active ? "page" : undefined} href={page.href}>
+              <Link aria-current={active ? "page" : undefined} href={page.href}>
                 {page.title}
-              </a>
+              </Link>
             </li>
           );
         })}

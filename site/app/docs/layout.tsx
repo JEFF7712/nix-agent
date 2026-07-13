@@ -8,13 +8,12 @@ export default function DocsLayout({ children }: Readonly<{ children: ReactNode 
       <Link className="docs-brand" href="/">
         nix-agent
       </Link>
-      <details className="docs-sidebar-toggle">
-        <summary>Docs</summary>
-        <DocsSidebarNav />
-      </details>
-      <div className="docs-sidebar-static">
-        <DocsSidebarNav />
-      </div>
+      <aside className="docs-sidebar-panel">
+        <details className="docs-nav-details" open>
+          <summary>Docs</summary>
+          <DocsSidebarNav />
+        </details>
+      </aside>
       <main className="docs-content">{children}</main>
     </div>
   );

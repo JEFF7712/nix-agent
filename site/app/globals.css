@@ -399,22 +399,17 @@ input {
   color: var(--blue-soft);
 }
 
-.docs-sidebar-toggle {
+.docs-brand:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 0.25rem;
+}
+
+.docs-sidebar-panel {
+  grid-area: sidebar;
+}
+
+.docs-nav-details summary {
   display: none;
-  grid-area: sidebar;
-}
-
-.docs-sidebar-static {
-  grid-area: sidebar;
-}
-
-.docs-sidebar-toggle summary {
-  padding: 0.6rem 0.2rem;
-  border-bottom: 1px solid var(--blue-faint);
-  cursor: pointer;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .docs-sidebar {
@@ -442,6 +437,11 @@ input {
 .docs-sidebar a:hover,
 .docs-sidebar a:focus-visible {
   color: var(--blue);
+}
+
+.docs-sidebar a:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 0.25rem;
 }
 
 .docs-sidebar a[aria-current="page"] {
@@ -489,6 +489,11 @@ input {
 .docs-article-header a:hover,
 .docs-article-header a:focus-visible {
   color: var(--blue);
+}
+
+.docs-article-header a:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 0.25rem;
 }
 
 .docs-article-body :first-child {
@@ -545,13 +550,23 @@ input {
       "content";
   }
 
-  .docs-sidebar-toggle {
-    display: block;
+  .docs-sidebar-panel {
     margin-bottom: 1.5rem;
   }
 
-  .docs-sidebar-static {
-    display: none;
+  .docs-nav-details summary {
+    display: block;
+    padding: 0.6rem 0.2rem;
+    border-bottom: 1px solid var(--blue-faint);
+    cursor: pointer;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .docs-nav-details summary:focus-visible {
+    outline: 1px solid var(--blue);
+    outline-offset: 0.25rem;
   }
 
   .docs-sidebar {

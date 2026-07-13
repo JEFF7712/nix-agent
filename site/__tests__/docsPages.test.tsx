@@ -69,6 +69,22 @@ describe("DocsArticle", () => {
 
     expect(screen.getByText("Hello docs")).toBeInTheDocument();
   });
+
+  it("does not duplicate the heading when the rendered body already starts with an h1", () => {
+    render(<DocsArticle page={page} html="<h1>Body title</h1><p>Content</p>" />);
+
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent("Body title");
+  });
+
+  it("still shows the chrome title when the body has no leading h1", () => {
+    render(<DocsArticle page={page} html="<p>Content</p>" />);
+
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent("Usage");
+  });
 });
 
 describe("docs CSS contract", () => {
