@@ -88,11 +88,14 @@ describe("DocsArticle", () => {
 });
 
 describe("docs CSS contract", () => {
-  it("defines shell, sidebar, and article rules in globals.css", () => {
+  it("defines shell, sidebar, article, and table rules in globals.css", () => {
     const css = readFileSync(`${process.cwd()}/app/globals.css`, "utf8");
 
     expect(css).toMatch(/\.docs-shell\s*{/);
     expect(css).toMatch(/\.docs-sidebar\s*{/);
     expect(css).toMatch(/\.docs-article\s*{/);
+    expect(css).toMatch(/\.docs-article-body\s+table\s*{/);
+    expect(css).toMatch(/\.docs-article-body\s+thead\s+th\s*{/);
+    expect(css).toMatch(/\.docs-article-body\s+tbody\s+td\s*{/);
   });
 });
