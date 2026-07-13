@@ -4,19 +4,29 @@ import { describe, expect, it } from "vitest";
 import { IconLinks } from "../components/IconLinks";
 
 describe("IconLinks", () => {
-  it.each([
-    ["GitHub", "https://github.com/JEFF7712/nix-agent"],
-    ["Documentation", "https://github.com/JEFF7712/nix-agent/blob/main/docs/usage.md"],
-  ])("renders the icon-only %s link", (name, href) => {
+  it("renders the icon-only GitHub link", () => {
     render(<IconLinks />);
 
-    const link = screen.getByRole("link", { name });
-    expect(link).toHaveAttribute("href", href);
-    expect(link).toHaveAttribute("title", name);
+    const link = screen.getByRole("link", { name: "GitHub" });
+    expect(link).toHaveAttribute("href", "https://github.com/JEFF7712/nix-agent");
+    expect(link).toHaveAttribute("title", "GitHub");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer");
-    expect(link).toHaveAttribute("data-tooltip", name);
-    expect(link).not.toHaveTextContent(name);
+    expect(link).toHaveAttribute("data-tooltip", "GitHub");
+    expect(link).not.toHaveTextContent("GitHub");
+    expect(link.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("renders the icon-only Documentation link", () => {
+    render(<IconLinks />);
+
+    const link = screen.getByRole("link", { name: "Documentation" });
+    expect(link).toHaveAttribute("href", "/docs");
+    expect(link).toHaveAttribute("title", "Documentation");
+    expect(link).not.toHaveAttribute("target");
+    expect(link).not.toHaveAttribute("rel");
+    expect(link).toHaveAttribute("data-tooltip", "Documentation");
+    expect(link).not.toHaveTextContent("Documentation");
     expect(link.querySelector("svg")).toBeInTheDocument();
   });
 
