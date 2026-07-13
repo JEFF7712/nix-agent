@@ -135,7 +135,10 @@ describe("glyph shaders", () => {
     expect(vertexShader).toMatch(/tilt/);
     expect(vertexShader).toMatch(/wince/);
     expect(vertexShader).toContain("uniform float uWinceAge");
+    expect(vertexShader).toContain("uniform float uBlinkPhase");
     expect(vertexShader).toMatch(/One-shot flinch|uWinceAge/);
+    expect(vertexShader).toMatch(/winceActive/);
+    expect(vertexShader).toMatch(/uTime\s*\+\s*uBlinkPhase/);
     expect(vertexShader).toMatch(/settle/);
     expect(vertexShader).toMatch(/agentBlinkAmount\([\s\S]*sleepy/);
   });

@@ -5,6 +5,8 @@ import {
   WINCE_COOLDOWN,
   WINCE_DURATION,
   advanceWince,
+  blinkPhaseShiftForWince,
+  blinkRate,
   clickSpamAnger,
   combineFaceAnger,
   faceAngerFromPointer,
@@ -91,14 +93,18 @@ describe("faceMood", () => {
     expect(
       shouldTriggerWince({ pulseScale: 1, distance: 0.1, winceAge: -1, winceCooldown: 0 }),
     ).toBe(false);
-    expect(
-      shouldTriggerWince({ pulseScale: 1.28, distance: 0.8, winceAge: -1, winceCooldown: 0 }),
-    ).toBe(true);
-    expect(
-      shouldTriggerWince({ pulseScale: 1.28, distance: 1.2, winceAge: -1, winceCooldown: 0 }),
-    ).toBe(false);
+    // Second click (1.28) should not wince yet; third (~1.64) should.
     expect(
       shouldTriggerWince({ pulseScale: 1.28, distance: 0.2, winceAge: -1, winceCooldown: 0 }),
+    ).toBe(false);
+    expect(
+      shouldTriggerWince({ pulseScale: 1.64, distance: 0.8, winceAge: -1, winceCooldown: 0 }),
+    ).toBe(true);
+    expect(
+      shouldTriggerWince({ pulseScale: 1.64, distance: 1.2, winceAge: -1, winceCooldown: 0 }),
+    ).toBe(false);
+    expect(
+      shouldTriggerWince({ pulseScale: 1.64, distance: 0.2, winceAge: -1, winceCooldown: 0 }),
     ).toBe(true);
     expect(
       shouldTriggerWince({ pulseScale: 2, distance: 0.2, winceAge: 0.1, winceCooldown: 0 }),
@@ -122,6 +128,23 @@ describe("faceMood", () => {
     expect(shouldTriggerWince({ pulseScale: 3, distance: 0.1, winceAge: age, winceCooldown: cooldown })).toBe(
       true,
     );
+  });
+
+  it("phase-shifts idle blinks into early open-eye after a wince", () => {
+    const rate = blinkRate(0);
+    // Mid-blink region of the settle cycle → jump forward past it.
+    const midBlinkTime = (0.95 - rate * WINCE_DURATION) / rate;
+    const shift = blinkPhaseShiftForWince(midBlinkTime, 0);
+    const settleCycle = (((midBlinkTime + shift + WINCE_DURATION) * rate) % 1 + 1) % 1;
+    expect(settleCycle).toBeCloseTo(0.12, 5);
+    expect(shift).toBeGreaterThan(0);
+
+    // Already early-open at settle → only a small nudge forward.
+    const earlyTime = (0.05 - rate * WINCE_DURATION) / rate;
+    const earlyShift = blinkPhaseShiftForWince(earlyTime, 0);
+    const earlySettle = (((earlyTime + earlyShift + WINCE_DURATION) * rate) % 1 + 1) % 1;
+    expect(earlySettle).toBeCloseTo(0.12, 5);
+    expect(earlyShift).toBeLessThan(shift);
   });
 
   it("centers the face estimate on mobile and shifts it right on desktop", () => {

@@ -10,6 +10,7 @@ import {
   FACE_HAPPY_EVENT,
   PULSE_SLOT_COUNT,
   advanceWince,
+  blinkPhaseShiftForWince,
   clickSpamAnger,
   combineFaceAnger,
   faceAngerFromPointer,
@@ -192,6 +193,7 @@ export function GlyphSnowflake() {
           uWake: { value: 0 },
           uPointerBlend: { value: 0 },
           uWinceAge: { value: -1 },
+          uBlinkPhase: { value: 0 },
           uPulseOrigins: {
             value: Array.from({ length: PULSE_SLOT_COUNT }, () => new THREE.Vector2()),
           },
@@ -328,6 +330,11 @@ export function GlyphSnowflake() {
           ) {
             winceAge = 0;
             uniforms.uWinceAge.value = 0;
+            uniforms.uBlinkPhase.value += blinkPhaseShiftForWince(
+              uniforms.uTime.value + uniforms.uBlinkPhase.value,
+              uniforms.uSleepy.value,
+            );
+            uniforms.uHappyBlink.value = -1;
           }
           spamAnger = clickSpamAnger(clickTimes, now);
           lastPointer = { x, y, time: now };

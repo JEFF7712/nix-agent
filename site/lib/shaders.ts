@@ -11,6 +11,7 @@ uniform float uSleepy;
 uniform float uWake;
 uniform float uPointerBlend;
 uniform float uWinceAge;
+uniform float uBlinkPhase;
 uniform vec2 uPulseOrigins[8];
 uniform float uPulseAges[8];
 uniform float uPulseScales[8];
@@ -87,18 +88,23 @@ void main() {
   float isMouth = step(0.25, agent) * (1.0 - step(0.9, agent));
   float isFace = step(0.25, agent);
 
-  float blinkAmt = max(agentBlinkAmount(uTime, sleepy, motionEnabled), happyDoubleBlink(uHappyBlink, motionEnabled));
-  blinkAmt = max(blinkAmt, sleepy * 0.28);
-
   // One-shot flinch driven by JS (refractory so stacked clicks don't chop).
   float aspect = uResolution.x / max(uResolution.y, 1.0);
   vec2 faceNdc = vec2(0.38, 0.1);
   float wince = 0.0;
+  float winceActive = 0.0;
   if (uWinceAge >= 0.0 && uWinceAge < 0.42) {
     float t = uWinceAge / 0.42;
-    wince = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.28, 0.85, t)) * motionEnabled;
+    wince = smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.32, 0.88, t)) * 0.7 * motionEnabled;
+    winceActive = 1.0;
   }
-  blinkAmt = max(blinkAmt, wince * 0.95);
+  // Mute idle/happy blinks during a wince; JS also phase-shifts so the next blink is deferred.
+  float blinkAmt = max(
+    agentBlinkAmount(uTime + uBlinkPhase, sleepy, motionEnabled),
+    happyDoubleBlink(uHappyBlink, motionEnabled)
+  ) * (1.0 - winceActive);
+  blinkAmt = max(blinkAmt, sleepy * 0.28 * (1.0 - winceActive));
+  blinkAmt = max(blinkAmt, wince * 0.55);
   float squash = mix(1.0, 0.18, blinkAmt * blinkAmt);
 
   float pulse = 0.0;
@@ -116,16 +122,16 @@ void main() {
     anger * (-0.028 * innerBrow + 0.01 * outerBrow)
     + happy * (0.028 + 0.018 * (1.0 - arcT * arcT))
     + sleepy * (-0.01 * (1.0 - abs(arcT)))
-    + wince * (-0.06 * innerBrow - 0.022 * (1.0 - abs(arcT)))
+    + wince * (-0.035 * innerBrow - 0.012 * (1.0 - abs(arcT)))
   );
   facePosition.y += isMouth * (
     anger * (0.045 * (1.0 - arcT * arcT) - 0.012)
     + happy * (-0.042 * (1.0 - arcT * arcT))
-    + wince * (0.04 * (1.0 - arcT * arcT) + 0.01)
+    + wince * (0.022 * (1.0 - arcT * arcT) + 0.005)
   );
-  // Cheek pinch / eye pull-in so big pulses read as a flinch, not just a blink.
-  facePosition.x += isEye * wince * (-0.016 * sign(position.x + 1e-5));
-  facePosition.y += isEye * wince * 0.008;
+  // Soft cheek pinch / eye pull-in so stacked pulses read as a flinch, not just a blink.
+  facePosition.x += isEye * wince * (-0.008 * sign(position.x + 1e-5));
+  facePosition.y += isEye * wince * 0.004;
 
   float pointerBlend = clamp(uPointerBlend, 0.0, 1.0);
   float pointerInRange = step(max(abs(uPointer.x), abs(uPointer.y)), 1.45);

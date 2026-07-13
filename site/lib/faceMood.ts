@@ -24,7 +24,7 @@ export function pulseFaceDistance(
   return Math.hypot(dx, dy);
 }
 
-/** True when a stacked pulse (2+ clicks) lands close enough to flinch. */
+/** True when a stacked pulse (3+ clicks) lands close enough to flinch. */
 export function shouldTriggerWince({
   pulseScale,
   distance,
@@ -36,12 +36,30 @@ export function shouldTriggerWince({
   winceAge: number;
   winceCooldown: number;
 }) {
-  // scale 1.28 = second rapid click; distance is host-NDC to face (aspect-corrected).
-  return pulseScale >= 1.25 && distance < 0.9 && winceAge < 0 && winceCooldown <= 0;
+  // scale 1.28^2 ≈ 1.64 = third rapid click; distance is host-NDC to face (aspect-corrected).
+  return pulseScale >= 1.6 && distance < 0.9 && winceAge < 0 && winceCooldown <= 0;
 }
 
 export const WINCE_DURATION = 0.42;
 export const WINCE_COOLDOWN = 0.55;
+
+/** Idle blink rate matching `agentBlinkAmount` in the vertex shader. */
+export function blinkRate(sleepy = 0) {
+  return 0.19 * (1 - sleepy) + 0.08 * sleepy;
+}
+
+/**
+ * Time shift that lands the idle blink cycle in early open-eye after a wince,
+ * so the flinch does not collide with an in-flight or imminent blink.
+ */
+export function blinkPhaseShiftForWince(time: number, sleepy = 0) {
+  const rate = blinkRate(sleepy);
+  const settleTime = time + WINCE_DURATION;
+  const cycle = ((settleTime * rate) % 1 + 1) % 1;
+  const target = 0.12;
+  const deltaCycle = cycle <= target ? target - cycle : 1 - cycle + target;
+  return deltaCycle / rate;
+}
 
 /** Advance a one-shot wince; returns next age (-1 when finished) and remaining cooldown. */
 export function advanceWince(age: number, cooldown: number, dt: number) {
