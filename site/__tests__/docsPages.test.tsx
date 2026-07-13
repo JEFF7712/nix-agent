@@ -97,5 +97,6 @@ describe("docs CSS contract", () => {
     expect(css).toMatch(/\.docs-article-body\s+table\s*{/);
     expect(css).toMatch(/\.docs-article-body\s+thead\s+th\s*{/);
     expect(css).toMatch(/\.docs-article-body\s+tbody\s+td\s*{/);
+    expect(css).toMatch(/\.docs-sidebar-panel\s*{[^}]*position:\s*sticky/);
   });
 });

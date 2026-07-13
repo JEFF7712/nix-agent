@@ -406,6 +406,11 @@ input {
 
 .docs-sidebar-panel {
   grid-area: sidebar;
+  align-self: start;
+  position: sticky;
+  top: clamp(1.5rem, 4vw, 3rem);
+  max-height: calc(100svh - 2 * clamp(1.5rem, 4vw, 3rem));
+  overflow-y: auto;
 }
 
 .docs-nav-details summary {
