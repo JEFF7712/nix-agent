@@ -71,7 +71,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          context: ./site
+          context: .
+          file: site/Dockerfile
           push: true
           tags: ghcr.io/jeff7712/nix-agent-site:${{ steps.version.outputs.tag }}
           cache-from: type=gha
