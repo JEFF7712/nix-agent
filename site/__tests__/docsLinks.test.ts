@@ -27,4 +27,10 @@ describe("rewriteDocsSrc", () => {
   it("maps the README banner to the site public path", () => {
     expect(rewriteDocsSrc("assets/banner.png", "README.md")).toBe("/banner.png");
   });
+
+  it("leaves absolute image srcs unchanged", () => {
+    expect(rewriteDocsSrc("https://example.com/img.png", "README.md")).toBe(
+      "https://example.com/img.png",
+    );
+  });
 });

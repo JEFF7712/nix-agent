@@ -52,6 +52,10 @@ export function rewriteDocsHref(href: string, sourcePath: string): string {
 }
 
 export function rewriteDocsSrc(src: string, sourcePath: string): string {
+  if (/^https?:\/\//.test(src) || src.startsWith("#")) {
+    return src;
+  }
+
   const repoPath = resolveRepoRelative(src, sourcePath);
 
   if (repoPath === "assets/banner.png") {
