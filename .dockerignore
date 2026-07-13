@@ -1,0 +1,30 @@
+# Repo-root context for site/Dockerfile. Only site/, README.md, the
+# three referenced docs/*.md files, and assets/banner.png are needed.
+.git
+.github
+.worktrees
+
+# Nix / Python tooling not needed for the site image
+nix
+skills
+src
+tests
+examples
+result
+.venv
+__pycache__
+*.egg-info
+
+# Heavy/irrelevant docs content
+docs/superpowers
+
+# Site build artifacts / deps (rebuilt inside the image)
+site/node_modules
+site/.next
+site/out
+site/coverage
+site/*.tsbuildinfo
+
+# Misc
+*.log
+.DS_Store

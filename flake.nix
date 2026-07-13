@@ -105,12 +105,22 @@
           src = siteSource;
           pnpm = pkgs.pnpm_11;
           fetcherVersion = 4;
-          hash = "sha256-xGnSugnTo+ADPHgtEIodSeV7oHqYPTdZ8RPy5teYzo0=";
+          hash = "sha256-jv6vDHJadvFN/83et5EhAajW7VDearhst8mZ9xilox0=";
         };
+        siteDocsInputs = pkgs.runCommand "nix-agent-site-docs-inputs" { } ''
+          mkdir -p "$out/site" "$out/docs" "$out/assets"
+          cp -a ${siteSource}/. "$out/site/"
+          cp ${./README.md} "$out/README.md"
+          cp ${./docs/usage.md} "$out/docs/usage.md"
+          cp ${./docs/agent-install.md} "$out/docs/agent-install.md"
+          cp ${./docs/privileged-automation.md} "$out/docs/privileged-automation.md"
+          cp ${./assets/banner.png} "$out/assets/banner.png"
+        '';
         siteCheck = pkgs.stdenvNoCC.mkDerivation {
           pname = "nix-agent-site-check";
           version = "0.1.0";
-          src = siteSource;
+          src = siteDocsInputs;
+          dontUnpack = true;
           pnpmDeps = sitePnpmDeps;
           CI = "true";
           NEXT_TELEMETRY_DISABLED = "1";
@@ -119,6 +129,12 @@
             pkgs.pnpm_11
             pkgs.pnpmConfigHook
           ];
+          preConfigure = ''
+            cp -a "$src/." repo
+            chmod -R u+w repo
+            export NIX_AGENT_REPO_ROOT="$PWD/repo"
+            cd repo/site
+          '';
           buildPhase = ''
             runHook preBuild
             pnpm lint

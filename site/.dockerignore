@@ -1,3 +1,7 @@
+# NOTE: site/Dockerfile now builds with the repo-root context (see
+# .github/workflows/site-docker.yml and the root .dockerignore). This file
+# only matters if someone builds with `context: ./site` directly, which is
+# no longer the supported path.
 .git
 .github
 .next
@@ -5,10 +9,8 @@ out
 node_modules
 coverage
 __tests__
-docs
 .vscode
 .idea
 .DS_Store
 *.tsbuildinfo
 *.log
-README.md
