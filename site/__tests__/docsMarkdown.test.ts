@@ -1,9 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadDocHtml, repoRoot } from "../lib/docs";
 
 describe("docs markdown pipeline", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("resolves the repo root above site/", () => {
-    expect(repoRoot().endsWith("nix-agent")).toBe(true);
+    const root = repoRoot();
+    expect(existsSync(path.join(root, "README.md"))).toBe(true);
+    expect(existsSync(path.join(root, "docs/usage.md"))).toBe(true);
+
+    if (!process.env.NIX_AGENT_REPO_ROOT) {
+      expect(path.basename(process.cwd())).toBe("site");
+      expect(root).toBe(path.resolve(process.cwd(), ".."));
+    }
+  });
+
+  it("honors NIX_AGENT_REPO_ROOT when set", () => {
+    const override = path.resolve(process.cwd(), "..");
+    vi.stubEnv("NIX_AGENT_REPO_ROOT", override);
+    expect(repoRoot()).toBe(override);
   });
 
   it("renders the usage doc heading and rewrites a relative doc link", async () => {
