@@ -142,7 +142,7 @@ export function createGlyphPoints(
 export function GlyphSnowflake() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [fallback, setFallback] = useState(CANONICAL_GLYPH_FALLBACK);
-  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -447,7 +447,7 @@ export function GlyphSnowflake() {
               },
               pointerMove,
               pointerLeave,
-              contextLost: () => setReady(false),
+              contextLost: () => setFailed(true),
               dispose: () => {
                 if (resourcesDisposed) return;
                 resourcesDisposed = true;
@@ -466,14 +466,14 @@ export function GlyphSnowflake() {
               document.documentElement.removeEventListener("pointerleave", documentPointerLeave);
               lifecycleCleanup();
             };
-            setReady(true);
+            setFailed(false);
           },
         });
       } catch (error) {
         cleanup();
         if (!abort.signal.aborted) {
           console.warn("Glyph snowflake renderer fell back to static ASCII", error);
-          setReady(false);
+          setFailed(true);
         }
       }
     })();
@@ -487,7 +487,7 @@ export function GlyphSnowflake() {
 
   return (
     <div className="glyph-snowflake" ref={hostRef}>
-      <pre aria-hidden="true" className="glyph-snowflake-fallback" data-glyph-fallback hidden={ready}>
+      <pre aria-hidden="true" className="glyph-snowflake-fallback" data-glyph-fallback hidden={!failed}>
         {fallback}
       </pre>
     </div>
