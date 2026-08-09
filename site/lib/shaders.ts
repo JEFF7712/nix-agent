@@ -1,6 +1,7 @@
 export const vertexShader = /* glsl */ `
 uniform float uTime;
 uniform vec2 uPointer;
+uniform vec2 uFaceNdc;
 uniform float uReducedMotion;
 uniform float uPointScale;
 uniform vec2 uResolution;
@@ -90,7 +91,7 @@ void main() {
 
   // One-shot flinch driven by JS (refractory so stacked clicks don't chop).
   float aspect = uResolution.x / max(uResolution.y, 1.0);
-  vec2 faceNdc = vec2(0.38, 0.1);
+  vec2 faceNdc = uFaceNdc;
   float wince = 0.0;
   float winceActive = 0.0;
   if (uWinceAge >= 0.0 && uWinceAge < 0.42) {
@@ -142,7 +143,8 @@ void main() {
     sin(uTime * 0.22) * 0.28 + sin(uTime * 0.09 + 1.7) * 0.12,
     sin(uTime * 0.17 + 0.8) * 0.18 + sin(uTime * 0.07 + 2.1) * 0.06
   ) * motionEnabled * (1.0 - sleepy * 0.55);
-  vec2 pointerGaze = clamp(uPointer, -1.0, 1.0) * motionEnabled;
+  // Gaze from face→pointer, not absolute NDC (face sits right of center on desktop).
+  vec2 pointerGaze = clamp((uPointer - faceNdc) * vec2(aspect, 1.0), -1.0, 1.0) * motionEnabled;
   // Softly crossfade to idle after the cursor leaves the window.
   vec2 gaze = mix(idleGaze, pointerGaze, pointerBlend);
   float gazeStrength = length(gaze) * (1.0 - blinkAmt);

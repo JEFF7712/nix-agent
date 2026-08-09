@@ -181,6 +181,7 @@ export function GlyphSnowflake() {
         const uniforms = {
           uTime: { value: 0 },
           uPointer: { value: new THREE.Vector2(20, 20) },
+          uFaceNdc: { value: new THREE.Vector2(0, 0.1) },
           uReducedMotion: { value: reducedMotion ? 1 : 0 },
           uPointScale: { value: 28 },
           uResolution: { value: new THREE.Vector2(1, 1) },
@@ -247,6 +248,8 @@ export function GlyphSnowflake() {
           points.position.x = snowflakeHorizontalOffset(width);
           uniforms.uPointScale.value = Math.min(width, height) * 0.038;
           uniforms.uResolution.value.set(width, height);
+          const face = faceCenterNdc(width);
+          uniforms.uFaceNdc.value.set(face.x, face.y);
           const nextTier = selectDensityTier(width, deviceMemory());
           if (shouldRebuildDensity(tier, nextTier)) {
             tier = nextTier;

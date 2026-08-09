@@ -76,7 +76,9 @@ describe("glyph shaders", () => {
     expect(vertexShader).toContain("attribute float eyeLocalY");
     expect(vertexShader).toMatch(/isEye\s*=\s*step\([\s\S]*agent/);
     expect(vertexShader).toMatch(/isPupil\s*=\s*step\([\s\S]*agent/);
-    expect(vertexShader).toMatch(/gaze[\s\S]*uPointer/);
+    expect(vertexShader).toContain("uniform vec2 uFaceNdc");
+    expect(vertexShader).toMatch(/pointerGaze[\s\S]*uPointer\s*-\s*faceNdc/);
+    expect(vertexShader).toMatch(/gaze[\s\S]*pointerGaze/);
     expect(vertexShader).toMatch(/transformed\.xy\s*\+=\s*gaze[\s\S]*isPupil/);
     expect(vertexShader).toMatch(/blinkAmt|agentBlinkAmount/);
     expect(vertexShader).toMatch(/lidY/);
