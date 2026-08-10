@@ -4,9 +4,11 @@
   --blue: #5fb8f2;
   --blue-faint: rgb(95 184 242 / 16%);
   --blue-soft: rgb(95 184 242 / 72%);
+  --cursor-dot: url("/cursor-dot.png") 4 4;
   background: var(--black);
   color: var(--blue);
   font-family: var(--font-ibm-plex-mono), monospace;
+  cursor: var(--cursor-dot), auto;
 }
 
 * {
@@ -17,6 +19,18 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--black);
+}
+
+a,
+button,
+summary,
+[role="button"] {
+  cursor: var(--cursor-dot), pointer;
+}
+
+input,
+textarea {
+  cursor: text;
 }
 
 button,
@@ -222,7 +236,7 @@ input {
   border: 1px solid rgb(95 184 242 / 30%);
   border-radius: 0;
   background: rgb(8 8 8 / 28%);
-  cursor: pointer;
+  cursor: var(--cursor-dot), pointer;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
@@ -658,7 +672,7 @@ input {
     display: block;
     padding: 0.6rem 0.2rem;
     border-bottom: 1px solid var(--blue-faint);
-    cursor: pointer;
+    cursor: var(--cursor-dot), pointer;
     font-size: 0.85rem;
     letter-spacing: 0.02em;
     text-transform: uppercase;
