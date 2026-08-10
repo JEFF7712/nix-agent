@@ -55,8 +55,9 @@ jobs:
         run: pnpm build
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 5d99d63dea23dde67ccb07e5dfb31107
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           command: pages deploy site/out --project-name nix-agent --branch main
