@@ -70,6 +70,7 @@ def test_usage_documents_runtime_dependencies_and_timeout_boundaries():
     wrapper = _paragraph_containing(what_you_get, "packaged wrapper")
     host = _paragraph_containing(what_you_get, "host must supply")
     timeout = _paragraph_containing(what_you_get, "`NIX_AGENT_COMMAND_TIMEOUT`")
+    usage_log = _paragraph_containing(what_you_get, "Off by default")
 
     for tool in ("statix", "deadnix", "nixfmt", "nvd"):
         assert f"`{tool}`" in wrapper
@@ -87,6 +88,9 @@ def test_usage_documents_runtime_dependencies_and_timeout_boundaries():
     assert "30 minutes" in timeout
     assert "invalid or nonpositive" in timeout
     assert "falls back" in timeout
+    assert "`NIX_AGENT_USAGE_LOG=1`" in usage_log
+    assert "usage.jsonl" in what_you_get
+    assert "nix-agent usage" in what_you_get
 
 
 def test_usage_documents_output_caps_and_full_switch_log_escape_hatch():

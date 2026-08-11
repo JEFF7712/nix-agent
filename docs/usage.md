@@ -27,6 +27,43 @@ Commands time out after 30 minutes by default. Set
 limit; an unset, invalid or nonpositive value falls back to the 30-minute
 default.
 
+### Local usage log
+
+Off by default. Set `NIX_AGENT_USAGE_LOG=1` (also `true` / `yes` / `on`) in
+the MCP host's env for the nix-agent server to append one JSON line per tool
+call (no network) while dogfooding:
+
+```json
+{
+  "mcpServers": {
+    "nix-agent": {
+      "command": "nix-agent",
+      "args": [],
+      "env": {
+        "NIX_AGENT_USAGE_LOG": "1"
+      }
+    }
+  }
+}
+```
+
+- default path: `$XDG_STATE_HOME/nix-agent/usage.jsonl` (or
+  `~/.local/state/nix-agent/usage.jsonl`)
+- override path with `NIX_AGENT_USAGE_LOG_PATH`
+
+Each event records the tool name, UTC timestamp, duration, envelope
+`status`, `resolved_target` when present, `raw_bytes` / `returned_bytes` /
+`bytes_saved` when byte accounting ran, plus a few request fields (`mode`,
+`flake_uri`, `level`, `action`, `attr`). Write failures are swallowed so
+logging never breaks a tool call.
+
+Summarize with:
+
+```bash
+nix-agent usage
+nix-agent usage --json
+```
+
 ## Install
 
 Add the flake input and module to your NixOS config:

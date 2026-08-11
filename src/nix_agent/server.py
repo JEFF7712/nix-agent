@@ -1,6 +1,12 @@
+import functools
+import time
+from collections.abc import Callable
+from typing import Any
+
 from fastmcp import FastMCP
 from fastmcp.tools.tool import Tool
 
+from nix_agent import metrics
 from nix_agent.tools.build import build, diff
 from nix_agent.tools.check import check
 from nix_agent.tools.eval import eval_config
@@ -76,8 +82,39 @@ _TOOLS = [
 ]
 
 
+def instrument(name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Time a tool call and append a local usage event (JSONL)."""
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not metrics.enabled():
+            return fn(*args, **kwargs)
+        start = time.perf_counter()
+        error: str | None = None
+        result: Any = None
+        try:
+            result = fn(*args, **kwargs)
+            return result
+        except Exception as exc:
+            error = type(exc).__name__
+            raise
+        finally:
+            metrics.record_call(
+                tool=name,
+                duration_ms=(time.perf_counter() - start) * 1000,
+                response=result if isinstance(result, dict) else None,
+                error=error,
+                kwargs=kwargs,
+            )
+
+    return wrapper
+
+
 def build_server() -> FastMCP:
     server = FastMCP("nix-agent")
     for fn, name, description in _TOOLS:
-        server.add_tool(Tool.from_function(fn, name=name, description=description))
+        instrumented = instrument(name, fn)
+        server.add_tool(
+            Tool.from_function(instrumented, name=name, description=description)
+        )
     return server

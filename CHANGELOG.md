@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.1 - 2026-08-10
+
+- Add an opt-in local JSONL usage log for MCP tool calls (tool, duration,
+  status, byte accounting, target) under `$XDG_STATE_HOME/nix-agent/usage.jsonl`,
+  with `nix-agent usage` to summarize. Enable with `NIX_AGENT_USAGE_LOG=1`.
+
 ## v0.8.0 - 2026-07-12
 
 - Trim the runtime tool surface from nine tools to seven, split into two

@@ -9,7 +9,8 @@ plus eval, locate, and check for config introspection.
 It pairs with [`mcp-nixos`](https://github.com/utensils/mcp-nixos). nix-agent
 operates on your actual configuration, `mcp-nixos` handles package and option
 discovery. Responses report raw vs returned bytes so token savings are
-visible per call, not just claimed.
+visible per call, not just claimed. Optional local usage logging
+(`NIX_AGENT_USAGE_LOG=1`); run `nix-agent usage` to summarize.
 
 > **Experimental and a work in progress.** Feedback and contributions welcome.
 
