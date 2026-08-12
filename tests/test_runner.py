@@ -262,6 +262,12 @@ def test_account_helper_on_hand_built_envelope():
     assert response["returned_bytes"] == len('{"status": "ok", "value": 1}')
 
 
+def test_strip_accounting_removes_usage_fields():
+    response = {"status": "ok", "raw_bytes": 10, "returned_bytes": 4, "value": 1}
+    assert runner.strip_accounting(response) == {"status": "ok", "value": 1}
+    assert "raw_bytes" not in response
+
+
 def test_run_raw_bytes_counts_bytes_not_chars(monkeypatch):
     def fake_run(argv, capture_output, text, cwd=None, errors=None, timeout=None):
         return subprocess.CompletedProcess(argv, 0, stdout="héllo", stderr="")

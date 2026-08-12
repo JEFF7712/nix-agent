@@ -37,7 +37,13 @@ def main() -> None:
     if args.command == "inspect-flake":
         from nix_agent.tools.inspect_flake import inspect_flake
 
-        json.dump(inspect_flake(args.flake_uri), sys.stdout, indent=2)
+        from nix_agent.runner import strip_accounting
+
+        json.dump(
+            strip_accounting(inspect_flake(args.flake_uri)),
+            sys.stdout,
+            indent=2,
+        )
         sys.stdout.write("\n")
         return
 

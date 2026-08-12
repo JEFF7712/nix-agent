@@ -422,7 +422,8 @@ channel also blanks the usage log. Do not do this in this pass.
 - Live `switch` in CI.
 - Changing lint-with-findings or switch-with-newly-failed-units
   away from `ok`.
-- Removing `raw_bytes` / `returned_bytes` from envelopes (deferred).
+- Removing `raw_bytes` / `returned_bytes` from envelopes (done in v0.9.1;
+  usage log still records them).
 
 ## Residual risks (accepted)
 

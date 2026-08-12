@@ -17,8 +17,10 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.9.0"' in pyproject_text
-    assert 'version = "0.9.0";' in flake_text
+    assert 'version = "0.9.1"' in pyproject_text
+    assert 'version = "0.9.1";' in flake_text
+    assert "## v0.9.1 - 2026-08-12" in changelog_text
+    assert "usage log" in changelog_text
     assert "## v0.9.0 - 2026-08-12" in changelog_text
     assert "rollback_generation" in changelog_text
     assert "## v0.8.1 - 2026-08-10" in changelog_text

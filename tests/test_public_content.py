@@ -165,7 +165,8 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "preflight_failed" in USAGE
     assert "returns `commands`" in USAGE
     assert "statix and deadnix" in USAGE
-    assert "omit both `raw_bytes` and `returned_bytes`" in USAGE
+    assert "usage-log diagnostics only" in USAGE
+    assert "omit byte fields in the log" in USAGE
     assert "never produced command output omits" not in USAGE
     assert "$NIX_AGENT_HM_FLAKE" in USAGE
     assert "falling\nback to `$NIX_AGENT_FLAKE`" in USAGE

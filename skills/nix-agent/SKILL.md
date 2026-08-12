@@ -22,8 +22,7 @@ Division of labor:
 
 Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
 omitted and echo back what they resolved and ran (`resolved_target` and
-`command`, or `commands` for `check("lint")`), plus `raw_bytes`/
-`returned_bytes` accounting when present (see Token discipline).
+`command`, or `commands` for `check("lint")`).
 
 Operational core:
 - `build(flake_uri?, mode?)`: build the closure, no activation. A failed
@@ -151,14 +150,9 @@ do not re-fetch.
   in one call; a tree-wide grep does not. That is why it has a slot, not
   because it caps a firehose (24 KB → 20 KB on
   `environment.systemPackages`).
-- **`raw_bytes`/`returned_bytes`** when present tell you how much log
-  the trimming saved. They are diagnostics, not knobs. Early-exit
-  statuses (`no_target`, `invalid_attr`, `invalid_action`,
-  `invalid_level`, `not_an_option`, `tool_missing`, `not_applicable`,
-  `preflight_failed`, `unknown_generation`, `target_locked`,
-  `remote_ref_rejected`) omit them. `target_locked` includes `pin`.
-  `remote_ref_rejected` means clone the flake locally and pin it; do
-  not retry the remote ref.
+- **Byte accounting is off the envelope.** `raw_bytes` / `returned_bytes`
+  live in the usage log (`NIX_AGENT_USAGE_LOG=1`, then `nix-agent usage`),
+  not on the tool response. Do not look for them in MCP results.
 - **Escape hatches are deliberate last resorts.** `full_log=True` and the
   raw `output` field exist for the rare case the trimmed view genuinely
   lacks what you need; reaching for them by default defeats the server.

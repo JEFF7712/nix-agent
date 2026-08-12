@@ -158,13 +158,22 @@ def envelope(
     return account(response)
 
 
+_ACCOUNTING_KEYS = ("raw_bytes", "returned_bytes")
+
+
 def account(response: dict[str, object]) -> dict[str, object]:
     """Attach returned_bytes: the serialized size of the envelope minus
-    the accounting fields themselves."""
-    body = {
-        k: v for k, v in response.items() if k not in ("raw_bytes", "returned_bytes")
-    }
+    the accounting fields themselves. MCP instrument strips both before
+    the model sees the envelope; the usage log reads them first."""
+    body = {k: v for k, v in response.items() if k not in _ACCOUNTING_KEYS}
     response["returned_bytes"] = len(json.dumps(body))
+    return response
+
+
+def strip_accounting(response: dict[str, object]) -> dict[str, object]:
+    """Remove usage-log byte fields from a tool envelope (in place)."""
+    for key in _ACCOUNTING_KEYS:
+        response.pop(key, None)
     return response
 
 

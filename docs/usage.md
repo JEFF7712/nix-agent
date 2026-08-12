@@ -251,34 +251,37 @@ per-stream limit.
 
 ### Byte accounting
 
-Every response that ran a command carries `raw_bytes` and `returned_bytes`
-so the token savings are visible per call, not just claimed (early-exit
-statuses listed below are the exception):
+Tool envelopes do not carry `raw_bytes` or `returned_bytes`. Those fields
+are usage-log diagnostics only (`NIX_AGENT_USAGE_LOG=1`, then
+`nix-agent usage`). When a command ran, the log event records:
 
-- `raw_bytes` is the underlying command output size (combined
-  stdout+stderr, in bytes, before any truncation). Tools whose work is
-  several co-equal runs sum them: `check("lint")` sums statix+deadnix,
-  batched `eval_config` sums the per-attr evals. Tools with auxiliary probes
+- `raw_bytes`: underlying command output size (combined stdout+stderr,
+  in bytes, before any truncation). Tools whose work is several co-equal
+  runs sum them: `check("lint")` sums statix+deadnix, batched
+  `eval_config` sums the per-attr evals. Tools with auxiliary probes
   count only the primary operation: `switch`'s post-activation
   health/diff probes are not included.
-- `returned_bytes` is the serialized size of the envelope actually handed
-  back, computed last, and excludes the ~30 bytes of the two accounting
-  fields themselves.
-- Early-exit statuses
-  (`no_target`, `invalid_attr`, `invalid_action`, `invalid_level`,
-  `not_an_option`, `tool_missing`, `not_applicable`, `preflight_failed`,
-  `unknown_generation`, `target_locked`, `remote_ref_rejected`)
-  omit both `raw_bytes` and `returned_bytes`.
-  `target_locked` also includes `pin` (the env value).
-  `unknown_generation` means the requested generation matched nothing;
-  no command ran. `remote_ref_rejected` means clone locally and pin;
-  `switch` and `check("dry-activate")` reject remote flake refs before
-  any sudo or dry-build.
+- `returned_bytes`: serialized size of the envelope handed to the model
+  (no accounting fields on that envelope).
+- `bytes_saved`: `raw_bytes - returned_bytes`.
+
+Early-exit statuses (`no_target`, `invalid_attr`, `invalid_action`,
+`invalid_level`, `not_an_option`, `tool_missing`, `not_applicable`,
+`preflight_failed`, `unknown_generation`, `target_locked`,
+`remote_ref_rejected`) omit byte fields in the log as well, because no
+command output was produced.
+`target_locked` also includes `pin` (the env value).
+`unknown_generation` means the requested generation matched nothing;
+no command ran. `remote_ref_rejected` means clone locally and pin;
+`switch` and `check("dry-activate")` reject remote flake refs before
+any sudo or dry-build.
 
 ### Measured on a real config
 
-Captured 2026-07-07 on a NixOS laptop, Nix 2.34, running real read-only
-operations against a live config (`/home/rupan/nixos#laptop`):
+The numbers below were captured 2026-07-07 on a NixOS laptop, Nix 2.34,
+running real read-only operations against a live config
+(`/home/rupan/nixos#laptop`). They describe usage-log accounting, not
+fields on the tool envelope:
 
 | Operation | raw bytes | returned bytes | note |
 |---|---|---|---|
@@ -286,19 +289,13 @@ operations against a live config (`/home/rupan/nixos#laptop`):
 | `eval_config("environment.systemPackages")` | 13,500 | 394 | the raw value is a huge list of store paths; the size guard collapses it to a length + head slice instead of returning it whole |
 | `locate_option("environment.systemPackages")` | 24,066 | 20,396 | 95 defining files, each already close to its per-entry size guard; savings here are modest because the option is genuinely defined in many places |
 
-`switch` carries the same `raw_bytes`/`returned_bytes` pair on its envelope;
-its log is trimmed to a tail on success by design, so the win there tracks
-the same shape as the numbers above rather than a fifth number worth
-quoting in isolation.
-
-The failure path shows a different kind of win, not a smaller
-`returned_bytes` (failure envelopes keep the full output on purpose, so
-`returned_bytes` can exceed `raw_bytes`): building a scratch flake with a
-builder that does `exit 1` gave `raw_bytes: 7187`, `returned_bytes: 7975`,
-and a populated `failed_derivation: {drv: ".../boom.drv", log_tail:
-"failing to build\n"}`. That field is the actual saving: it names the one
-failing `.drv` and its last log line directly, instead of the agent running
-a separate `nix log` and scanning a much longer derivation log by hand.
+A successful `switch` trims the activation log to a tail, so its
+usage-log win tracks the same shape. The failure path is a different
+kind of win: building a scratch flake with a builder that does `exit 1`
+gave `raw_bytes: 7187`, `returned_bytes: 7975`, and a populated
+`failed_derivation: {drv: ".../boom.drv", log_tail: "failing to build\n"}`.
+That field is the actual saving: it names the one failing `.drv` and its
+last log line directly, instead of the agent running a separate `nix log`.
 
 ## Design notes
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.1 - 2026-08-12
+
+- Stop putting `raw_bytes` / `returned_bytes` on MCP tool envelopes.
+  Byte accounting stays in the usage log (`NIX_AGENT_USAGE_LOG=1`,
+  `nix-agent usage`).
+
 ## v0.9.0 - 2026-08-12
 
 - Privileged `switch` / `check("dry-activate")` reject remote flake refs

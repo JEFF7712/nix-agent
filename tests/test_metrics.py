@@ -141,7 +141,10 @@ def test_instrument_records_success_and_error(monkeypatch, tmp_path):
         }
 
     wrapped = instrument("check", ok_tool)
-    assert wrapped(mode="nixos")["status"] == "ok"
+    returned = wrapped(mode="nixos")
+    assert returned["status"] == "ok"
+    assert "raw_bytes" not in returned
+    assert "returned_bytes" not in returned
 
     def boom() -> dict:
         raise ValueError("nope")
@@ -154,8 +157,21 @@ def test_instrument_records_success_and_error(monkeypatch, tmp_path):
     assert events[0]["tool"] == "check"
     assert events[0]["status"] == "ok"
     assert events[0]["mode"] == "nixos"
+    assert events[0]["raw_bytes"] == 10
+    assert events[0]["returned_bytes"] == 4
+    assert events[0]["bytes_saved"] == 6
     assert events[1]["tool"] == "build"
     assert events[1]["error"] == "ValueError"
+
+
+def test_instrument_strips_accounting_when_log_disabled(monkeypatch):
+    monkeypatch.delenv(metrics.ENABLED_ENV, raising=False)
+
+    def ok_tool() -> dict:
+        return {"status": "ok", "raw_bytes": 10, "returned_bytes": 4}
+
+    returned = instrument("diff", ok_tool)()
+    assert returned == {"status": "ok"}
 
 
 def test_attr_summary_in_event():

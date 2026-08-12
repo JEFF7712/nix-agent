@@ -186,6 +186,9 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
         "remote_ref_rejected": remote_ref_rejected,
     }
 
-    actual = {name: _schema(value) for name, value in examples.items()}
+    actual = {
+        name: _schema(runner.strip_accounting(dict(value)))
+        for name, value in examples.items()
+    }
     expected = json.loads(SNAPSHOT.read_text())
     assert actual == expected

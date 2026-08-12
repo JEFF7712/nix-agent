@@ -4,9 +4,7 @@
       "str"
     ],
     "output": "str",
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "status": "str",
     "store_path": "str"
   },
@@ -35,9 +33,7 @@
     "current_generation": "str",
     "log_truncated": "bool",
     "output": "str",
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "rollback_generation": "str",
     "status": "str",
     "summary": {
@@ -80,9 +76,7 @@
         "str"
       ]
     },
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "rollback_generation": "str",
     "status": "str"
   },
@@ -97,9 +91,7 @@
     },
     "first_error": "str",
     "output": "str",
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "rollback_generation": "str",
     "status": "str"
   },
@@ -121,9 +113,7 @@
       ],
       "removed": []
     },
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "status": "str",
     "store_path": "str"
   },
@@ -141,9 +131,7 @@
         "value": "bool"
       }
     ],
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "status": "str"
   },
   "generations_list_nixos": {
@@ -159,9 +147,7 @@
       }
     ],
     "output": "str",
-    "raw_bytes": "int",
     "resolved_target": "str",
-    "returned_bytes": "int",
     "status": "str"
   },
   "unknown_generation": {
