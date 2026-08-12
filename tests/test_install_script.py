@@ -10,10 +10,12 @@ def test_install_script_exists_and_mentions_supported_hosts():
     assert "codex" in script_text
     assert "opencode" in script_text
     assert "claude" in script_text
+    assert "cursor" in script_text
     assert '"$skills_dir"/*/' in script_text
     assert ".codex}/skills" in script_text
     assert ".config/opencode/skills" in script_text
     assert ".claude/skills" in script_text
+    assert ".cursor/skills" in script_text
 
 
 def test_install_script_covers_every_skill_dir():
@@ -32,3 +34,4 @@ def test_docs_mention_install_script():
     assert "./install-skill.sh codex" in usage_text
     assert "./install-skill.sh opencode" in usage_text
     assert "./install-skill.sh claude" in usage_text
+    assert "./install-skill.sh cursor" in usage_text

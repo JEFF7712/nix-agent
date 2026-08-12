@@ -2,7 +2,7 @@
 
 This document is the canonical, ordered checklist for installing
 [`nix-agent`](https://github.com/JEFF7712/nix-agent) on a NixOS machine and
-wiring it into an MCP-capable coding agent (Codex, Claude Code, opencode, etc.).
+wiring it into an MCP-capable coding agent (Codex, Claude Code, opencode, Cursor, etc.).
 
 It is written for an autonomous agent. Follow every step in order. Do not
 skip steps. Stop and report to the user if any step fails.
@@ -143,6 +143,8 @@ cd /tmp/nix-agent-src
 ./install-skill.sh opencode
 # or Claude Code
 ./install-skill.sh claude
+# or Cursor
+./install-skill.sh cursor
 ```
 
 This copies each directory under `skills/` (currently `nix-agent` and
@@ -151,6 +153,7 @@ This copies each directory under `skills/` (currently `nix-agent` and
 - Codex: `$CODEX_HOME/skills/<skill>` if `CODEX_HOME` is set, otherwise `~/.codex/skills/<skill>`
 - opencode: `~/.config/opencode/skills/<skill>`
 - Claude Code: `~/.claude/skills/<skill>`
+- Cursor: `~/.cursor/skills/<skill>`
 
 For other hosts, copy each directory under `skills/` into that host's
 skills directory manually.

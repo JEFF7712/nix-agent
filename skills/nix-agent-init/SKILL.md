@@ -1,6 +1,6 @@
 ---
 name: nix-agent-init
-description: Use when the user wants to make a NixOS/Home Manager config repo agent-ready (AGENT_MAP.md, CLAUDE.md, .mcp.json) and the host exposes the nix-agent MCP server.
+description: Onboard an unfamiliar NixOS or Home Manager flake by running nix-agent inspect-flake and generating AGENT_MAP.md, CLAUDE.md, and .mcp.json from observed facts. Use on first contact with a config repo, when the user asks how the flake is laid out, or when making the repo agent-ready. Requires the nix-agent MCP server.
 ---
 
 # Nix Agent Init

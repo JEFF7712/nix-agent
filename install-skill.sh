@@ -17,8 +17,11 @@ case "$target" in
   claude)
     skills_root="$HOME/.claude/skills"
     ;;
+  cursor)
+    skills_root="$HOME/.cursor/skills"
+    ;;
   *)
-    printf 'Usage: %s [codex|opencode|claude]\n' "$(basename "$0")" >&2
+    printf 'Usage: %s [codex|opencode|claude|cursor]\n' "$(basename "$0")" >&2
     exit 1
     ;;
 esac

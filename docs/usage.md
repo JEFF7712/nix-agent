@@ -126,6 +126,7 @@ directory:
 ./install-skill.sh codex
 ./install-skill.sh opencode
 ./install-skill.sh claude
+./install-skill.sh cursor
 ```
 
 ## Tool surface

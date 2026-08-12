@@ -1,6 +1,6 @@
 ---
 name: nix-agent
-description: Use when a user wants to change NixOS packages, options, modules, or local configuration and the host exposes the nix-agent MCP server (usually alongside mcp-nixos).
+description: Operate on this machine's NixOS or Home Manager configuration with the nix-agent MCP tools (build, diff, switch, generations, eval_config, locate_option, check). Use when changing packages, options, or modules; diagnosing a failed build or switch; rolling back a generation; or asking what the live config currently resolves to. Requires the nix-agent MCP server (usually alongside mcp-nixos).
 ---
 
 # Nix Agent
@@ -99,7 +99,10 @@ an attribute this flake does not define. Fix it with an explicit
 5. `diff()`: show the user what will change.
 6. `switch()`: report the result and `rollback_generation`.
 7. On failure at any step: read `first_error`, then `error_detail`, then
-   `failed_derivation.log_tail`; fix and retry. On regret after a switch:
+   `failed_derivation.log_tail`; fix and retry. `status: "preflight_failed"`
+   means `switch(validate=True)` never activated — fix the nested
+   `preflight` dry-build, do not retry activation. A `privilege` field
+   means sudo auth failed, not a Nix error. On regret after a switch:
    `generations(action="rollback")` to the recorded generation.
 
 Steps 3 through 5 are judgment calls, not gates. For a trivial change,
