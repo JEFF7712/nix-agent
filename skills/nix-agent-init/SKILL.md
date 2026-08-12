@@ -116,6 +116,10 @@ Manager is wired in as a NixOS module, there is no separate
 When `hm_integration == "standalone"`, note that HM is its own flake and
 its operations use `mode="home-manager"`.
 
+When `hm_integration == "unknown"`, the facts were inconclusive
+(lock-file presence alone does not prove integration). Say that. Do not
+write a hard mode rule.
+
 Keep it to one screen. Do not restage generic NixOS tutorials.
 
 Then create `AGENTS.md` as a symlink to `CLAUDE.md`:

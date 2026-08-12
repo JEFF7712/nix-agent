@@ -29,6 +29,7 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 - [docs/usage.md](docs/usage.md): install, MCP host config, tool surface, workflow, design notes
 - [docs/agent-install.md](docs/agent-install.md): install guide for agents
 - [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive dry-activate, switch, and rollback
+- [docs/proposed-changes.md](docs/proposed-changes.md): v0.9.0 rollback and privileged-target contract
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion workflow skill
 - [skills/nix-agent-init/SKILL.md](skills/nix-agent-init/SKILL.md): repo onboarding skill
 

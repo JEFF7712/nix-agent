@@ -4,7 +4,13 @@ import re
 from pathlib import Path
 
 from nix_agent import health, runner
-from nix_agent.target import TargetError, current_hm_profile, resolve_target
+from nix_agent.privilege import sudo_diagnosis
+from nix_agent.target import (
+    TargetError,
+    constrain_privileged_target,
+    current_hm_profile,
+    resolve_target,
+)
 from nix_agent.tools.build import closure_diff
 from nix_agent.tools.check import check
 
@@ -27,13 +33,6 @@ _UNIT_PATTERNS = {
     "new": re.compile(r"the following new units were started:\s*(.+)"),
 }
 _BUILDING = re.compile(r"^\s*building '/nix/store/\S+\.drv'")
-
-# sudo refused because there is no interactive terminal or askpass helper.
-_SUDO_NO_AUTH = re.compile(
-    r"sudo: (a terminal is required|a password is required|"
-    r"no askpass program|no tty present)",
-    re.IGNORECASE,
-)
 
 
 def _current_generation(mode: str) -> str | None:
@@ -63,26 +62,6 @@ def _summarize_switch(output: str) -> dict[str, object]:
     return summary
 
 
-def _sudo_diagnosis(argv: list[str], output: str) -> dict[str, object] | None:
-    if not _SUDO_NO_AUTH.search(output):
-        return None
-    return {
-        "cause": "sudo could not authenticate non-interactively",
-        "detail": (
-            "Activation needs root via sudo, but there is no TTY/askpass and "
-            "no passwordless rule matched this command form. nix-agent invokes "
-            "sudo with the resolved store path of nixos-rebuild; a NOPASSWD "
-            "rule must match that exact argv."
-        ),
-        "command_form": argv,
-        "fixes": [
-            "Add a NOPASSWD sudoers rule for this nixos-rebuild store path, or",
-            "Set SUDO_ASKPASS and run with sudo -A, or",
-            "Run switch from an interactive session.",
-        ],
-    }
-
-
 def switch(
     flake_uri: str | None = None,
     mode: str = "nixos",
@@ -101,6 +80,10 @@ def switch(
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
+
+    locked = constrain_privileged_target(target, mode=mode)
+    if locked is not None:
+        return locked
 
     if validate:
         preflight = check("dry-build", flake_uri=flake_uri, mode=mode)
@@ -148,13 +131,27 @@ def switch(
             extra["log_truncated"] = extra["output"] != result.output
         return runner.envelope("ok", target.flake_ref, result, **extra)
 
-    diagnosis = _sudo_diagnosis(argv, result.output)
+    diagnosis = sudo_diagnosis(argv, result.output)
     if diagnosis is not None:
         extra["privilege"] = diagnosis
     drv_info = runner.failed_derivation_info(result.output)
     if drv_info is not None:
         extra["failed_derivation"] = drv_info
     return runner.envelope("failed", target.flake_ref, result, **extra)
+
+
+def _nixos_profile_link(gen_id: object) -> str:
+    return f"{SYSTEM_PROFILE}-{gen_id}-link"
+
+
+def _attach_nixos_path(entry: dict[str, object]) -> dict[str, object]:
+    gen_id = entry.get("id")
+    if gen_id is None:
+        return entry
+    link = _nixos_profile_link(gen_id)
+    if os.path.exists(link):
+        entry["path"] = os.path.realpath(link)
+    return entry
 
 
 def _list_nixos() -> dict[str, object]:
@@ -167,11 +164,13 @@ def _list_nixos() -> dict[str, object]:
             entries = None
         if isinstance(entries, list):
             gens = [
-                {
-                    "id": entry.get("generation"),
-                    "date": entry.get("date"),
-                    "current": bool(entry.get("current")),
-                }
+                _attach_nixos_path(
+                    {
+                        "id": entry.get("generation"),
+                        "date": entry.get("date"),
+                        "current": bool(entry.get("current")),
+                    }
+                )
                 for entry in entries
             ]
             return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
@@ -189,11 +188,13 @@ def _list_nixos_nix_env() -> dict[str, object]:
         match = _NIX_ENV_LINE.match(line)
         if match:
             gens.append(
-                {
-                    "id": int(match.group(1)),
-                    "date": match.group(2),
-                    "current": match.group(3) is not None,
-                }
+                _attach_nixos_path(
+                    {
+                        "id": int(match.group(1)),
+                        "date": match.group(2),
+                        "current": match.group(3) is not None,
+                    }
+                )
             )
     return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
 
@@ -218,7 +219,130 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
     return envelope, gens
 
 
-def generations(action: str = "list", mode: str = "nixos") -> dict[str, object]:
+def _generation_id(generation: object) -> int | None:
+    if isinstance(generation, bool):
+        return None
+    if isinstance(generation, int):
+        return generation
+    if isinstance(generation, str) and generation.isdigit():
+        return int(generation)
+    return None
+
+
+def _match_generation(
+    gens: list[dict[str, object]], generation: object
+) -> dict[str, object] | None:
+    want_id = _generation_id(generation)
+    wanted = str(generation)
+    for entry in gens:
+        if want_id is not None and entry.get("id") == want_id:
+            return entry
+        if entry.get("path") == wanted:
+            return entry
+        gen_id = entry.get("id")
+        if gen_id is None:
+            continue
+        link = _nixos_profile_link(gen_id)
+        if wanted == link:
+            return entry
+        if os.path.lexists(link) and os.path.realpath(link) == wanted:
+            return entry
+        if os.path.lexists(wanted) and os.path.realpath(wanted) == entry.get("path"):
+            return entry
+    return None
+
+
+def _unknown_generation(generation: object) -> dict[str, object]:
+    return {
+        "status": "unknown_generation",
+        "error": f"generation {generation!r} does not match any listed generation",
+    }
+
+
+def _rollback_nixos_untargeted() -> dict[str, object]:
+    nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
+    argv = ["sudo", nixos_rebuild, "switch", "--rollback"]
+    result = runner.run(argv)
+    extra: dict[str, object] = {
+        "current_generation": _current_generation("nixos"),
+    }
+    if not result.ok:
+        diagnosis = sudo_diagnosis(argv, result.output)
+        if diagnosis is not None:
+            extra["privilege"] = diagnosis
+    return runner.envelope(
+        "ok" if result.ok else "failed",
+        SYSTEM_PROFILE,
+        result,
+        **extra,
+    )
+
+
+def _rollback_nixos_targeted(matched: dict[str, object]) -> dict[str, object]:
+    nix_env = runner.resolve_binary("nix-env") or "nix-env"
+    step1 = [
+        "sudo",
+        nix_env,
+        "-p",
+        SYSTEM_PROFILE,
+        "--switch-generation",
+        str(matched["id"]),
+    ]
+    result1 = runner.run(step1)
+    if not result1.ok:
+        extra: dict[str, object] = {}
+        diagnosis = sudo_diagnosis(step1, result1.output)
+        if diagnosis is not None:
+            extra["privilege"] = diagnosis
+        return runner.envelope("failed", SYSTEM_PROFILE, result1, **extra)
+
+    step2 = [
+        "sudo",
+        f"{SYSTEM_PROFILE}/bin/switch-to-configuration",
+        "switch",
+    ]
+    result2 = runner.run(step2)
+    extra = {"current_generation": _current_generation("nixos")}
+    if not result2.ok:
+        extra["note"] = "profile advanced but activation did not"
+        diagnosis = sudo_diagnosis(step2, result2.output)
+        if diagnosis is not None:
+            extra["privilege"] = diagnosis
+        return runner.envelope("failed", SYSTEM_PROFILE, result2, **extra)
+    return runner.envelope("ok", SYSTEM_PROFILE, result2, **extra)
+
+
+def _rollback_hm(
+    gens: list[dict[str, object]], generation: int | str | None
+) -> dict[str, object]:
+    if generation is not None:
+        matched = _match_generation(gens, generation)
+        if matched is None:
+            return _unknown_generation(generation)
+        previous = matched
+    else:
+        current_index = next((i for i, g in enumerate(gens) if g["current"]), 0)
+        if current_index + 1 >= len(gens):
+            return {
+                "status": "failed",
+                "resolved_target": "home-manager profile",
+                "error": "no previous home-manager generation to roll back to",
+            }
+        previous = gens[current_index + 1]
+    result = runner.run([f"{previous['path']}/activate"])
+    return runner.envelope(
+        "ok" if result.ok else "failed",
+        "home-manager profile",
+        result,
+        activated_generation=previous,
+    )
+
+
+def generations(
+    action: str = "list",
+    mode: str = "nixos",
+    generation: int | str | None = None,
+) -> dict[str, object]:
     if action not in ("list", "rollback"):
         return {
             "status": "invalid_action",
@@ -237,27 +361,18 @@ def generations(action: str = "list", mode: str = "nixos") -> dict[str, object]:
         return envelope
 
     if mode == "nixos":
-        nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
-        result = runner.run(["sudo", nixos_rebuild, "switch", "--rollback"])
-        return runner.envelope(
-            "ok" if result.ok else "failed",
-            SYSTEM_PROFILE,
-            result,
-            current_generation=_current_generation(mode),
-        )
-    _, gens = _list_hm()
-    current_index = next((i for i, g in enumerate(gens) if g["current"]), 0)
-    if current_index + 1 >= len(gens):
-        return {
-            "status": "failed",
-            "resolved_target": "home-manager profile",
-            "error": "no previous home-manager generation to roll back to",
-        }
-    previous = gens[current_index + 1]
-    result = runner.run([f"{previous['path']}/activate"])
-    return runner.envelope(
-        "ok" if result.ok else "failed",
-        "home-manager profile",
-        result,
-        activated_generation=previous,
-    )
+        if generation is None:
+            return _rollback_nixos_untargeted()
+        listed = _list_nixos()
+        if listed.get("status") != "ok":
+            return listed
+        gens = list(listed.get("generations") or [])
+        matched = _match_generation(gens, generation)
+        if matched is None:
+            return _unknown_generation(generation)
+        return _rollback_nixos_targeted(matched)
+
+    envelope, gens = _list_hm()
+    if envelope.get("status") != "ok":
+        return envelope
+    return _rollback_hm(gens, generation)

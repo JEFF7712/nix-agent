@@ -25,6 +25,7 @@ _KWARG_KEYS = (
     "flake_uri",
     "level",
     "action",
+    "generation",
     "validate",
     "full_log",
 )

@@ -130,5 +130,13 @@ def eval_config(
             "results": results,
             "raw_bytes": raw_total,
         }
+        if results and all(entry.get("status") != "ok" for entry in results):
+            response["status"] = "failed"
+            first = next(
+                (entry["first_error"] for entry in results if entry.get("first_error")),
+                None,
+            )
+            if first is not None:
+                response["first_error"] = first
         return runner.account(response)
     return _eval_one(target, candidates, attr)

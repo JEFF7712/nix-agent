@@ -35,23 +35,35 @@ Operational core:
   `rollback_generation`, returns a `summary` (units changed, derivations
   built, `packages` vs the rollback generation, `health`), and trims the
   log to a tail on success. `validate=True` gates on `check("dry-build")`.
-- `generations(action="list"|"rollback", mode?)`: list or roll back.
+  Remote refs and pin mismatches exit as `remote_ref_rejected` /
+  `target_locked` before sudo or dry-build.
+- `generations(action="list"|"rollback", mode?, generation?)`: list or
+  roll back. NixOS list entries include `path` when the profile link
+  exists. After `switch`, call
+  `generations(action="rollback", generation=<rollback_generation or id>)`.
+  Bare `generations(action="rollback")` is previous-generation only.
+  Unknown ids return `unknown_generation` and run no command.
 
 Config introspection:
 - `eval_config(attr, flake_uri?, mode?)`: final merged value of any
   config attribute on THIS machine, after all modules/overlays.
   `mcp-nixos` says what an option means; this says what it is. Pass a
   **list** for `attr` to evaluate many in one call (per-attr `results`).
-  Values above ~2 KB degrade to attr names / length / a head slice,
-  marked `truncated: true`.
+  All attrs ok or mixed → `ok` (failures in `results`); every attr
+  failed → `failed` with `first_error` from the first failed entry that
+  has one. Values above ~2 KB degrade to attr names / length / a head
+  slice, marked `truncated: true`.
 - `locate_option(attr, flake_uri?, mode?)`: which file sets an option,
-  as `declarations` and `definitions` (`{file, value}` per file). Use
-  this instead of grepping the tree. `status` is `not_an_option` for
-  plain config values (use `eval_config` there). For integrated HM,
-  spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`.
+  as `declarations` and `definitions` (`{file, value}` per file). Earns
+  its slot as that which-file answer, not as a cap (measured
+  `environment.systemPackages` is 24 KB → 20 KB). Use this instead of
+  grepping the tree. `status` is `not_an_option` for plain config values
+  (use `eval_config` there). For integrated HM, spell the attr
+  `home-manager.users.<user>.<attr>` with `mode="nixos"`.
 - `check(level, flake_uri?, mode?)`: validation ladder, fast to slow:
   `"lint"` (statix + deadnix, structured `findings`), `"dry-build"`,
-  `"dry-activate"` (NixOS only).
+  `"dry-activate"` (NixOS only). Dry-activate uses the same remote/pin
+  classifier as `switch` and attaches `privilege` on sudo auth failure.
 
 Formatting is not a tool: format edited files with the flake's own
 formatter (`nix fmt`, or `nixfmt` on the files) via your Bash tool. Repo
@@ -97,13 +109,18 @@ an attribute this flake does not define. Fix it with an explicit
 3. Format with the flake's formatter (`nix fmt`, or `nixfmt` on the edited files) via Bash, then `check("lint")`: fix findings worth fixing.
 4. `check("dry-build")`: catches eval/build errors cheaply.
 5. `diff()`: show the user what will change.
-6. `switch()`: report the result and `rollback_generation`.
+6. `switch()`: report the result and `rollback_generation`. Keep that
+   value.
 7. On failure at any step: read `first_error`, then `error_detail`, then
    `failed_derivation.log_tail`; fix and retry. `status: "preflight_failed"`
    means `switch(validate=True)` never activated — fix the nested
    `preflight` dry-build, do not retry activation. A `privilege` field
-   means sudo auth failed, not a Nix error. On regret after a switch:
-   `generations(action="rollback")` to the recorded generation.
+   means sudo auth failed, not a Nix error. `unknown_generation`,
+   `target_locked`, and `remote_ref_rejected` are early exits: no
+   command ran. On regret after a switch:
+   `generations(action="rollback", generation=<rollback_generation or id>)`.
+   Bare `generations(action="rollback")` is previous-generation only,
+   and is only the right default when nothing else has switched since.
 
 Steps 3 through 5 are judgment calls, not gates. For a trivial change,
 going straight to `switch` is fine.
@@ -126,13 +143,22 @@ do not re-fetch.
   vs the rollback generation. These replace running `systemctl --failed`
   or a second `diff()`.
 - **Batch attr checks.** `eval_config([...])` answers N questions in one
-  call. A `truncated: true` value means eval a child attr for the part
-  you need, NOT retry for full output.
+  call. Mixed results stay `ok` with failures in `results`; if every
+  attr failed, top-level `status` is `failed` with `first_error` from
+  the first failed entry that has one. A `truncated: true` value means
+  eval a child attr for the part you need, NOT retry for full output.
 - **`locate_option` before grepping.** It answers "which file sets this"
-  in one call; a tree-wide grep does not.
+  in one call; a tree-wide grep does not. That is why it has a slot, not
+  because it caps a firehose (24 KB → 20 KB on
+  `environment.systemPackages`).
 - **`raw_bytes`/`returned_bytes`** when present tell you how much log
   the trimming saved. They are diagnostics, not knobs. Early-exit
-  statuses omit them.
+  statuses (`no_target`, `invalid_attr`, `invalid_action`,
+  `invalid_level`, `not_an_option`, `tool_missing`, `not_applicable`,
+  `preflight_failed`, `unknown_generation`, `target_locked`,
+  `remote_ref_rejected`) omit them. `target_locked` includes `pin`.
+  `remote_ref_rejected` means clone the flake locally and pin it; do
+  not retry the remote ref.
 - **Escape hatches are deliberate last resorts.** `full_log=True` and the
   raw `output` field exist for the rare case the trimmed view genuinely
   lacks what you need; reaching for them by default defeats the server.
@@ -150,3 +176,11 @@ boilerplate.
   sops-nix/agenix and only edit references.
 - Never call `switch` when the user asked only to check or preview;
   `diff` is the preview.
+- Host allowlists cannot see `flake_uri`. Privileged tools reject remote
+  refs and honor `$NIX_AGENT_FLAKE` / `$NIX_AGENT_HM_FLAKE` as an
+  anti-footgun (the HM lock does not fall back to the NixOS pin). Do not
+  treat the pin as a security boundary. Sudoers must be narrowed to that
+  directory.
+- After `switch`, undo with
+  `generations(action="rollback", generation=<rollback_generation>)`.
+  Bare rollback is previous-only.

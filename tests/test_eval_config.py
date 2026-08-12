@@ -234,6 +234,27 @@ def test_eval_batched_partial_failure(monkeypatch):
     }
 
 
+def test_eval_batched_all_failed(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(False, stderr="error: attribute 'nope' missing", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(["services.nope", "services.also"], flake_uri="/x#h")
+    assert out["status"] == "failed"
+    assert out["first_error"] == "error: attribute 'nope' missing"
+    assert len(out["results"]) == 2
+    assert all(entry["status"] == "failed" for entry in out["results"])
+
+
+def test_eval_config_does_not_reject_remote_ref(monkeypatch):
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("services.openssh.enable", flake_uri="github:example/nixos#host")
+    assert out["status"] == "ok"
+
+
 def test_eval_batched_empty_list():
     out = eval_config([], flake_uri="/x#h")
     assert out["status"] == "invalid_attr"

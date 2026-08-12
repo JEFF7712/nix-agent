@@ -36,3 +36,8 @@ jobs:
       - name: Run flake checks
         if: matrix.check == 'nix-flake-check'
         run: nix flake check --system x86_64-linux
+
+      - name: Eval tiny-flake quoting fixture
+        if: matrix.check == 'nix-flake-check'
+        run: |
+          test "$(nix eval ./tests/fixtures/tiny-flake#nixosConfigurations.\"fixture\".config.networking.hostName --json --no-write-lock-file)" = '"fixture"'

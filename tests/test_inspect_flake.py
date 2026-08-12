@@ -54,10 +54,20 @@ def test_parse_flake_show_unknown_formatter_name_passes_through():
 
 
 def test_hm_integration_classification():
-    assert inspect_mod.classify_hm(True, []) == "integrated"
+    assert inspect_mod.classify_hm(True, []) == "unknown"
     assert inspect_mod.classify_hm(True, ["rupan"]) == "standalone"
     assert inspect_mod.classify_hm(False, ["rupan"]) == "standalone"
     assert inspect_mod.classify_hm(False, []) == "none"
+    assert (
+        inspect_mod.classify_hm(
+            True, [], flake_text="inputs.home-manager.nixosModules.home-manager"
+        )
+        == "integrated"
+    )
+    assert (
+        inspect_mod.classify_hm(False, [], flake_text="home-manager.users.rupan = {")
+        == "integrated"
+    )
 
 
 def test_scan_repo_files(tmp_path):
@@ -104,7 +114,9 @@ def test_scan_repo_lock_not_an_object(tmp_path):
 
 
 def test_inspect_flake_integrated_hm(monkeypatch, tmp_path):
-    (tmp_path / "flake.nix").write_text('{ inputs.import-tree.url = "x"; }')
+    (tmp_path / "flake.nix").write_text(
+        '{ inputs.import-tree.url = "x"; }\nhome-manager.nixosModules.home-manager\n'
+    )
     (tmp_path / "flake.lock").write_text(json.dumps({"nodes": {"home-manager": {}}}))
 
     def fake_run(argv, cwd=None):
@@ -125,6 +137,30 @@ def test_inspect_flake_integrated_hm(monkeypatch, tmp_path):
     assert out["mcp_json"] == "absent"
 
 
+def test_inspect_flake_lock_only_hm_is_unknown(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text('{ inputs.import-tree.url = "x"; }')
+    (tmp_path / "flake.lock").write_text(json.dumps({"nodes": {"home-manager": {}}}))
+
+    def fake_run(argv, cwd=None):
+        return _result(True, stdout=SHOW_JSON, command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: None)
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["hm_integration"] == "unknown"
+
+
+def test_scan_repo_ignores_darwin_dirs(tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }")
+    (tmp_path / "darwin").mkdir()
+    (tmp_path / "darwin" / "a.nix").write_text("{}")
+    (tmp_path / "modules" / "darwin").mkdir(parents=True)
+    (tmp_path / "modules" / "darwin" / "a.nix").write_text("{}")
+    facts = inspect_mod.scan_repo(str(tmp_path))
+    assert "darwin" not in facts["module_dirs"]
+    assert "modules/darwin" not in facts["module_dirs"]
+
+
 def test_inspect_flake_show_failure_degrades(monkeypatch, tmp_path):
     (tmp_path / "flake.nix").write_text("{ }")
 
@@ -137,11 +173,26 @@ def test_inspect_flake_show_failure_degrades(monkeypatch, tmp_path):
     assert out["status"] == "ok"
     assert out["hosts"] is None
     assert out["home_configurations"] is None
-    assert out["hm_integration"] == "unknown"
+    assert out["hm_integration"] == "none"
     assert out["formatter"] == "unknown"
     assert "flake show failed" in out["note"]
     assert out["first_error"] == "error: cannot evaluate"
     assert out["lint_tools"] == []
+
+
+def test_inspect_flake_show_failure_still_classifies_hm_from_flake_text(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "flake.nix").write_text("home-manager.users.rupan = {};\n")
+
+    def fake_run(argv, cwd=None):
+        return _result(False, stderr="error: cannot evaluate", command=argv)
+
+    monkeypatch.setattr(inspect_mod.runner, "run", fake_run)
+    monkeypatch.setattr(inspect_mod.runner, "resolve_binary", lambda n: None)
+    out = inspect_flake(flake_uri=str(tmp_path))
+    assert out["hosts"] is None
+    assert out["hm_integration"] == "integrated"
 
 
 def test_inspect_flake_strips_attr_from_uri(monkeypatch, tmp_path):

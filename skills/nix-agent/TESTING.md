@@ -42,8 +42,16 @@
 
 ### Rollback
 
-- After a switch, call `generations(action="list")` to see the generation history.
-- Call `generations(action="rollback")` and verify the system reverts.
+- After a switch, keep `rollback_generation`.
+- Call `generations(action="rollback", generation=<that path or id>)`
+  and verify the system reverts to that generation, not merely the
+  previous one if something else has switched since.
+- Call `generations(action="list")` and confirm NixOS entries include
+  `path` when the profile link exists.
+- Bare `generations(action="rollback")` is previous-generation only;
+  use it only when nothing else has switched since.
+- A `generation` that matches nothing returns `unknown_generation` and
+  must not run sudo.
 
 ## Why this skill exists
 

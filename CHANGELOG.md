@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.9.0 - 2026-08-12
+
+- Privileged `switch` / `check("dry-activate")` reject remote flake refs
+  and honor `$NIX_AGENT_FLAKE` / `$NIX_AGENT_HM_FLAKE` as an anti-footgun;
+  sudoers narrow to `--flake <flake_dir>*` instead of a wildcard flake ref.
+- `generations(action="rollback", generation=...)` consumes the recorded
+  `rollback_generation` (id, profile path, or store realpath). Bare
+  rollback remains previous-generation only. NixOS list entries include
+  `path`. Targeted NixOS rollback uses `nix-env --switch-generation` then
+  the profile `switch-to-configuration`, never a store-path binary.
+- Installer default Claude Code allow list is build/diff/eval/locate/check
+  only. Unprompted `switch` / `generations` is a separate ask (default no),
+  distinct from passwordless sudo.
+- NixOS module: `programs.nix-agent.flake` wraps `NIX_AGENT_FLAKE` into the
+  binary; `programs.nix-agent.privilegedAutomation` emits the narrowed
+  sudoers. `NIX_AGENT_ALLOW_REMOTE` is documented for humans only.
+- Batched `eval_config` is `failed` when every attr failed.
+  `locate_option` is documented as the which-file tool (24 KB → 20 KB on
+  `environment.systemPackages`), not a firehose cap. nix-darwin is out of
+  scope. `inspect-flake` HM classification of `"unknown"` stays
+  inconclusive in the init skill.
+
 ## v0.8.1 - 2026-08-10
 
 - Add an opt-in local JSONL usage log for MCP tool calls (tool, duration,

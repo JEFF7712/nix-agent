@@ -1,7 +1,13 @@
 import json
 
 from nix_agent import runner
-from nix_agent.target import Target, TargetError, resolve_target
+from nix_agent.privilege import sudo_diagnosis
+from nix_agent.target import (
+    Target,
+    TargetError,
+    constrain_privileged_target,
+    resolve_target,
+)
 from nix_agent.tools.build import build_closure
 
 LEVELS = ("lint", "dry-build", "dry-activate")
@@ -185,8 +191,18 @@ def check(
             "resolved_target": target.flake_ref,
             "hint": "home-manager has no dry-activate; use level='dry-build'",
         }
+
+    locked = constrain_privileged_target(target, mode=mode)
+    if locked is not None:
+        return locked
     nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
-    result = runner.run(
-        ["sudo", nixos_rebuild, "dry-activate", "--flake", target.flake_ref]
+    argv = ["sudo", nixos_rebuild, "dry-activate", "--flake", target.flake_ref]
+    result = runner.run(argv)
+    extra: dict[str, object] = {}
+    if not result.ok:
+        diagnosis = sudo_diagnosis(argv, result.output)
+        if diagnosis is not None:
+            extra["privilege"] = diagnosis
+    return runner.envelope(
+        "ok" if result.ok else "failed", target.flake_ref, result, **extra
     )
-    return runner.envelope("ok" if result.ok else "failed", target.flake_ref, result)

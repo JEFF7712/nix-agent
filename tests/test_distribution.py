@@ -17,8 +17,10 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.8.1"' in pyproject_text
-    assert 'version = "0.8.1";' in flake_text
+    assert 'version = "0.9.0"' in pyproject_text
+    assert 'version = "0.9.0";' in flake_text
+    assert "## v0.9.0 - 2026-08-12" in changelog_text
+    assert "rollback_generation" in changelog_text
     assert "## v0.8.1 - 2026-08-10" in changelog_text
     assert "NIX_AGENT_USAGE_LOG=1" in changelog_text
     assert "## v0.8.0 - 2026-07-12" in changelog_text
@@ -47,6 +49,15 @@ def test_nixos_module_exposes_enable_option():
 
     assert "programs.nix-agent.enable" in module_text
     assert "environment.systemPackages" in module_text
+    assert "programs.nix-agent.flake" in module_text
+    assert "programs.nix-agent.privilegedAutomation.enable" in module_text
+    assert "programs.nix-agent.privilegedAutomation.user" in module_text
+    assert "NIX_AGENT_FLAKE" in module_text
+    assert "--switch-generation" in module_text
+    assert "/nix/var/nix/profiles/system/bin/switch-to-configuration" in module_text
+    assert "rupan" not in module_text
+    assert "--flake *" not in module_text
+    assert "/nix/store/*/bin/switch-to-configuration" not in module_text
 
 
 def test_ci_workflow_runs_pytest():
@@ -57,6 +68,7 @@ def test_ci_workflow_runs_pytest():
     assert "nix-flake-check" in workflow_text
     assert "python -m pytest" in workflow_text
     assert "nix flake check --system x86_64-linux" in workflow_text
+    assert "tiny-flake" in workflow_text
     assert "pull_request" in workflow_text
     assert "push" in workflow_text
 

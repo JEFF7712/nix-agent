@@ -79,6 +79,7 @@ Add the flake input and module to your NixOS config:
         nix-agent.nixosModules.default
         ({ ... }: {
           programs.nix-agent.enable = true;
+          # programs.nix-agent.flake = /home/me/nixos;
         })
       ];
     };
@@ -92,7 +93,11 @@ Then rebuild:
 sudo nixos-rebuild switch --flake .#my-host
 ```
 
-That installs the `nix-agent` binary.
+That installs the `nix-agent` binary. Set `programs.nix-agent.flake` to
+the absolute working-tree path so the wrapper pins `NIX_AGENT_FLAKE` on
+the binary (an anti-footgun, not a security boundary). Privileged
+automation is `programs.nix-agent.privilegedAutomation`; see
+[privileged-automation.md](privileged-automation.md).
 
 Prefer to let an agent do it? See [agent-install.md](agent-install.md) for the
 one-shot install prompt.
@@ -153,8 +158,11 @@ full mode-selection guidance.
 
 The surface is two tiers. The **operational core** produces structured
 operational signal and rollback safety that ad-hoc shell cannot reproduce
-reliably. **Config introspection** tools each earn their slot by capping or
-structuring Nix output the host would otherwise pay for in raw context.
+reliably. **Config introspection** tools earn their slot by capping or
+structuring Nix output the host would otherwise pay for in raw context,
+except `locate_option`, which earns it as the which-file answer rather
+than as a cap (the measured `environment.systemPackages` case is 24 KB →
+20 KB). nix-darwin is out of scope.
 
 Operational core:
 
@@ -163,14 +171,14 @@ Operational core:
 | `build(flake_uri?, mode?)` | Build the closure, no activation. A failed build carries `failed_derivation` (`{drv, log_tail}`). |
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this to the user before switching. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. |
-| `generations(action="list"\|"rollback", mode?)` | List or roll back generations. |
+| `generations(action="list"\|"rollback", mode?, generation?)` | List or roll back generations. NixOS list entries include `path` (realpath of the profile link) when that link exists. After `switch`, undo with `generations(action="rollback", generation=<rollback_generation or id>)`. Bare `generations(action="rollback")` is previous-generation only, and is only the right default when nothing else has switched since. A `generation` that matches nothing returns `unknown_generation` and runs no command. |
 
 Config introspection:
 
 | Tool | What it does |
 |------|-------------|
-| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. |
-| `locate_option(attr, flake_uri?, mode?)` | Where this configuration sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it; large values degrade under the same size guard as `eval_config`, marked `truncated: true` per entry). For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`. |
+| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. All attrs ok → `ok`; mixed results → `ok` with failures in `results`; every attr failed → `failed`, `results` unchanged, `first_error` from the first failed entry that has one. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. |
+| `locate_option(attr, flake_uri?, mode?)` | Which file sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it; large values degrade under the same size guard as `eval_config`, marked `truncated: true` per entry). Earns its slot as that which-file answer, not as a firehose cap; the measured `environment.systemPackages` case is 24 KB → 20 KB. For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`. |
 | `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"dry-build"`, `"dry-activate"` (NixOS only). |
 
 Repo onboarding is a CLI subcommand, not a runtime tool: `nix-agent
@@ -199,8 +207,9 @@ top-level `health_note` replaces `summary.health`.
 3. Format with the flake's formatter (`nix fmt`, or `nixfmt` on the edited files) then `check("lint")`, fix findings worth fixing.
 4. `check("dry-build")`, catches eval/build errors cheaply.
 5. `diff()`, show the user what will change.
-6. `switch()`, activate; reports `rollback_generation`.
-7. On regret: `generations(action="rollback")`.
+6. `switch()`, activate; reports `rollback_generation`. Keep that value.
+7. On regret: `generations(action="rollback", generation=<that path or id>)`.
+   Bare `generations(action="rollback")` is previous generation only.
 
 Steps 3–5 are judgment calls, not gates. For a trivial change, going straight
 to `switch` is fine.
@@ -225,7 +234,14 @@ On failure, the response carries the full log plus:
 
 `switch(validate=True)` is a special case: if the dry-build preflight fails, the
 envelope status is `preflight_failed` (not `failed`), with the check result
-nested under `preflight` and no activation attempted.
+nested under `preflight` and no activation attempted. Remote flake refs and
+pin mismatches are rejected first (`remote_ref_rejected`, `target_locked`),
+so a rejected target does not pay for a dry-build. `check("dry-activate")`
+and NixOS rollback attach a `privilege` diagnosis on sudo auth failure,
+same object `switch` produces. Targeted NixOS rollback is two steps
+(profile `--switch-generation`, then profile `switch-to-configuration`);
+if the pointer moves and activation fails, the envelope includes
+`current_generation` and a `note`.
 
 The command runner truncates each stdout and stderr stream independently at
 64,000 Python characters. A successful `switch` is more compact: it returns a
@@ -250,8 +266,14 @@ statuses listed below are the exception):
   fields themselves.
 - Early-exit statuses
   (`no_target`, `invalid_attr`, `invalid_action`, `invalid_level`,
-  `not_an_option`, `tool_missing`, `not_applicable`, `preflight_failed`)
+  `not_an_option`, `tool_missing`, `not_applicable`, `preflight_failed`,
+  `unknown_generation`, `target_locked`, `remote_ref_rejected`)
   omit both `raw_bytes` and `returned_bytes`.
+  `target_locked` also includes `pin` (the env value).
+  `unknown_generation` means the requested generation matched nothing;
+  no command ran. `remote_ref_rejected` means clone locally and pin;
+  `switch` and `check("dry-activate")` reject remote flake refs before
+  any sudo or dry-build.
 
 ### Measured on a real config
 
@@ -285,8 +307,16 @@ a separate `nix log` and scanning a much longer derivation log by hand.
   formatter (`nix fmt` / `nixfmt`) to format them. The one reader is the
   `nix-agent inspect-flake` CLI subcommand, which reads flake metadata and
   repository layout for its best-effort onboarding inspection.
-- No in-MCP approval gates. Path restrictions belong to the host's
-  permission system; rollback safety belongs to Nix generations.
+- No in-MCP approval gate. Host MCP allowlists are tool-name-level and
+  cannot see `flake_uri`. Privileged tools (`switch`,
+  `check("dry-activate")`) reject remote flake refs and, when a pin is
+  set, honor `$NIX_AGENT_FLAKE` / `$NIX_AGENT_HM_FLAKE` as an
+  anti-footgun (not a security boundary; the HM lock does not fall back
+  to the NixOS pin). Sudoers must be narrowed to that directory; see
+  [privileged-automation.md](privileged-automation.md). After `switch`,
+  keep `rollback_generation` and undo with
+  `generations(action="rollback", generation=<that path or id>)`. Bare
+  `generations(action="rollback")` is previous-generation only.
 - Responses that resolve a target and run one command echo
   `resolved_target` and the exact `command` run, so nothing is silently
   implicit. Multi-command tools differ by design: a batched `eval_config`

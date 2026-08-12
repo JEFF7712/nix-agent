@@ -8,10 +8,8 @@ MODULE_DIR_CANDIDATES = (
     "modules",
     "modules/nixos",
     "modules/home-manager",
-    "modules/darwin",
     "nixos/modules",
     "nix",
-    "darwin",
     "home",
     "hosts",
     "overlays",
@@ -39,11 +37,15 @@ def parse_flake_show(shown: dict) -> dict[str, object]:
     }
 
 
-def classify_hm(hm_in_lock: bool, home_configurations: list) -> str:
+def classify_hm(
+    hm_in_lock: bool, home_configurations: list, flake_text: str = ""
+) -> str:
     if home_configurations:
         return "standalone"
-    if hm_in_lock:
+    if "home-manager.nixosModules" in flake_text or "home-manager.users" in flake_text:
         return "integrated"
+    if hm_in_lock:
+        return "unknown"
     return "none"
 
 
@@ -63,11 +65,12 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
             pass
 
     auto_import = "unknown"
+    flake_text = ""
     flake_path = root / "flake.nix"
     if flake_path.is_file():
         try:
-            text = flake_path.read_text()
-            auto_import = "import-tree" if "import-tree" in text else "none"
+            flake_text = flake_path.read_text()
+            auto_import = "import-tree" if "import-tree" in flake_text else "none"
         except OSError:
             pass
 
@@ -96,6 +99,7 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
 
     return {
         "hm_in_lock": hm_in_lock,
+        "flake_text": flake_text,
         "auto_import": auto_import,
         "module_dirs": module_dirs,
         "has_justfile": any(
@@ -148,15 +152,17 @@ def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
     hosts = facts.get("hosts")
     home_configurations = facts.get("home_configurations")
     if facts:
-        hm_integration = classify_hm(
-            bool(repo["hm_in_lock"]), list(home_configurations or [])
-        )
         formatter = facts["formatter"]
     else:
         hosts = None
         home_configurations = None
-        hm_integration = "unknown"
         formatter = "unknown"
+
+    hm_integration = classify_hm(
+        bool(repo["hm_in_lock"]),
+        list(home_configurations or []),
+        flake_text=str(repo.get("flake_text") or ""),
+    )
 
     lint_tools = sorted(
         name for name in ("statix", "deadnix") if runner.resolve_binary(name)

@@ -122,7 +122,12 @@ def test_check_dry_build_delegates_to_build_closure(monkeypatch):
     assert seen["dry_run"] is True
 
 
-def test_check_dry_activate_nixos(monkeypatch):
+def test_check_dry_activate_nixos(monkeypatch, tmp_path):
+    flake = tmp_path / "nixos"
+    flake.mkdir()
+    (flake / "flake.nix").write_text("{ }\n")
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
     calls = []
 
     def fake_run(argv, cwd=None):
@@ -131,19 +136,24 @@ def test_check_dry_activate_nixos(monkeypatch):
 
     monkeypatch.setattr(check_mod.runner, "run", fake_run)
     monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
-    out = check("dry-activate", flake_uri="/etc/nixos#zen")
+    out = check("dry-activate", flake_uri=f"{flake}#zen")
     assert out["status"] == "ok"
     assert calls[0] == [
         "sudo",
         "/bin/nixos-rebuild",
         "dry-activate",
         "--flake",
-        "/etc/nixos#zen",
+        f"{flake}#zen",
     ]
 
 
-def test_check_dry_activate_hm_not_applicable():
-    out = check("dry-activate", flake_uri="/x", mode="home-manager")
+def test_check_dry_activate_hm_not_applicable(tmp_path, monkeypatch):
+    flake = tmp_path / "hm"
+    flake.mkdir()
+    (flake / "flake.nix").write_text("{ }\n")
+    monkeypatch.delenv("NIX_AGENT_HM_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+    out = check("dry-activate", flake_uri=str(flake), mode="home-manager")
     assert out["status"] == "not_applicable"
     assert "dry-build" in out["hint"]
 
@@ -186,3 +196,54 @@ def test_check_lint_envelope_accounted(monkeypatch):
     assert out["status"] == "ok"
     assert out["raw_bytes"] == len(STATIX_FIXTURE) + len(DEADNIX_FIXTURE)
     assert out["returned_bytes"] > 0
+
+
+def test_check_dry_activate_sudo_diagnosis(monkeypatch, tmp_path):
+    flake = tmp_path / "nixos"
+    flake.mkdir()
+    (flake / "flake.nix").write_text("{ }\n")
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+
+    def fake_run(argv, cwd=None):
+        return _result(
+            False,
+            stderr="sudo: a terminal is required to read the password",
+            command=argv,
+        )
+
+    monkeypatch.setattr(check_mod.runner, "run", fake_run)
+    monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = check("dry-activate", flake_uri=str(flake))
+    assert out["status"] == "failed"
+    assert "sudo" in out["privilege"]["cause"]
+    assert out["privilege"]["command_form"][0] == "sudo"
+
+
+def test_check_dry_activate_remote_rejected(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(check_mod.runner, "run", fake_run)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+    out = check("dry-activate", flake_uri="github:example/nixos#host")
+    assert out["status"] == "remote_ref_rejected"
+    assert calls == []
+    assert "NIX_AGENT_ALLOW_REMOTE" not in str(out)
+
+
+def test_check_dry_build_does_not_reject_remote(monkeypatch):
+    seen = {}
+
+    def fake_build_closure(target, dry_run=False):
+        seen["dry_run"] = dry_run
+        seen["dir"] = target.flake_dir
+        return {"status": "ok", "resolved_target": "x", "command": [], "output": ""}
+
+    monkeypatch.setattr(check_mod, "build_closure", fake_build_closure)
+    out = check("dry-build", flake_uri="github:example/nixos#host")
+    assert out["status"] == "ok"
+    assert seen["dir"] == "github:example/nixos"

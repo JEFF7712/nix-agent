@@ -27,5 +27,155 @@
     "hint": "str",
     "resolved_target": "str",
     "status": "str"
+  },
+  "switch_ok": {
+    "command": [
+      "str"
+    ],
+    "current_generation": "str",
+    "log_truncated": "bool",
+    "output": "str",
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "rollback_generation": "str",
+    "status": "str",
+    "summary": {
+      "changed": "bool",
+      "derivations_built": "int",
+      "health": {
+        "newly_failed": [
+          {
+            "log_tail": "str",
+            "unit": "str"
+          }
+        ],
+        "resolved": [],
+        "still_failed": []
+      },
+      "units": {
+        "started": [
+          "str"
+        ],
+        "stopped": [
+          "str"
+        ]
+      }
+    }
+  },
+  "switch_privilege": {
+    "command": [
+      "str"
+    ],
+    "current_generation": "str",
+    "first_error": "null",
+    "output": "str",
+    "privilege": {
+      "cause": "str",
+      "command_form": [
+        "str"
+      ],
+      "detail": "str",
+      "fixes": [
+        "str"
+      ]
+    },
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "rollback_generation": "str",
+    "status": "str"
+  },
+  "switch_failed_derivation": {
+    "command": [
+      "str"
+    ],
+    "current_generation": "str",
+    "failed_derivation": {
+      "drv": "str",
+      "log_tail": "str"
+    },
+    "first_error": "str",
+    "output": "str",
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "rollback_generation": "str",
+    "status": "str"
+  },
+  "diff_ok_packages": {
+    "command": [
+      "str"
+    ],
+    "current_closure": "str",
+    "diff": "str",
+    "output": "str",
+    "packages": {
+      "added": [],
+      "changed": [
+        {
+          "name": "str",
+          "new": "str",
+          "old": "str"
+        }
+      ],
+      "removed": []
+    },
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "status": "str",
+    "store_path": "str"
+  },
+  "locate_ok": {
+    "attr": "str",
+    "command": [
+      "str"
+    ],
+    "declarations": [
+      "str"
+    ],
+    "definitions": [
+      {
+        "file": "str",
+        "value": "bool"
+      }
+    ],
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "status": "str"
+  },
+  "generations_list_nixos": {
+    "command": [
+      "str"
+    ],
+    "generations": [
+      {
+        "current": "bool",
+        "date": "str",
+        "id": "int",
+        "path": "str"
+      }
+    ],
+    "output": "str",
+    "raw_bytes": "int",
+    "resolved_target": "str",
+    "returned_bytes": "int",
+    "status": "str"
+  },
+  "unknown_generation": {
+    "error": "str",
+    "status": "str"
+  },
+  "target_locked": {
+    "error": "str",
+    "pin": "str",
+    "status": "str"
+  },
+  "remote_ref_rejected": {
+    "error": "str",
+    "hint": "str",
+    "status": "str"
   }
 }

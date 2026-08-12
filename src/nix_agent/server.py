@@ -48,8 +48,11 @@ _TOOLS = [
         generations,
         "generations",
         "action='list': enumerate system/HM generations with dates and "
-        "current marker. action='rollback': revert to the previous "
-        "generation. Pass mode='home-manager' for HM generations.",
+        "current marker. NixOS entries include path when the profile link "
+        "exists. action='rollback': revert to the previous generation, or "
+        "pass generation=<id or path> to activate that generation. Bare "
+        "rollback is previous-only. Pass mode='home-manager' for HM "
+        "generations.",
     ),
     (
         eval_config,

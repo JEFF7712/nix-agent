@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -19,6 +20,16 @@ EXPECTED_TOOLS = {
     "locate_option",
     "check",
 }
+
+DEFAULT_ALLOW_TOOLS = {
+    "build",
+    "diff",
+    "eval_config",
+    "locate_option",
+    "check",
+}
+
+ACTIVATION_TOOLS = {"switch", "generations"}
 
 
 def _readme_install_prompt() -> str:
@@ -128,12 +139,21 @@ def test_usage_qualifies_inspection_as_best_effort_and_file_access_precisely():
     assert "nix-agent does no file I/O" not in USAGE
 
 
+def _default_permissions_allow(install: str) -> list[str]:
+    section = install.split("## 7. Configure host permissions", 1)[1]
+    match = re.search(r"```json\n(.*?)\n```", section, re.DOTALL)
+    payload = json.loads(match.group(1))
+    return payload["permissions"]["allow"]
+
+
 def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     install = (REPOSITORY_ROOT / "docs/agent-install.md").read_text()
     privileged = (REPOSITORY_ROOT / "docs/privileged-automation.md").read_text()
+    skill = (REPOSITORY_ROOT / "skills/nix-agent/SKILL.md").read_text()
+    default_allow = _default_permissions_allow(install)
 
     assert "nine `nix-agent` MCP tools" not in install
-    assert "the seven `nix-agent` MCP tools" in install
+    assert "the seven `nix-agent` MCP tools" not in install
     assert "`nix-agent` writes to `/etc/nixos/**`" not in install
     assert "every build or switch will pause" not in install
     assert '`check("dry-activate")`, `build`, and `switch`' not in install
@@ -149,5 +169,23 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "never produced command output omits" not in USAGE
     assert "$NIX_AGENT_HM_FLAKE" in USAGE
     assert "falling\nback to `$NIX_AGENT_FLAKE`" in USAGE
+    assert "unknown_generation" in USAGE
+    assert "target_locked" in USAGE
+    assert "remote_ref_rejected" in USAGE
+    assert "NIX_AGENT_ALLOW_REMOTE" in privileged
+    assert "NIX_AGENT_ALLOW_REMOTE" not in skill
+    assert "programs.nix-agent.privilegedAutomation" in privileged
+    assert "--switch-generation" in privileged
+    assert "/nix/var/nix/profiles/system/bin/switch-to-configuration" in privileged
+    assert "/nix/store/*/bin/switch-to-configuration" in privileged
+    for tool in DEFAULT_ALLOW_TOOLS:
+        assert f"mcp__nix-agent__{tool}" in default_allow
+    for tool in ACTIVATION_TOOLS:
+        assert f"mcp__nix-agent__{tool}" not in default_allow
+    assert not any(
+        entry.startswith("Bash(sudo nixos-rebuild switch") for entry in default_allow
+    )
+    assert not any("nixos-rebuild dry-activate" in entry for entry in default_allow)
+    assert not any("switch --rollback" in entry for entry in default_allow)
     for tool in EXPECTED_TOOLS:
         assert f"mcp__nix-agent__{tool}" in install
