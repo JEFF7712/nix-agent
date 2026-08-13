@@ -1,8 +1,7 @@
 # Implementation plan
 
-Follow `docs/proposed-changes.md` as the spec. This file assigns work,
-names argv and statuses, and lists files. Do not invent a different
-NixOS activation mechanism.
+This file assigns work, names argv and statuses, and lists files. Do
+not invent a different NixOS activation mechanism.
 
 TDD: write or extend the failing tests first, then the code.
 
@@ -163,10 +162,8 @@ early exits.
 
 ## Workstream B — docs, installer, module, skills
 
-Own: `docs/**` except this plan and `proposed-changes.md` (those are
-already the spec; you may add a one-line pointer from `docs/usage.md`
-Docs index if usage has no index — usage does not, so skip).
-`skills/**`, `nix/module.nix`, `flake.nix` wrapper only if the module
+Own: `docs/**` except this plan. `skills/**`, `nix/module.nix`,
+`flake.nix` wrapper only if the module
 needs a new option plumbed through the package, `CHANGELOG.md`,
 `CLAUDE.md`, `tests/test_public_content.py`, `tests/test_distribution.py`.
 
