@@ -1,3 +1,5 @@
+import json
+
 from nix_agent.runner import RunResult
 from nix_agent.tools import switch as switch_mod
 from nix_agent.tools.switch import generations, switch
@@ -10,9 +12,8 @@ def _result(ok, stdout="", stderr="", command=("x",)):
 def _unlock(monkeypatch):
     monkeypatch.setattr(
         switch_mod,
-        "constrain_privileged_target",
-        lambda target, *, mode: None,
-        raising=False,
+        "prepare_privileged_target",
+        lambda target, *, mode: target,
     )
 
 
@@ -50,6 +51,7 @@ def test_switch_nixos(monkeypatch):
     assert out["current_generation"] == "/nix/var/.../system-43-link"
     assert [
         "sudo",
+        "-n",
         "/bin/nixos-rebuild",
         "switch",
         "--flake",
@@ -157,6 +159,7 @@ def test_switch_sudo_diagnosis(monkeypatch):
     assert out["rollback_generation"] == "gen"
     assert "sudo" in out["privilege"]["cause"]
     assert out["privilege"]["command_form"][0] == "sudo"
+    assert any("privilegedAutomation" in fix for fix in out["privilege"]["fixes"])
 
 
 def test_switch_validate_aborts_on_failed_dry_build(monkeypatch):
@@ -273,7 +276,7 @@ def test_generations_rollback_nixos(monkeypatch):
     monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
     out = generations(action="rollback")
     assert out["status"] == "ok"
-    assert calls[0] == ["sudo", "/bin/nixos-rebuild", "switch", "--rollback"]
+    assert calls[0] == ["sudo", "-n", "/bin/nixos-rebuild", "switch", "--rollback"]
 
 
 def test_generations_rollback_hm_activates_previous(monkeypatch):
@@ -394,7 +397,7 @@ def test_switch_reports_newly_failed_units(monkeypatch):
     monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
     monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
     out = switch(flake_uri="/x#h")
-    assert out["status"] == "ok"
+    assert out["status"] == "degraded"
     health = out["summary"]["health"]
     assert health["newly_failed"] == [
         {"unit": "broken.service", "log_tail": "unit crashed\n"}
@@ -496,6 +499,7 @@ def test_generations_targeted_rollback_nixos_by_id(monkeypatch, tmp_path):
     assert out["status"] == "ok"
     assert [
         "sudo",
+        "-n",
         "/bin/nix-env",
         "-p",
         str(profile),
@@ -504,6 +508,7 @@ def test_generations_targeted_rollback_nixos_by_id(monkeypatch, tmp_path):
     ] in calls
     assert [
         "sudo",
+        "-n",
         f"{profile}/bin/switch-to-configuration",
         "switch",
     ] in calls
@@ -622,8 +627,7 @@ def test_generations_targeted_rollback_sudo_diagnosis(monkeypatch, tmp_path):
     assert "privilege" in out
     assert "--switch-generation" in out["privilege"]["command_form"]
     assert not any(
-        "switch-to-configuration" in (argv[1] if len(argv) > 1 else "")
-        for argv in calls
+        any("switch-to-configuration" in str(arg) for arg in argv) for argv in calls
     )
 
 
@@ -646,8 +650,7 @@ def test_generations_targeted_step1_fail_skips_step2(monkeypatch, tmp_path):
     out = generations(action="rollback", generation=41)
     assert out["status"] == "failed"
     assert not any(
-        "switch-to-configuration" in (argv[1] if len(argv) > 1 else "")
-        for argv in calls
+        any("switch-to-configuration" in str(arg) for arg in argv) for argv in calls
     )
 
 
@@ -658,7 +661,7 @@ def test_generations_targeted_step2_fail_notes_pointer(monkeypatch, tmp_path):
     def fake_run(argv, cwd=None):
         if "list-generations" in argv:
             return _result(True, stdout=NIXOS_REBUILD_JSON, command=argv)
-        if len(argv) > 1 and "switch-to-configuration" in argv[1]:
+        if any("switch-to-configuration" in str(arg) for arg in argv):
             return _result(False, stderr="error: activate failed", command=argv)
         return _result(True, command=argv)
 
@@ -843,4 +846,84 @@ def test_generations_does_not_apply_classifier(monkeypatch):
     monkeypatch.setenv("NIX_AGENT_FLAKE", "/some/pin#host")
     out = generations(action="rollback")
     assert out["status"] == "ok"
-    assert calls[0] == ["sudo", "/bin/nixos-rebuild", "switch", "--rollback"]
+    assert calls[0] == ["sudo", "-n", "/bin/nixos-rebuild", "switch", "--rollback"]
+
+
+def test_switch_binds_unique_host(monkeypatch, tmp_path):
+    flake = tmp_path / "nixos"
+    flake.mkdir()
+    (flake / "flake.nix").write_text("{ }\n")
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+    from nix_agent import target as target_mod
+
+    monkeypatch.setattr(target_mod.socket, "gethostname", lambda: "zen")
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"laptop": {}}}),
+                command=argv,
+            )
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri=str(flake))
+    assert out["status"] == "ok"
+    assert [a for a in calls if a and a[0] == "sudo"][0][-1] == f"{flake}#laptop"
+
+
+def test_switch_ambiguous_hosts_unknown_host(monkeypatch, tmp_path):
+    flake = tmp_path / "nixos"
+    flake.mkdir()
+    (flake / "flake.nix").write_text("{ }\n")
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+    from nix_agent import target as target_mod
+
+    monkeypatch.setattr(target_mod.socket, "gethostname", lambda: "zen")
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps(
+                    {"nixosConfigurations": {"laptop": {}, "desktop": {}}}
+                ),
+                command=argv,
+            )
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    out = switch(flake_uri=str(flake))
+    assert out["status"] == "unknown_host"
+    assert out["hosts"] == ["desktop", "laptop"]
+    assert not any(argv and argv[0] == "sudo" for argv in calls)
+
+
+def test_switch_dot_uses_pin(monkeypatch, tmp_path):
+    pin = tmp_path / "nixos"
+    pin.mkdir()
+    (pin / "flake.nix").write_text("{ }\n")
+    monkeypatch.setenv("NIX_AGENT_FLAKE", str(pin))
+    monkeypatch.delenv("NIX_AGENT_ALLOW_REMOTE", raising=False)
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return _result(True, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", fake_run)
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    out = switch(flake_uri=".#host")
+    assert out["status"] == "ok"
+    sudo = [a for a in calls if a and a[0] == "sudo"][0]
+    assert sudo[-1] == f"{pin.resolve()}#host"

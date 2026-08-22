@@ -3,6 +3,11 @@
 This file assigns work, names argv and statuses, and lists files. Do
 not invent a different NixOS activation mechanism.
 
+Trust model: the current documented default is high trust (all seven
+MCP tools unprompted, plus `privilegedAutomation` in the autonomous
+install). Do not reintroduce an installer ask for activation or
+passwordless sudo. Lower trust is an opt-down the user must ask for.
+
 TDD: write or extend the failing tests first, then the code.
 
 Do not commit. Do not bump the package version. Add a `CHANGELOG.md`
@@ -124,7 +129,7 @@ Tests in `tests/test_target.py` and `tests/test_switch_generations.py`
 - same dir, different attr → proceeds
 - NixOS pin does not lock HM switch
 - `NIX_AGENT_ALLOW_REMOTE=1` allows github unless pin conflicts
-- relative `.` → rejected for privileged ops
+- relative `.` / `./` resolve to `$NIX_AGENT_FLAKE` when the pin is set
 - `~/nixos` expands and realpaths
 - `switch(validate=True)` on a remote ref does not call `check`
 
@@ -184,15 +189,17 @@ Rewrite `docs/privileged-automation.md`:
 
 ### B2. Agent install
 
-`docs/agent-install.md` step 7–8 per spec §3. Default allow JSON
-block: five MCP tools, no Bash switch/dry-activate/rollback.
+`docs/agent-install.md` step 7–8: high-trust default. Default allow JSON
+block: all seven MCP tools plus Bash `nixos-rebuild` dry-activate /
+switch / rollback narrowed to `${FLAKE_DIR}`. Do not ask. Lower trust
+(omit switch/generations, or skip `privilegedAutomation`) only if the
+user already asked.
 
-Ask (default no) for unprompted activation MCP + narrowed Bash.
+Step 8: verify the module options from step 2; pasted sudoers must
+match B1.
 
-Step 8: prefer module options; pasted sudoers must match B1.
-
-Fix every sentence that says "the seven nix-agent MCP tools" in the
-permissions intent.
+The intent paragraph names all seven `nix-agent` MCP tools as the
+default allow.
 
 ### B3. Usage, skill, CLAUDE.md, init skill
 
@@ -248,11 +255,12 @@ Rewrite `test_agent_install_matches_current_tool_surface_and_sudo_needs`
 so it:
 
 - parses the default allow JSON block in agent-install.md
-- asserts the five tools are in it
-- asserts `switch` and `generations` are not in that block
-- asserts no `Bash(sudo nixos-rebuild switch` in that block
-- still allows those strings in the optional-ask section
-- drops the assertion `"the seven \`nix-agent\` MCP tools" in install`
+- asserts all seven tools are in it
+- asserts `Bash(sudo nixos-rebuild switch`, dry-activate, and
+  `switch --rollback` are in that block
+- asserts the installer does not ask ("Ask the user this question
+  verbatim" absent; "Do not ask" / "high trust" / "Lower trust" present)
+- requires `"all seven \`nix-agent\` MCP tools"` in the intent paragraph
 
 Update `test_distribution.py` for new module option names.
 

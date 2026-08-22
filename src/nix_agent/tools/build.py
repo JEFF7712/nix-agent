@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from nix_agent import logparse, runner
+from nix_agent import hostattr, logparse, runner
 from nix_agent.target import (
     Target,
     TargetError,
@@ -20,10 +20,14 @@ def closure_installable(target: Target, candidate: str) -> str:
 
 def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
     """Shared by build(), diff(), and check(level='dry-build')."""
-    candidates = attr_candidates(target)
+    pending = list(attr_candidates(target))
+    tried: list[str] = []
     installable = ""
     result = runner.RunResult(ok=False, command=[], stdout="", stderr="")
-    for i, candidate in enumerate(candidates):
+    idx = 0
+    while idx < len(pending):
+        candidate = pending[idx]
+        tried.append(candidate)
         installable = closure_installable(target, candidate)
         argv = ["nix", "build", "--no-link"]
         if dry_run:
@@ -39,8 +43,17 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
             if not lines:
                 return runner.envelope("failed", installable, result)
             return runner.envelope("ok", installable, result, store_path=lines[-1])
-        if "does not provide attribute" in result.output and i < len(candidates) - 1:
-            continue
+        if hostattr.missing_flake_attr(result.output):
+            if idx < len(pending) - 1:
+                idx += 1
+                continue
+            more, unknown = hostattr.extra_hosts_or_unknown(target, tried)
+            if more:
+                pending.extend(more)
+                idx += 1
+                continue
+            if unknown is not None:
+                return unknown
         break
     extra: dict[str, object] = {}
     drv_info = runner.failed_derivation_info(result.output)

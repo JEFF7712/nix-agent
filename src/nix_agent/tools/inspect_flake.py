@@ -110,6 +110,22 @@ def scan_repo(flake_dir: str) -> dict[str, object]:
     }
 
 
+def list_flake_configs(flake_dir: str, mode: str) -> list[str] | None:
+    """Config names from `nix flake show --json`, or None when show fails."""
+    result = runner.run(["nix", "flake", "show", flake_dir, "--json"])
+    if not result.ok:
+        return None
+    try:
+        shown = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(shown, dict):
+        return None
+    facts = parse_flake_show(shown)
+    key = "hosts" if mode == "nixos" else "home_configurations"
+    return list(facts[key])
+
+
 def inspect_flake(flake_uri: str | None = None) -> dict[str, object]:
     """Structured facts about a config repo in one call: hosts, HM
     integration, module layout, formatter, tooling. The discovery step

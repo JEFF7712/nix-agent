@@ -18,6 +18,9 @@ Division of labor:
 - **`mcp-nixos`** discovers packages and options (what exists, what it means).
 - **`nix-agent`** operates on the user's actual configuration (what their machine resolves, whether it builds, what a switch would change).
 
+Default is apply: after a config change, `diff()` then `switch()` without
+waiting. Wait only when the user asked to preview or check, not activate.
+
 ## Tool Surface
 
 Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
@@ -29,13 +32,18 @@ Operational core:
   build carries `failed_derivation`.
 - `diff(flake_uri?, mode?)`: what a switch would change (adds/removes/
   version bumps), plus a structured `packages` object when it parses.
-  Show this before switching.
+  Include this in the reply and switch unless the user asked only to
+  preview or check.
 - `switch(flake_uri?, mode?, validate?, full_log?)`: activate. Records
   `rollback_generation`, returns a `summary` (units changed, derivations
   built, `packages` vs the rollback generation, `health`), and trims the
   log to a tail on success. `validate=True` gates on `check("dry-build")`.
   Remote refs and pin mismatches exit as `remote_ref_rejected` /
-  `target_locked` before sudo or dry-build.
+  `target_locked` before sudo or dry-build. `.` / `./` resolve to the
+  pin when `$NIX_AGENT_FLAKE` is set. Newly failed units after
+  activation are `status: "degraded"`; report `summary.health` and roll
+  back unless the user asked to leave those units failed. Privileged
+  argv uses `sudo -n`.
 - `generations(action="list"|"rollback", mode?, generation?)`: list or
   roll back. NixOS list entries include `path` when the profile link
   exists. After `switch`, call
@@ -51,14 +59,19 @@ Config introspection:
   All attrs ok or mixed → `ok` (failures in `results`); every attr
   failed → `failed` with `first_error` from the first failed entry that
   has one. Values above ~2 KB degrade to attr names / length / a head
-  slice, marked `truncated: true`.
+  slice, marked `truncated: true`. A missing hostname attr falls back to
+  a unique flake host or returns `unknown_host` with `hosts`. In NixOS
+  mode, a missing option is retried as `home-manager.users.<user>.<attr>`
+  (`hm_rewritten: true`).
 - `locate_option(attr, flake_uri?, mode?)`: which file sets an option,
   as `declarations` and `definitions` (`{file, value}` per file). Earns
   its slot as that which-file answer, not as a cap (measured
   `environment.systemPackages` is 24 KB → 20 KB). Use this instead of
   grepping the tree. `status` is `not_an_option` for plain config values
   (use `eval_config` there). For integrated HM, spell the attr
-  `home-manager.users.<user>.<attr>` with `mode="nixos"`.
+  `home-manager.users.<user>.<attr>` with `mode="nixos"`; if you pass
+  the unprefixed attr, the tool retries that spelling (`hm_rewritten`).
+  Missing hostname → `unknown_host` with `hosts`.
 - `check(level, flake_uri?, mode?)`: validation ladder, fast to slow:
   `"lint"` (statix + deadnix, structured `findings`), `"dry-build"`,
   `"dry-activate"` (NixOS only). Dry-activate uses the same remote/pin
@@ -94,10 +107,11 @@ set `NIX_AGENT_FLAKE` once (or `NIX_AGENT_HM_FLAKE` for standalone HM,
 which falls back to `NIX_AGENT_FLAKE`), or pass an explicit `flake_uri`
 like `/home/you/nixos#host`. Either pins the target exactly.
 
-**Wrong-host symptom:** a `failed` envelope whose `first_error` names a
-missing `nixosConfigurations."<hostname>"` means auto-resolution picked
-an attribute this flake does not define. Fix it with an explicit
-`flake_uri` (`.../repo#realhost`) or `$NIX_AGENT_FLAKE`, not by retrying.
+**Wrong-host symptom:** `unknown_host` lists `hosts` from the flake. A
+`failed` envelope whose `first_error` names a missing
+`nixosConfigurations."<hostname>"` means auto-resolution could not
+recover; pass an explicit `flake_uri` (`.../repo#realhost`) or
+`$NIX_AGENT_FLAKE`, not by retrying the same hostname.
 
 ## Workflow
 
@@ -107,16 +121,19 @@ an attribute this flake does not define. Fix it with an explicit
 2. Edit `.nix` files with your native file tools.
 3. Format with the flake's formatter (`nix fmt`, or `nixfmt` on the edited files) via Bash, then `check("lint")`: fix findings worth fixing.
 4. `check("dry-build")`: catches eval/build errors cheaply.
-5. `diff()`: show the user what will change.
+5. `diff()`: include the changeset in the reply and switch unless the
+   user asked only to preview or check.
 6. `switch()`: report the result and `rollback_generation`. Keep that
-   value.
+   value. `status: "degraded"` means activation succeeded but units
+   newly failed — report `summary.health` and roll back unless the user
+   asked to leave those units failed.
 7. On failure at any step: read `first_error`, then `error_detail`, then
    `failed_derivation.log_tail`; fix and retry. `status: "preflight_failed"`
    means `switch(validate=True)` never activated — fix the nested
    `preflight` dry-build, do not retry activation. A `privilege` field
    means sudo auth failed, not a Nix error. `unknown_generation`,
-   `target_locked`, and `remote_ref_rejected` are early exits: no
-   command ran. On regret after a switch:
+   `unknown_host`, `target_locked`, and `remote_ref_rejected` are early
+   exits: no command ran. On regret after a switch:
    `generations(action="rollback", generation=<rollback_generation or id>)`.
    Bare `generations(action="rollback")` is previous-generation only,
    and is only the right default when nothing else has switched since.
@@ -136,8 +153,12 @@ do not re-fetch.
   target. `failed_derivation.log_tail` is the failing builder's log,
   already fetched. Do NOT run `nix log` or re-run with `full_log=True`
   unless these fields are absent.
-- **After a switch, read `summary`, do not re-probe.** `summary.health`
-  reports units `newly_failed`/`resolved`/`still_failed` with journal
+- **After a switch, read `summary`, do not re-probe.** `status: "degraded"`
+  means units `newly_failed`; treat that as a problem, not success, and
+  roll back with
+  `generations(action="rollback", generation=<rollback_generation>)`
+  unless the user asked to leave those units failed.
+  `summary.health` reports units `newly_failed`/`resolved`/`still_failed` with journal
   tails for the first five newly failed units; `summary.packages` reports changes
   vs the rollback generation. These replace running `systemctl --failed`
   or a second `diff()`.
@@ -169,12 +190,18 @@ boilerplate.
 - Never write secret payloads into config files; reference secrets via
   sops-nix/agenix and only edit references.
 - Never call `switch` when the user asked only to check or preview;
-  `diff` is the preview.
+  `diff` is the preview. Otherwise the default is apply: switch after
+  `diff()` without waiting.
+- `status: "degraded"` means activation succeeded but units newly
+  failed; report `summary.health` and roll back unless the user asked
+  to leave those units failed.
 - Host allowlists cannot see `flake_uri`. Privileged tools reject remote
   refs and honor `$NIX_AGENT_FLAKE` / `$NIX_AGENT_HM_FLAKE` as an
   anti-footgun (the HM lock does not fall back to the NixOS pin). Do not
   treat the pin as a security boundary. Sudoers must be narrowed to that
-  directory.
+  directory. Default install is unprompted activation plus passwordless
+  sudo for this flake. Do not re-ask for confirmation. Lower trust
+  (host prompts, sudo password) only if the user asked.
 - After `switch`, undo with
   `generations(action="rollback", generation=<rollback_generation>)`.
   Bare rollback is previous-only.

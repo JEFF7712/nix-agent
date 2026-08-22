@@ -21,16 +21,6 @@ EXPECTED_TOOLS = {
     "check",
 }
 
-DEFAULT_ALLOW_TOOLS = {
-    "build",
-    "diff",
-    "eval_config",
-    "locate_option",
-    "check",
-}
-
-ACTIVATION_TOOLS = {"switch", "generations"}
-
 
 def _readme_install_prompt() -> str:
     install_section = README.split("## Install", 1)[1].split("## Docs", 1)[0]
@@ -139,21 +129,22 @@ def test_usage_qualifies_inspection_as_best_effort_and_file_access_precisely():
     assert "nix-agent does no file I/O" not in USAGE
 
 
-def _default_permissions_allow(install: str) -> list[str]:
+def _default_permissions(install: str) -> dict:
     section = install.split("## 7. Configure host permissions", 1)[1]
     match = re.search(r"```json\n(.*?)\n```", section, re.DOTALL)
-    payload = json.loads(match.group(1))
-    return payload["permissions"]["allow"]
+    return json.loads(match.group(1))["permissions"]
 
 
 def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     install = (REPOSITORY_ROOT / "docs/agent-install.md").read_text()
     privileged = (REPOSITORY_ROOT / "docs/privileged-automation.md").read_text()
     skill = (REPOSITORY_ROOT / "skills/nix-agent/SKILL.md").read_text()
-    default_allow = _default_permissions_allow(install)
+    permissions = _default_permissions(install)
+    default_allow = permissions["allow"]
+    deny = permissions["deny"]
 
     assert "nine `nix-agent` MCP tools" not in install
-    assert "the seven `nix-agent` MCP tools" not in install
+    assert "all seven `nix-agent` MCP tools" in install
     assert "`nix-agent` writes to `/etc/nixos/**`" not in install
     assert "every build or switch will pause" not in install
     assert '`check("dry-activate")`, `build`, and `switch`' not in install
@@ -171,6 +162,7 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "$NIX_AGENT_HM_FLAKE" in USAGE
     assert "falling\nback to `$NIX_AGENT_FLAKE`" in USAGE
     assert "unknown_generation" in USAGE
+    assert "unknown_host" in USAGE
     assert "target_locked" in USAGE
     assert "remote_ref_rejected" in USAGE
     assert "NIX_AGENT_ALLOW_REMOTE" in privileged
@@ -179,14 +171,26 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "--switch-generation" in privileged
     assert "/nix/var/nix/profiles/system/bin/switch-to-configuration" in privileged
     assert "/nix/store/*/bin/switch-to-configuration" in privileged
-    for tool in DEFAULT_ALLOW_TOOLS:
+    for tool in EXPECTED_TOOLS:
         assert f"mcp__nix-agent__{tool}" in default_allow
-    for tool in ACTIVATION_TOOLS:
-        assert f"mcp__nix-agent__{tool}" not in default_allow
-    assert not any(
+    assert any(
         entry.startswith("Bash(sudo nixos-rebuild switch") for entry in default_allow
     )
-    assert not any("nixos-rebuild dry-activate" in entry for entry in default_allow)
-    assert not any("switch --rollback" in entry for entry in default_allow)
+    assert any("nixos-rebuild dry-activate" in entry for entry in default_allow)
+    assert any("switch --rollback" in entry for entry in default_allow)
+    assert "Ask the user this question verbatim" not in install
+    assert "Lower trust" in install
+    assert "high trust" in install.lower()
+    assert "Do not ask" in install
+    assert "privilegedAutomation.enable = true" in install
+    assert "do not invent a more restrictive" in install.lower()
+    assert "Ask (default no)" not in install
+    skill_flat = re.sub(r"\s+", " ", skill)
+    usage_flat = re.sub(r"\s+", " ", USAGE)
+    assert "switch unless the user asked only to preview" in skill_flat
+    assert "Default is apply" in skill
+    assert "switch unless the user asked only to preview" in usage_flat
+    assert "Read(**/secrets/**)" in deny
+    assert "Write(/etc/sudoers)" in deny
     for tool in EXPECTED_TOOLS:
         assert f"mcp__nix-agent__{tool}" in install

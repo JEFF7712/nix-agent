@@ -1,11 +1,11 @@
 import json
 
-from nix_agent import runner
-from nix_agent.privilege import sudo_diagnosis
+from nix_agent import hostattr, runner
+from nix_agent.privilege import sudo_argv, sudo_diagnosis
 from nix_agent.target import (
     Target,
     TargetError,
-    constrain_privileged_target,
+    prepare_privileged_target,
     resolve_target,
 )
 from nix_agent.tools.build import build_closure
@@ -192,11 +192,16 @@ def check(
             "hint": "home-manager has no dry-activate; use level='dry-build'",
         }
 
-    locked = constrain_privileged_target(target, mode=mode)
-    if locked is not None:
-        return locked
+    prepared = prepare_privileged_target(target, mode=mode)
+    if not isinstance(prepared, Target):
+        return prepared
+    target = prepared
+    bound = hostattr.bind_implicit_host(target)
+    if not isinstance(bound, Target):
+        return bound
+    target = bound
     nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
-    argv = ["sudo", nixos_rebuild, "dry-activate", "--flake", target.flake_ref]
+    argv = sudo_argv([nixos_rebuild, "dry-activate", "--flake", target.flake_ref])
     result = runner.run(argv)
     extra: dict[str, object] = {}
     if not result.ok:

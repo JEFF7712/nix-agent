@@ -3,11 +3,12 @@ import os
 import re
 from pathlib import Path
 
-from nix_agent import health, runner
-from nix_agent.privilege import sudo_diagnosis
+from nix_agent import health, hostattr, runner
+from nix_agent.privilege import sudo_argv, sudo_diagnosis
 from nix_agent.target import (
+    Target,
     TargetError,
-    constrain_privileged_target,
+    prepare_privileged_target,
     current_hm_profile,
     resolve_target,
 )
@@ -81,9 +82,15 @@ def switch(
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
 
-    locked = constrain_privileged_target(target, mode=mode)
-    if locked is not None:
-        return locked
+    prepared = prepare_privileged_target(target, mode=mode)
+    if not isinstance(prepared, Target):
+        return prepared
+    target = prepared
+
+    bound = hostattr.bind_implicit_host(target)
+    if not isinstance(bound, Target):
+        return bound
+    target = bound
 
     if validate:
         preflight = check("dry-build", flake_uri=flake_uri, mode=mode)
@@ -100,7 +107,7 @@ def switch(
     pre_failed, health_note = health.failed_units(mode)
     if mode == "nixos":
         nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
-        argv = ["sudo", nixos_rebuild, "switch", "--flake", target.flake_ref]
+        argv = sudo_argv([nixos_rebuild, "switch", "--flake", target.flake_ref])
     else:
         argv = ["home-manager", "switch", "--flake", target.flake_ref]
     result = runner.run(argv)
@@ -129,7 +136,18 @@ def switch(
         if not full_log:
             extra["output"] = runner.tail(result.output)
             extra["log_truncated"] = extra["output"] != result.output
-        return runner.envelope("ok", target.flake_ref, result, **extra)
+        newly_failed = bool(report and report.get("newly_failed"))
+        if newly_failed:
+            extra["hint"] = (
+                "activation succeeded but systemd units newly failed; consider "
+                "generations(action='rollback', generation=<rollback_generation>)"
+            )
+        return runner.envelope(
+            "degraded" if newly_failed else "ok",
+            target.flake_ref,
+            result,
+            **extra,
+        )
 
     diagnosis = sudo_diagnosis(argv, result.output)
     if diagnosis is not None:
@@ -261,7 +279,7 @@ def _unknown_generation(generation: object) -> dict[str, object]:
 
 def _rollback_nixos_untargeted() -> dict[str, object]:
     nixos_rebuild = runner.resolve_binary("nixos-rebuild") or "nixos-rebuild"
-    argv = ["sudo", nixos_rebuild, "switch", "--rollback"]
+    argv = sudo_argv([nixos_rebuild, "switch", "--rollback"])
     result = runner.run(argv)
     extra: dict[str, object] = {
         "current_generation": _current_generation("nixos"),
@@ -280,14 +298,15 @@ def _rollback_nixos_untargeted() -> dict[str, object]:
 
 def _rollback_nixos_targeted(matched: dict[str, object]) -> dict[str, object]:
     nix_env = runner.resolve_binary("nix-env") or "nix-env"
-    step1 = [
-        "sudo",
-        nix_env,
-        "-p",
-        SYSTEM_PROFILE,
-        "--switch-generation",
-        str(matched["id"]),
-    ]
+    step1 = sudo_argv(
+        [
+            nix_env,
+            "-p",
+            SYSTEM_PROFILE,
+            "--switch-generation",
+            str(matched["id"]),
+        ]
+    )
     result1 = runner.run(step1)
     if not result1.ok:
         extra: dict[str, object] = {}
@@ -296,11 +315,12 @@ def _rollback_nixos_targeted(matched: dict[str, object]) -> dict[str, object]:
             extra["privilege"] = diagnosis
         return runner.envelope("failed", SYSTEM_PROFILE, result1, **extra)
 
-    step2 = [
-        "sudo",
-        f"{SYSTEM_PROFILE}/bin/switch-to-configuration",
-        "switch",
-    ]
+    step2 = sudo_argv(
+        [
+            f"{SYSTEM_PROFILE}/bin/switch-to-configuration",
+            "switch",
+        ]
+    )
     result2 = runner.run(step2)
     extra = {"current_generation": _current_generation("nixos")}
     if not result2.ok:

@@ -40,6 +40,35 @@
       "changed": "bool",
       "derivations_built": "int",
       "health": {
+        "newly_failed": [],
+        "resolved": [],
+        "still_failed": []
+      },
+      "units": {
+        "started": [
+          "str"
+        ],
+        "stopped": [
+          "str"
+        ]
+      }
+    }
+  },
+  "switch_degraded": {
+    "command": [
+      "str"
+    ],
+    "current_generation": "str",
+    "hint": "str",
+    "log_truncated": "bool",
+    "output": "str",
+    "resolved_target": "str",
+    "rollback_generation": "str",
+    "status": "str",
+    "summary": {
+      "changed": "bool",
+      "derivations_built": "int",
+      "health": {
         "newly_failed": [
           {
             "log_tail": "str",
@@ -162,6 +191,15 @@
   "remote_ref_rejected": {
     "error": "str",
     "hint": "str",
+    "status": "str"
+  },
+  "unknown_host": {
+    "error": "str",
+    "hint": "str",
+    "hostname": "str",
+    "hosts": [
+      "str"
+    ],
     "status": "str"
   }
 }

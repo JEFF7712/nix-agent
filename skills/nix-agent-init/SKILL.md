@@ -120,7 +120,10 @@ When `hm_integration == "unknown"`, the facts were inconclusive
 (lock-file presence alone does not prove integration). Say that. Do not
 write a hard mode rule.
 
-Keep it to one screen. Do not restage generic NixOS tutorials.
+Keep it to one screen. Do not restage generic NixOS tutorials. When the
+brief includes the nix-agent ladder, state that the default is apply:
+`diff()` then `switch()` without waiting, unless the user asked only to
+preview or check.
 
 Then create `AGENTS.md` as a symlink to `CLAUDE.md`:
 
@@ -135,8 +138,9 @@ same markers.
 
 Wire both servers. Pin `NIX_AGENT_FLAKE` to `flake_dir`. Append `#<host>`
 only when exactly one host exists; with several hosts, pin the bare dir
-and tell the user which host you would otherwise have defaulted to so they
-can set it. Never put a secret, token, or password in this file.
+(hostname resolution and unique-host fallback pick the attr). List the
+hosts in `CLAUDE.md`. Do not wait for the user to pick one. Never put a
+secret, token, or password in this file.
 
 ```json
 {

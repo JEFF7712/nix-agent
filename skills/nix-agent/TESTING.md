@@ -36,8 +36,15 @@
 ### Diffing and switching
 
 - Edit a `.nix` file to add or remove a package.
-- Call `diff()`, show the user the changeset before activation, and verify the structured `packages` object (`added`/`removed` as `{name, version}`, `changed` as `{name, old, new}`) when the diff parses.
-- Call `switch()` to activate and capture `rollback_generation`. Verify `summary` carries `packages` (vs the rollback generation) and `health` (systemd units `newly_failed`/`resolved`/`still_failed`, with journal tails for the first five newly failed units).
+- Call `diff()`, include the changeset in the reply, and switch unless
+  the user asked only to preview or check. Verify the structured
+  `packages` object (`added`/`removed`
+  as `{name, version}`, `changed` as `{name, old, new}`) when the diff parses.
+- Call `switch()` to activate and capture `rollback_generation`. Verify
+  `summary` carries `packages` (vs the rollback generation) and `health`
+  (systemd units `newly_failed`/`resolved`/`still_failed`, with journal
+  tails for the first five newly failed units). Newly failed units must
+  be `status: "degraded"`.
 - Confirm the change on the live system.
 
 ### Rollback

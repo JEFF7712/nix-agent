@@ -10,6 +10,8 @@ from nix_agent.target import (
     config_attr,
     constrain_privileged_target,
     is_remote_flake_ref,
+    matched_hosts,
+    prepare_privileged_target,
     resolve_target,
 )
 
@@ -257,3 +259,35 @@ def test_hm_resolution_still_falls_back_to_nixos_pin(monkeypatch):
     t = resolve_target(None, "home-manager")
     assert t.flake_dir == "/sys"
     assert t.attr == "host"
+
+
+def test_matched_hosts_unique_flake():
+    assert matched_hosts("zen", ["laptop"]) == ["laptop"]
+    assert matched_hosts("zen", ["laptop", "desktop"]) == []
+    assert matched_hosts("zen", ["zen"]) == ["zen"]
+    assert matched_hosts("zen.local", ["zen"]) == ["zen"]
+    assert matched_hosts("zen", ["zen-laptop", "desktop"]) == ["zen-laptop"]
+    assert matched_hosts("lap", ["laptop", "laptop-server"]) == []
+
+
+def test_constrain_dot_resolves_to_pin(monkeypatch, tmp_path):
+    pin = tmp_path / "nixos"
+    pin.mkdir()
+    (pin / "flake.nix").write_text("{ }\n")
+    monkeypatch.setenv("NIX_AGENT_FLAKE", str(pin))
+    t = Target(flake_dir=".", attr="host", mode="nixos")
+    assert constrain_privileged_target(t, mode="nixos") is None
+    prepared = prepare_privileged_target(t, mode="nixos")
+    assert isinstance(prepared, Target)
+    assert prepared.flake_dir == str(pin.resolve())
+    assert prepared.attr == "host"
+
+
+def test_constrain_dot_without_pin_rejected_in_unrelated_cwd(monkeypatch, tmp_path):
+    (tmp_path / "flake.nix").write_text("{ }\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    t = Target(flake_dir=".", attr=None, mode="nixos")
+    out = _early_exit(constrain_privileged_target(t, mode="nixos"))
+    assert out["status"] == "no_target"
+    assert "NIX_AGENT_FLAKE" in out["hint"]

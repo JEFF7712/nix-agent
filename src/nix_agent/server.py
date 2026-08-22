@@ -31,16 +31,19 @@ _TOOLS = [
         "diff",
         "Build the new closure and diff it against the running system "
         "(nvd, falling back to nix store diff-closures): package "
-        "additions, removals, version changes. Use before switch.",
+        "additions, removals, version changes. Include the changeset in "
+        "the reply and switch unless the user asked only to preview or "
+        "check.",
     ),
     (
         switch,
         "switch",
-        "Activate the configuration (sudo nixos-rebuild switch / "
+        "Activate the configuration (sudo -n nixos-rebuild switch / "
         "home-manager switch). Records rollback_generation first. Returns a "
         "structured 'summary' (units changed, derivations built, package "
         "delta, systemd health) plus gen before/after; on success the raw "
-        "log is trimmed to a tail (pass full_log=True for all of it). No "
+        "log is trimmed to a tail (pass full_log=True for all of it). Status "
+        "is 'degraded' when activation succeeded but units newly failed. No "
         "implicit validation by default; pass validate=True to gate on "
         "check('dry-build') first. On a sudo auth failure returns a "
         "'privilege' diagnosis.",

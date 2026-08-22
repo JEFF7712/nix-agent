@@ -105,6 +105,67 @@ def attr_candidates(target: Target) -> list[str]:
     return [f"{user}@{host}", user]
 
 
+def matched_hosts(guess: str, hosts: list[str]) -> list[str]:
+    """Flake config names to try after `guess` was missing.
+
+    Unique flake name, or a unique prefix/suffix/FQDN match. Empty means
+    ambiguous or none — callers should surface `unknown_host`.
+    """
+    if not hosts:
+        return []
+    if guess in hosts:
+        return [guess]
+    if len(hosts) == 1:
+        return [hosts[0]]
+    needle = guess.lower()
+    hits: list[str] = []
+    for host in hosts:
+        hay = host.lower()
+        if (
+            hay.startswith(needle)
+            or needle.startswith(hay)
+            or hay.endswith(needle)
+            or needle.endswith(hay)
+            or hay.split(".", 1)[0] == needle
+            or needle.split(".", 1)[0] == hay
+        ):
+            hits.append(host)
+    if len(hits) == 1:
+        return hits
+    return []
+
+
+def unknown_host_envelope(
+    *,
+    hostname: str,
+    hosts: list[str],
+    flake_dir: str,
+    mode: str,
+) -> dict[str, object]:
+    root = "nixosConfigurations" if mode == "nixos" else "homeConfigurations"
+    example = hosts[0] if hosts else "host"
+    return {
+        "status": "unknown_host",
+        "error": f"flake {flake_dir!r} has no {root} matching {hostname!r}",
+        "hostname": hostname,
+        "hosts": hosts,
+        "hint": (
+            f"pass flake_uri with an explicit attribute "
+            f"(e.g. '{flake_dir}#{example}') or set $NIX_AGENT_FLAKE"
+        ),
+    }
+
+
+def hm_user_attr(attr: str) -> str | None:
+    """NixOS-mode rewrite of an HM option onto home-manager.users.<user>."""
+    if attr.startswith("home-manager.users."):
+        return None
+    user = current_user()
+    if not user:
+        return None
+    return f"home-manager.users.{user}.{attr}"
+
+
 def current_hm_profile() -> str | None:
     user = current_user()
     candidates = []
@@ -141,8 +202,12 @@ def _lock_pin(mode: str) -> str | None:
     return os.environ.get("NIX_AGENT_FLAKE")
 
 
-def constrain_privileged_target(target: Target, *, mode: str) -> dict | None:
-    """Early-exit envelope for switch / dry-activate, or None to proceed."""
+_DOT_REFS = frozenset({".", "./"})
+
+
+def prepare_privileged_target(target: Target, *, mode: str) -> Target | dict:
+    """Absolute local target for switch / dry-activate, or an early-exit
+    envelope. Resolves `.` / `./` to the pin directory when one is set."""
     dir_part = target.flake_dir
     remote = is_remote_flake_ref(dir_part)
     if remote and not _allow_remote():
@@ -154,30 +219,47 @@ def constrain_privileged_target(target: Target, *, mode: str) -> dict | None:
             "hint": "clone the repository locally and pin that directory",
         }
 
-    if not remote:
-        expanded = os.path.expanduser(dir_part)
-        if not os.path.isabs(expanded):
-            return {
-                "status": "no_target",
-                "error": (
-                    "privileged operations require an absolute flake path, "
-                    f"got {dir_part!r}"
-                ),
-            }
-        resolved = os.path.realpath(expanded)
-    else:
-        resolved = dir_part
-
     pin = _lock_pin(mode)
+    pin_resolved = None
     if pin:
         pin_dir, _, _ = pin.partition("#")
         pin_resolved = os.path.realpath(os.path.expanduser(pin_dir))
-        if pin_resolved != resolved:
-            return {
-                "status": "target_locked",
-                "error": f"privileged operations are locked to {pin}",
-                "pin": pin,
-            }
+
+    if remote:
+        resolved = dir_part
+    else:
+        expanded = os.path.expanduser(dir_part)
+        if not os.path.isabs(expanded):
+            if pin_resolved is not None and dir_part in _DOT_REFS:
+                resolved = pin_resolved
+            else:
+                resolved = os.path.realpath(expanded)
+                if pin_resolved is None:
+                    search = {
+                        os.path.realpath(str(candidate))
+                        for candidate in flake_search_dirs(mode)
+                        if candidate.is_dir()
+                    }
+                    if resolved not in search:
+                        return {
+                            "status": "no_target",
+                            "error": (
+                                "privileged operations require an absolute flake "
+                                f"path, got {dir_part!r}"
+                            ),
+                            "hint": (
+                                "set $NIX_AGENT_FLAKE or pass an absolute flake_uri"
+                            ),
+                        }
+        else:
+            resolved = os.path.realpath(expanded)
+
+    if pin_resolved is not None and pin_resolved != resolved:
+        return {
+            "status": "target_locked",
+            "error": f"privileged operations are locked to {pin}",
+            "pin": pin,
+        }
 
     if not remote:
         flake_nix = os.path.join(resolved, "flake.nix")
@@ -186,4 +268,15 @@ def constrain_privileged_target(target: Target, *, mode: str) -> dict | None:
                 "status": "no_target",
                 "error": f"{resolved} is not a directory containing flake.nix",
             }
-    return None
+
+    if resolved == dir_part:
+        return target
+    return Target(flake_dir=resolved, attr=target.attr, mode=target.mode)
+
+
+def constrain_privileged_target(target: Target, *, mode: str) -> dict | None:
+    """Early-exit envelope for switch / dry-activate, or None to proceed."""
+    prepared = prepare_privileged_target(target, mode=mode)
+    if isinstance(prepared, Target):
+        return None
+    return prepared

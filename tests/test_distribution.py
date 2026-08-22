@@ -17,8 +17,10 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.9.1"' in pyproject_text
-    assert 'version = "0.9.1";' in flake_text
+    assert 'version = "0.10.0"' in pyproject_text
+    assert 'version = "0.10.0";' in flake_text
+    assert "## v0.10.0 - 2026-08-22" in changelog_text
+    assert "high trust" in changelog_text
     assert "## v0.9.1 - 2026-08-12" in changelog_text
     assert "usage log" in changelog_text
     assert "## v0.9.0 - 2026-08-12" in changelog_text
@@ -54,6 +56,7 @@ def test_nixos_module_exposes_enable_option():
     assert "programs.nix-agent.flake" in module_text
     assert "programs.nix-agent.privilegedAutomation.enable" in module_text
     assert "programs.nix-agent.privilegedAutomation.user" in module_text
+    assert "autonomous install" in module_text
     assert "NIX_AGENT_FLAKE" in module_text
     assert "--switch-generation" in module_text
     assert "/nix/var/nix/profiles/system/bin/switch-to-configuration" in module_text

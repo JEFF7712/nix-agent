@@ -267,3 +267,70 @@ def test_eval_batched_envelope_accounted(monkeypatch):
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     out = eval_config(["services.openssh.enable"], flake_uri="/x#h")
     assert out["returned_bytes"] > 0
+
+
+def test_eval_unique_host_fallback(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"laptop": {}}}),
+                command=argv,
+            )
+        if 'nixosConfigurations."zen"' in argv[2]:
+            return _result(
+                False,
+                stderr="error: flake does not provide attribute "
+                "'nixosConfigurations.\"zen\"'",
+                command=argv,
+            )
+        return _result(True, stdout='"ok"\n', command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["zen"])
+    out = eval_config("networking.hostName", flake_uri="/x")
+    assert out["status"] == "ok"
+    assert out["value"] == "ok"
+    assert any(
+        'nixosConfigurations."laptop"' in argv[2] for argv in calls if len(argv) > 2
+    )
+
+
+def test_eval_explicit_unknown_host(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"laptop": {}, "iso": {}}}),
+                command=argv,
+            )
+        return _result(
+            False,
+            stderr="error: flake does not provide attribute "
+            "'nixosConfigurations.\"wrong\"'",
+            command=argv,
+        )
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("networking.hostName", flake_uri="/x#wrong")
+    assert out["status"] == "unknown_host"
+    assert out["hosts"] == ["iso", "laptop"]
+    assert "command" not in out
+
+
+def test_eval_hm_rewrite(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if len(argv) > 2 and "home-manager.users" in argv[2]:
+            return _result(True, stdout="true\n", command=argv)
+        return _result(False, stderr="error: attribute 'enable' missing", command=argv)
+
+    monkeypatch.setenv("USER", "rupan")
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("programs.git.enable", flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["value"] is True
+    assert out["hm_rewritten"] is True
+    assert out["requested_attr"] == "programs.git.enable"

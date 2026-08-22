@@ -1,10 +1,16 @@
 # Privileged Automation
 
-`nix-agent` can run fully non-interactively on NixOS only if the host allows
-the exact commands it uses to run through `sudo` without prompting. nix-agent
-invokes sudo with the **resolved store path** of `nixos-rebuild` and
-`nix-env`, so NOPASSWD rules must match that argv form (as in the examples
-below). Standalone Home Manager mode does not use sudo.
+The documented default for autonomous use is passwordless sudo for the
+narrow nix-agent commands, scoped to one user and one flake directory.
+nix-agent invokes `sudo -n` with the **resolved store path** of
+`nixos-rebuild` and `nix-env`, so a missing NOPASSWD rule fails
+immediately with a `privilege` diagnosis instead of hanging on a
+password prompt. NOPASSWD rules must match that argv form (the command
+after `sudo -n`, as in the examples below). Standalone Home Manager mode
+does not use sudo.
+
+To lower trust (sudo password, or host prompts on activation), see
+[Lower trust](#lower-trust). Do not grant a wildcard flake ref.
 
 `$NIX_AGENT_FLAKE` (and the module option that wraps it into the binary) is
 an **anti-footgun**, not a security boundary. The agent can still edit the
@@ -12,8 +18,8 @@ pinned tree and, if it can edit MCP config, the pin in `.mcp.json`. The
 privilege boundary that actually runs as root is sudoers. Narrow those rules
 to the pinned flake directory. Do not grant a wildcard flake ref.
 
-Prefer the NixOS module over a pasted `extraRules` block when
-`nixosModules.default` is already imported:
+The autonomous install enables this. Prefer the NixOS module over a
+pasted `extraRules` block when `nixosModules.default` is already imported:
 
 ```nix
 programs.nix-agent.enable = true;
@@ -54,9 +60,9 @@ NOPASSWD on a store-path binary, and never write a sudoers wildcard over
 
 ## Equivalent `extraRules`
 
-If you are not using `programs.nix-agent.privilegedAutomation`, the same
-narrowed rules look like this. Replace `/home/alice/nixos` with the real
-flake directory.
+If you are wiring sudoers by hand instead of
+`programs.nix-agent.privilegedAutomation`, the same narrowed rules look
+like this. Replace `/home/alice/nixos` with the real flake directory.
 
 ```nix
 security.sudo.extraRules = [
@@ -92,8 +98,21 @@ If the flake directory is unknown, omit the two `--flake` rebuild/switch
 rules entirely. Keep only `--rollback`, `nix-env --switch-generation`, and
 the profile `switch-to-configuration` rule.
 
-This is intentionally broader than manual approval and should only be used
-on a trusted local machine.
+This is intentionally broader than per-command host prompts and is the
+default for a trusted local machine. It is not a reason to widen the
+flake argument or to wildcard `/nix/store/*/bin/switch-to-configuration`.
+
+## Lower trust
+
+Keep `programs.nix-agent.enable` and the flake pin. Then:
+
+- **Sudo password:** omit `programs.nix-agent.privilegedAutomation` (the
+  Nix option defaults to off) or set `enable = false`. Privileged MCP
+  tools fail fast with `privilege` (`sudo -n`) until a human authenticates.
+- **Host prompts on activation:** omit `switch` / `generations` (and
+  matching Bash `nixos-rebuild` switch / dry-activate / rollback) from
+  the host allow list. See [agent-install.md](agent-install.md) § Lower
+  trust. Do this only when the user asked for human-in-the-loop guards.
 
 ## Remote flake refs (humans only)
 

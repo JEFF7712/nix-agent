@@ -140,6 +140,7 @@ def test_check_dry_activate_nixos(monkeypatch, tmp_path):
     assert out["status"] == "ok"
     assert calls[0] == [
         "sudo",
+        "-n",
         "/bin/nixos-rebuild",
         "dry-activate",
         "--flake",

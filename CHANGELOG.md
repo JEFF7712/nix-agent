@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.10.0 - 2026-08-22
+
+- The documented default is high trust: unprompted `switch` /
+  `generations` and narrowed passwordless sudo for this machine's flake.
+  Lower trust (host prompts, sudo password) is an opt-down; apply it
+  only if the user asked. The Nix option
+  `privilegedAutomation.enable` still defaults to false so existing
+  configs do not grow sudoers without an explicit user.
+- Privileged argv uses `sudo -n` so a missing NOPASSWD rule fails
+  immediately with `privilege` instead of hanging on a password prompt.
+- When the hostname attr is missing, tools fall back to a unique flake host
+  (or a unique prefix/suffix match) and otherwise return `unknown_host`
+  with the available names. Explicit `flake_uri#attr` is never rewritten.
+- `locate_option` and `eval_config` retry NixOS-mode queries under
+  `home-manager.users.<user>.…` when the unprefixed attr is not an option.
+- Privileged ops accept `.` / `./` by resolving them to `$NIX_AGENT_FLAKE`
+  when the pin is set.
+- `switch` returns `status: "degraded"` (with a rollback hint) when
+  activation succeeded but systemd units newly failed. The workflow
+  default is apply: switch after `diff()` unless the user asked only to
+  preview or check. On `degraded`, roll back unless the user asked to
+  leave those units failed.
+
 ## v0.9.1 - 2026-08-12
 
 - Stop putting `raw_bytes` / `returned_bytes` on MCP tool envelopes.

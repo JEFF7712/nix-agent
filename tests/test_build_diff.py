@@ -272,3 +272,31 @@ def test_diff_tool_failure_keeps_store_path(monkeypatch):
     assert out["status"] == "failed"
     assert out["store_path"] == "/nix/store/new-toplevel"
     assert "packages" not in out
+
+
+def test_build_unique_host_fallback(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout='{"nixosConfigurations": {"laptop": {}}}',
+                command=argv,
+            )
+        if 'nixosConfigurations."zen"' in argv[-1]:
+            return _result(
+                False,
+                stderr="error: flake does not provide attribute "
+                "'nixosConfigurations.\"zen\"'",
+                command=argv,
+            )
+        return _result(True, stdout="/nix/store/sys\n", command=argv)
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod, "attr_candidates", lambda t: ["zen"])
+    out = build(flake_uri="/x", mode="nixos")
+    assert out["status"] == "ok"
+    assert out["store_path"] == "/nix/store/sys"
+    assert any('nixosConfigurations."laptop"' in argv[-1] for argv in calls)

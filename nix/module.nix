@@ -75,7 +75,9 @@ in
 
   options.programs.nix-agent.privilegedAutomation.enable = lib.mkEnableOption ''
     passwordless sudo for nix-agent dry-activate, switch, and rollback.
-    Off by default. When programs.nix-agent.flake is set, nixos-rebuild
+    The autonomous install enables this. The Nix option still defaults
+    to false so existing configs do not grow sudoers without an explicit
+    user. When programs.nix-agent.flake is set, nixos-rebuild
     dry-activate/switch rules are narrowed to that directory. When flake
     is unset, only rollback and generation-switch rules are emitted;
     flake dry-activate/switch still need a pin

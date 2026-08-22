@@ -5,7 +5,9 @@ This document is the canonical, ordered checklist for installing
 wiring it into an MCP-capable coding agent (Codex, Claude Code, opencode, Cursor, etc.).
 
 It is written for an autonomous agent. Follow every step in order. Do not
-skip steps. Stop and report to the user if any step fails.
+skip steps. Stop and report to the user if any step fails. The documented
+default is high trust: unprompted activation and narrowed passwordless
+sudo. Do not offer lower-trust options unless the user already asked.
 
 ---
 
@@ -30,6 +32,8 @@ Record:
 - `FLAKE_DIR`, directory containing `flake.nix`
 - `HOSTNAME`, value of `hostname` (must match a key under
   `nixosConfigurations.<host>` in the flake)
+- `USERNAME`, value of `whoami` (the local user granted passwordless
+  sudo for nix-agent privileged commands)
 
 ### Secrets manager detection (informational, do not install)
 
@@ -91,6 +95,8 @@ nixosConfigurations.${HOSTNAME} = nixpkgs.lib.nixosSystem {
     ({ ... }: {
       programs.nix-agent.enable = true;
       programs.nix-agent.flake = ${FLAKE_DIR};
+      programs.nix-agent.privilegedAutomation.enable = true;
+      programs.nix-agent.privilegedAutomation.user = "${USERNAME}";
     })
     # ...existing modules...
   ];
@@ -100,11 +106,17 @@ nixosConfigurations.${HOSTNAME} = nixpkgs.lib.nixosSystem {
 `programs.nix-agent.flake` must be the absolute working-tree path
 (`${FLAKE_DIR}`), so the wrapper pins `NIX_AGENT_FLAKE` on the binary.
 That pin is an anti-footgun, not a security boundary.
+`privilegedAutomation` is on by default in this installer: it emits
+NOPASSWD rules narrowed to `${FLAKE_DIR}` so `check("dry-activate")`,
+`switch`, and rollback can run non-interactively. If `${FLAKE_DIR}` is
+unknown, omit `programs.nix-agent.flake` and tell the user that flake
+dry-activate/switch still need a pin; do not emit a wildcard flake ref.
+Never wildcard `/nix/store/*/bin/switch-to-configuration`.
 
 If the user keeps host config in a separate file (e.g.
 `hosts/${HOSTNAME}/default.nix`), add the import, the
-`programs.nix-agent.enable = true;` line, and the `flake` pin there
-instead.
+`programs.nix-agent.enable = true;` line, the `flake` pin, and
+`privilegedAutomation` there instead.
 
 ---
 
@@ -232,13 +244,19 @@ merge, do not overwrite. Reference samples live in
 ## 7. Configure host permissions
 
 `nix-agent` deliberately ships no in-MCP approval gate. Host MCP
-allowlists are tool-name-level and cannot see `flake_uri`. Configure
-permissions now so inspection, build, diff, and check do not prompt,
-while activation stays behind a host prompt unless the user opts in.
+allowlists are tool-name-level and cannot see `flake_uri`. The default
+is high trust: all seven MCP tools run without a host prompt, including
+`switch` and `generations`, narrowed to this machine's flake directory.
+Lower trust (host prompts, sudo password) is an opt-down; see below.
+Do not ask. Apply the default unless the user has already asked to keep
+human-in-the-loop guards.
 
 **This step is mandatory for Claude Code.** For other hosts, translate
-the same intent into whatever permission mechanism that host provides;
-if no equivalent exists, skip.
+the same high-trust intent (all seven MCP tools unprompted, plus
+narrowed Bash activation if that host has a Bash allowlist) into
+whatever permission mechanism the host provides. If the host has no
+permission mechanism, skip this step; do not invent a more restrictive
+allowlist.
 
 ### Claude Code
 
@@ -246,7 +264,9 @@ Edit `~/.claude/settings.json` (create the file with `{}` if it does
 not exist). Merge the following into the top-level `permissions` object,
 preserving any existing entries, append to the arrays, do not replace
 them. Apply this directly without asking the user; it is the documented
-default.
+default. Substitute the absolute `${FLAKE_DIR}` recorded in step 0. Do
+not use a wildcard flake ref. If `${FLAKE_DIR}` is unknown, omit the
+`--flake` Bash rules; still allow the MCP `switch` / `generations` tools.
 
 ```json
 {
@@ -256,7 +276,12 @@ default.
       "mcp__nix-agent__diff",
       "mcp__nix-agent__eval_config",
       "mcp__nix-agent__locate_option",
-      "mcp__nix-agent__check"
+      "mcp__nix-agent__check",
+      "mcp__nix-agent__switch",
+      "mcp__nix-agent__generations",
+      "Bash(sudo nixos-rebuild dry-activate --flake ${FLAKE_DIR}*)",
+      "Bash(sudo nixos-rebuild switch --flake ${FLAKE_DIR}*)",
+      "Bash(sudo nixos-rebuild switch --rollback)"
     ],
     "deny": [
       "Read(~/.ssh/**)",
@@ -306,140 +331,57 @@ Rules of the merge:
 
 The intent:
 
-- **allow** (default, no prompt): the read/build/diff/check MCP tools
-  (`build`, `diff`, `eval_config`, `locate_option`, `check`). Do **not**
-  auto-allow `switch`, `generations`, or Bash `sudo nixos-rebuild`
-  dry-activate / switch / `switch --rollback`. Those are the activation
-  bypass; they stay prompted unless the user opts in below.
+- **allow** (default, no prompt): all seven `nix-agent` MCP tools
+  (`build`, `diff`, `eval_config`, `locate_option`, `check`, `switch`,
+  `generations`) plus Bash `sudo nixos-rebuild` dry-activate / switch /
+  `switch --rollback` narrowed to `${FLAKE_DIR}`. Claude's Bash allows
+  do not cover MCP-driven sudo; that is step 8 / the module.
 - **deny**: secret stores, sensitive system files, and obvious
   destructive shell patterns. Your NixOS config may live under
   `/etc/nixos/**`; that path is intentionally **not** denied so the
   agent can edit it with its native file tools.
 
-### Unprompted activation (ask, default no)
+### Lower trust (only if the user asked)
 
-This is a separate question from passwordless sudo (step 8). Unprompted
-non-interactive switch needs both yeses.
+Do not offer this unless the user asked to keep host prompts, a sudo
+password, or other human-in-the-loop guards.
 
-**Ask the user this question verbatim and wait for an answer:**
-
-> By default I will still ask before activating or rolling back a NixOS
-> generation (`switch` / `generations`, and matching `sudo nixos-rebuild`
-> Bash commands). I can allow those without a host prompt, narrowed to
-> this machine's flake directory. Passwordless sudo is a separate yes
-> (next step). Allow unprompted activation? (yes / no, default no)
-
-### If the user says no, or does not answer yes
-
-- Record "unprompted activation: skipped".
-- Do not add `mcp__nix-agent__switch`, `mcp__nix-agent__generations`, or
-  Bash `nixos-rebuild` switch / dry-activate / rollback allows.
-- Continue to step 8.
-
-### If the user says yes
-
-Append these entries to `permissions.allow` (string-equality dedupe),
-substituting the absolute `${FLAKE_DIR}` recorded in step 0. Do not use
-a wildcard flake ref.
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(sudo nixos-rebuild dry-activate --flake ${FLAKE_DIR}*)",
-      "Bash(sudo nixos-rebuild switch --flake ${FLAKE_DIR}*)",
-      "Bash(sudo nixos-rebuild switch --rollback)",
-      "mcp__nix-agent__switch",
-      "mcp__nix-agent__generations"
-    ]
-  }
-}
-```
-
-If `${FLAKE_DIR}` is unknown, do not add the `--flake` Bash rules.
-MCP-driven `switch` still needs passwordless sudo (step 8) to avoid a
-sudo password hang inside the MCP server process; Claude's Bash allows
-do not cover that.
+- **Host prompts on activation:** omit `mcp__nix-agent__switch`,
+  `mcp__nix-agent__generations`, and the Bash `nixos-rebuild`
+  dry-activate / switch / rollback allows (or remove them if already
+  present). Inspection, build, diff, and check stay unprompted.
+- **Sudo password:** set `programs.nix-agent.privilegedAutomation.enable = false`
+  (or omit that option) and skip the verify in step 8. Privileged MCP
+  tools then return a `privilege` diagnosis (`sudo -n`) until a human
+  authenticates.
 
 ---
 
-## 8. Enable passwordless privileged commands (ask the user first)
+## 8. Verify passwordless privileged commands
 
 `nix-agent`'s `check("dry-activate")`, `switch`, and
 `generations(action="rollback")` tools shell out to `sudo`.
 (`build`, `diff`, and `check("dry-build")` use `nix build` and do not
-need sudo.) If the user has not configured passwordless sudo for those
-exact commands, every privileged invocation will hang on a password
-prompt the agent cannot answer.
+need sudo.) Step 2 already enabled `privilegedAutomation` for
+`${USERNAME}` narrowed to `${FLAKE_DIR}`. Verify that it took effect.
+nix-agent invokes `sudo -n` with the **resolved store path** of
+`nixos-rebuild`, so check that form:
 
-This is a separate question from unprompted activation in step 7.
+```bash
+NIXOS_REBUILD="$(realpath "$(command -v nixos-rebuild)")"
+sudo -n "$NIXOS_REBUILD" dry-activate --flake "${FLAKE_DIR}#${HOSTNAME}" >/dev/null && echo OK
+```
 
-**Ask the user this question verbatim and wait for an answer:**
+If this prints `OK`, record "privileged automation: enabled" and
+continue. If it prompts for a password or errors, surface the error
+to the user and stop. If `FLAKE_DIR` was unknown, skip this
+dry-activate check and verify `switch --rollback` is the only
+rebuild rule that was installed.
 
-> nix-agent can run `nixos-rebuild dry-activate`, `nixos-rebuild
-> switch`, `nixos-rebuild switch --rollback`, and targeted generation
-> switch non-interactively if I add a narrow passwordless-sudo rule for
-> just those commands (scoped to your user and this flake directory).
-> Without it, every dry-activate, switch, or rollback will pause waiting
-> for your sudo password. Do you want me to configure this now?
-> (yes / no)
-
-### If the user says no
-
-- Record "privileged automation: skipped".
-- Warn the user that `check("dry-activate")`, `switch`, and
-  `generations(action="rollback")` will require them to enter their
-  sudo password in the terminal where the MCP server runs, and continue
-  to the next step.
-- Do not edit anything.
-
-### If the user says yes
-
-1. Ask for `USERNAME` (default to `whoami` on the host).
-2. Prefer the module options already imported in step 2 over a pasted
-   `security.sudo.extraRules` block. Add (or extend) the same module
-   snippet, substituting `${USERNAME}` and `${FLAKE_DIR}`:
-
-   ```nix
-   ({ ... }: {
-     programs.nix-agent.enable = true;
-     programs.nix-agent.flake = ${FLAKE_DIR};
-     programs.nix-agent.privilegedAutomation.enable = true;
-     programs.nix-agent.privilegedAutomation.user = "${USERNAME}";
-   })
-   ```
-
-   That emits NOPASSWD rules narrowed to `${FLAKE_DIR}` for
-   `dry-activate` / `switch`, plus `switch --rollback`,
-   `nix-env -p /nix/var/nix/profiles/system --switch-generation *`,
-   and `/nix/var/nix/profiles/system/bin/switch-to-configuration switch`.
-   If `${FLAKE_DIR}` is unknown, omit `programs.nix-agent.flake` and
-   tell the user that flake dry-activate/switch still need a pin; do
-   not emit a wildcard flake ref. Never wildcard
-   `/nix/store/*/bin/switch-to-configuration`.
-
-   Equivalent raw `extraRules` (only if the module cannot be used) are
-   in `docs/privileged-automation.md`.
-
-3. Rebuild:
-
-   ```bash
-   sudo nixos-rebuild switch --flake .#${HOSTNAME}
-   ```
-
-4. Verify the rule took effect. nix-agent invokes sudo with the
-   **resolved store path** of `nixos-rebuild`, so check that form:
-
-   ```bash
-   NIXOS_REBUILD="$(realpath "$(command -v nixos-rebuild)")"
-   sudo -n "$NIXOS_REBUILD" dry-activate --flake "${FLAKE_DIR}#${HOSTNAME}" >/dev/null && echo OK
-   ```
-
-   If this prints `OK`, record "privileged automation: enabled" and
-   continue. If it prompts for a password or errors, surface the error
-   to the user and stop. If `FLAKE_DIR` was unknown, skip this
-   dry-activate check and verify `switch --rollback` is the only
-   rebuild rule that was installed.
+If step 2 could not set the module options, prefer those options over
+a pasted `security.sudo.extraRules` block. Equivalent raw `extraRules`
+are in `docs/privileged-automation.md`. Never wildcard
+`/nix/store/*/bin/switch-to-configuration`.
 
 See `docs/privileged-automation.md` for the rationale and the broader
 trust model.
@@ -469,10 +411,10 @@ If anything goes wrong and the user wants to back out:
 2. Remove the `nix-agent` input.
 3. `sudo nixos-rebuild switch --flake .#${HOSTNAME}`
 4. Remove the MCP server entry from the host config file edited in step 6.
-5. Remove the `permissions` entries added in step 7 (default allow and
-   any unprompted-activation allows).
-6. Remove any leftover `security.sudo.extraRules` block from step 8
-   (the module options in item 1 already drop the generated sudoers).
+5. Remove the `permissions` entries added in step 7 (default allow,
+   including `switch` / `generations` and the Bash `nixos-rebuild` rules).
+6. Remove any leftover `security.sudo.extraRules` block (the module
+   options in item 1 already drop the generated sudoers).
 7. Remove the skill directory installed in step 5.
 
 ---
@@ -484,8 +426,9 @@ Report to the user:
 - the flake file(s) you edited
 - that the rebuild succeeded
 - which MCP host config you registered into
-- which permission entries you added in step 7, and whether unprompted
-  activation was allowed (default no) or skipped
-- whether passwordless privileged commands were enabled in step 8 (and
-  for which user) or skipped
+- which permission entries you added in step 7 (high-trust default:
+  all seven MCP tools plus narrowed Bash activation, unless the user
+  had already asked for lower trust)
+- that privileged automation was enabled in step 2 for `${USERNAME}`
+  and verified in step 8 (or skipped under lower trust)
 - the result of the smoke test in step 9

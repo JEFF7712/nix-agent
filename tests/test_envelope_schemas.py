@@ -98,11 +98,11 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
     build_ok = build(flake_uri="/x#h")
     diff_ok = diff(flake_uri="/x#h")
 
-    systemctl_calls = iter(["[]", '[{"unit": "broken.service"}]'])
+    systemctl_ok = iter(["[]", "[]"])
 
     def switch_success_run(argv, cwd=None):
         if argv and argv[0] == "systemctl":
-            return _result(True, stdout=next(systemctl_calls), command=argv)
+            return _result(True, stdout=next(systemctl_ok), command=argv)
         if argv and argv[0] == "journalctl":
             return _result(True, stdout="unit crashed\n", command=argv)
         return _result(True, stdout=SWITCH_LOG, command=argv)
@@ -111,6 +111,18 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
     monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen-42")
     monkeypatch.setattr(switch_mod.runner, "run", switch_success_run)
     switch_ok = switch(flake_uri=f"{flake}#h")
+
+    systemctl_degraded = iter(["[]", '[{"unit": "broken.service"}]'])
+
+    def switch_degraded_run(argv, cwd=None):
+        if argv and argv[0] == "systemctl":
+            return _result(True, stdout=next(systemctl_degraded), command=argv)
+        if argv and argv[0] == "journalctl":
+            return _result(True, stdout="unit crashed\n", command=argv)
+        return _result(True, stdout=SWITCH_LOG, command=argv)
+
+    monkeypatch.setattr(switch_mod.runner, "run", switch_degraded_run)
+    switch_degraded = switch(flake_uri=f"{flake}#h")
 
     def privilege_run(argv, cwd=None):
         return _result(
@@ -163,6 +175,13 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
     target_locked = switch(flake_uri="/tmp/other#host")
     monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
     remote_ref_rejected = switch(flake_uri="github:example/nixos#host")
+    unknown_host = {
+        "status": "unknown_host",
+        "error": "flake '/x' has no nixosConfigurations matching 'zen'",
+        "hostname": "zen",
+        "hosts": ["desktop", "laptop"],
+        "hint": "pass flake_uri with an explicit attribute",
+    }
 
     examples = {
         "build_ok": build_ok,
@@ -176,6 +195,7 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
             "hint": "plain config value",
         },
         "switch_ok": switch_ok,
+        "switch_degraded": switch_degraded,
         "switch_privilege": switch_privilege,
         "switch_failed_derivation": switch_drv,
         "diff_ok_packages": diff_ok,
@@ -184,6 +204,7 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
         "unknown_generation": unknown_generation,
         "target_locked": target_locked,
         "remote_ref_rejected": remote_ref_rejected,
+        "unknown_host": unknown_host,
     }
 
     actual = {

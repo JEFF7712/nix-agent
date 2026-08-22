@@ -94,8 +94,14 @@ def test_locate_option_missing_attr_is_not_an_option(monkeypatch):
     assert out["status"] == "not_an_option"
 
 
-def test_locate_option_missing_host_is_failed(monkeypatch):
+def test_locate_option_missing_host_is_unknown_host(monkeypatch):
     def fake_run(argv, cwd=None):
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"laptop": {}, "iso": {}}}),
+                command=argv,
+            )
         return _result(
             False,
             stderr="error: flake 'git+file:///x' does not provide attribute "
@@ -105,8 +111,30 @@ def test_locate_option_missing_host_is_failed(monkeypatch):
 
     monkeypatch.setattr(locate_mod.runner, "run", fake_run)
     out = locate_option("networking.hostName", flake_uri="/x#laptop-nixos")
-    assert out["status"] == "failed"
-    assert "does not provide attribute" in out["first_error"]
+    assert out["status"] == "unknown_host"
+    assert out["hosts"] == ["iso", "laptop"]
+    assert "command" not in out
+
+
+def test_locate_option_hm_rewrite(monkeypatch):
+    def fake_run(argv, cwd=None):
+        installable = argv[2] if len(argv) > 2 else ""
+        if installable.endswith(".options"):
+            return _result(True, stdout="true\n", command=argv)
+        if "home-manager.users" in installable:
+            return _result(True, stdout=LOCATED, command=argv)
+        payload = json.dumps(
+            {"is_option": False, "declarations": [], "definitions": []}
+        )
+        return _result(True, stdout=payload, command=argv)
+
+    monkeypatch.setenv("USER", "rupan")
+    monkeypatch.setattr(locate_mod.runner, "run", fake_run)
+    out = locate_option("programs.git.enable", flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["hm_rewritten"] is True
+    assert out["requested_attr"] == "programs.git.enable"
+    assert out["attr"] == "home-manager.users.rupan.programs.git.enable"
 
 
 def test_locate_option_real_failure(monkeypatch):

@@ -11,6 +11,10 @@ operates on your actual configuration, `mcp-nixos` handles package and option
 discovery. Optional local usage logging (`NIX_AGENT_USAGE_LOG=1`) records
 per-call byte accounting; run `nix-agent usage` to summarize.
 
+The documented default is high trust: unprompted `switch` / `generations`
+and passwordless sudo narrowed to this machine's flake. Lower trust (host
+prompts, a sudo password) is an opt-down.
+
 > **Experimental and a work in progress.** Feedback and contributions welcome.
 
 ## Install
@@ -26,8 +30,8 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 ## Docs
 
 - [docs/usage.md](docs/usage.md): install, MCP host config, tool surface, workflow, design notes
-- [docs/agent-install.md](docs/agent-install.md): install guide for agents
-- [docs/privileged-automation.md](docs/privileged-automation.md): non-interactive dry-activate, switch, and rollback
+- [docs/agent-install.md](docs/agent-install.md): high-trust install guide for agents
+- [docs/privileged-automation.md](docs/privileged-automation.md): default non-interactive dry-activate, switch, and rollback (opt-down for a sudo password)
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion workflow skill
 - [skills/nix-agent-init/SKILL.md](skills/nix-agent-init/SKILL.md): repo onboarding skill
 
