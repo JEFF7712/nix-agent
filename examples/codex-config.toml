@@ -1,3 +1,4 @@
 [mcp_servers.nix-agent]
 command = "nix-agent"
 args = []
+default_tools_approval_mode = "approve"

@@ -314,6 +314,5 @@ After A, B, and C return:
 
 ## Out of this implementation
 
-- Removing envelope byte accounting
-- Live `switch` / full NixOS module eval in CI
-- Version bump
+- Live host `switch` on GitHub-hosted runners (no KVM). CI evals the
+  NixOS module sudoers instead (`checks.nixos-module`).

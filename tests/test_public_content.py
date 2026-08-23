@@ -183,7 +183,8 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "high trust" in install.lower()
     assert "Do not ask" in install
     assert "privilegedAutomation.enable = true" in install
-    assert "do not invent a more restrictive" in install.lower()
+    install_flat = re.sub(r"\s+", " ", install)
+    assert "do not invent a more restrictive" in install_flat.lower()
     assert "Ask (default no)" not in install
     skill_flat = re.sub(r"\s+", " ", skill)
     usage_flat = re.sub(r"\s+", " ", USAGE)
@@ -192,5 +193,9 @@ def test_agent_install_matches_current_tool_surface_and_sudo_needs():
     assert "switch unless the user asked only to preview" in usage_flat
     assert "Read(**/secrets/**)" in deny
     assert "Write(/etc/sudoers)" in deny
-    for tool in EXPECTED_TOOLS:
-        assert f"mcp__nix-agent__{tool}" in install
+    assert "bootstrap-rebuild" in install
+    assert "needs a TTY" in install
+    assert "Mcp(nix-agent, switch)" in install
+    assert 'default_tools_approval_mode = "approve"' in install
+    assert "### Cursor CLI" in install
+    assert "### Codex" in install

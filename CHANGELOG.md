@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.0 - 2026-08-22
+
+- First rebuild is `sudo -n` when NOPASSWD already matches; otherwise
+  `nix-agent bootstrap-rebuild` (and the installer) stop with one TTY
+  command instead of hanging on a password prompt.
+- Cursor CLI and Codex have explicit high-trust allowlists
+  (`Mcp(nix-agent, …)` / `default_tools_approval_mode = "approve"`).
+- CI evaluates the NixOS module's sudoers (`checks.nixos-module`):
+  narrowed flake refs, rollback, switch-generation, profile
+  `switch-to-configuration`; no `--flake *` and no store-path wildcard.
+
 ## v0.10.0 - 2026-08-22
 
 - The documented default is high trust: unprompted `switch` /

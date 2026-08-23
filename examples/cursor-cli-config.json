@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Mcp(nix-agent, build)",
+      "Mcp(nix-agent, diff)",
+      "Mcp(nix-agent, eval_config)",
+      "Mcp(nix-agent, locate_option)",
+      "Mcp(nix-agent, check)",
+      "Mcp(nix-agent, switch)",
+      "Mcp(nix-agent, generations)",
+      "Shell(sudo nixos-rebuild dry-activate --flake /home/me/nixos*)",
+      "Shell(sudo nixos-rebuild switch --flake /home/me/nixos*)",
+      "Shell(sudo nixos-rebuild switch --rollback)"
+    ]
+  }
+}

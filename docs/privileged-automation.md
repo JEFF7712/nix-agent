@@ -12,6 +12,10 @@ does not use sudo.
 To lower trust (sudo password, or host prompts on activation), see
 [Lower trust](#lower-trust). Do not grant a wildcard flake ref.
 
+The first generation that installs these rules still needs a TTY if
+NOPASSWD is not already present. The installer tries `sudo -n` first;
+`nix-agent bootstrap-rebuild` prints one `tty_command` when that fails.
+
 `$NIX_AGENT_FLAKE` (and the module option that wraps it into the binary) is
 an **anti-footgun**, not a security boundary. The agent can still edit the
 pinned tree and, if it can edit MCP config, the pin in `.mcp.json`. The

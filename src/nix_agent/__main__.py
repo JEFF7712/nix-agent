@@ -15,6 +15,17 @@ def main() -> None:
     )
     inspect.add_argument("flake_uri", nargs="?", default=None)
 
+    bootstrap = sub.add_parser(
+        "bootstrap-rebuild",
+        help="First privileged switch: sudo -n, or print a one-shot TTY command.",
+    )
+    bootstrap.add_argument("flake_uri", nargs="?", default=None)
+    bootstrap.add_argument(
+        "--mode",
+        default="nixos",
+        choices=("nixos", "home-manager"),
+    )
+
     usage = sub.add_parser(
         "usage",
         help="Summarize local MCP tool usage from the JSONL usage log.",
@@ -45,6 +56,20 @@ def main() -> None:
             indent=2,
         )
         sys.stdout.write("\n")
+        return
+
+    if args.command == "bootstrap-rebuild":
+        from nix_agent.bootstrap import bootstrap_rebuild
+        from nix_agent.runner import strip_accounting
+
+        payload = strip_accounting(bootstrap_rebuild(args.flake_uri, mode=args.mode))
+        json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        status = payload.get("status")
+        if status == "needs_bootstrap":
+            raise SystemExit(2)
+        if status not in {"ok", "degraded"}:
+            raise SystemExit(1)
         return
 
     if args.command == "usage":

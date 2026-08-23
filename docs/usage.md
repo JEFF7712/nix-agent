@@ -122,8 +122,8 @@ Point your MCP host at:
 }
 ```
 
-See `examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
-`examples/opencode-mcp.json`.
+See `examples/codex-config.toml`, `examples/claude-code-mcp.json`,
+`examples/cursor-cli-config.json`, and `examples/opencode-mcp.json`.
 
 ## Companion skills
 
@@ -199,6 +199,12 @@ inspect-flake [flake_uri]` prints structured facts about a config repo as JSON
 and integrated Home Manager detection are best-effort presence/absence
 heuristics that may reflect unreadable or unmatched files as absence. The
 `skills/nix-agent-init/` skill invokes it during onboarding.
+
+The first privileged switch on a machine that does not yet have NOPASSWD
+is `nix-agent bootstrap-rebuild [flake_uri]`: `sudo -n` if a rule already
+matches, otherwise `status: "needs_bootstrap"` with `tty_command` (exit 2)
+to run once in a real terminal. After that generation, MCP `switch` uses
+`sudo -n` as usual.
 
 `summary.health` reports post-activation unit status. A switch that leaves
 units newly failed returns `status: "degraded"` (activation succeeded, the

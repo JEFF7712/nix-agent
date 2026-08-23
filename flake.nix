@@ -53,7 +53,7 @@
         siteSource = cleanSource ./site;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.10.0";
+          version = "0.11.0";
           format = "pyproject";
           src = packageSource;
           nativeBuildInputs =
@@ -116,6 +116,53 @@
           cp ${./docs/privileged-automation.md} "$out/docs/privileged-automation.md"
           cp ${./assets/banner.png} "$out/assets/banner.png"
         '';
+        nixosModuleSudoers =
+          let
+            eval = nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = [
+                self.nixosModules.default
+                {
+                  programs.nix-agent.enable = true;
+                  programs.nix-agent.package = nix-agent-package;
+                  programs.nix-agent.flake = ./.;
+                  programs.nix-agent.privilegedAutomation.enable = true;
+                  programs.nix-agent.privilegedAutomation.user = "alice";
+                  system.stateVersion = "25.11";
+                  boot.loader.grub.enable = false;
+                  fileSystems."/" = {
+                    device = "none";
+                    fsType = "tmpfs";
+                  };
+                }
+              ];
+            };
+            commands = lib.concatLists (
+              map (rule: map (c: c.command) rule.commands) (
+                lib.filter (rule: builtins.elem "alice" (rule.users or [ ])) eval.config.security.sudo.extraRules
+              )
+            );
+          in
+          pkgs.runCommand "nix-agent-nixos-module"
+            {
+              commands = pkgs.writeText "nix-agent-sudoers-commands" (lib.concatStringsSep "\n" commands);
+            }
+            ''
+              grep -q 'dry-activate --flake' "$commands"
+              grep -q 'switch --flake' "$commands"
+              grep -q 'switch --rollback' "$commands"
+              grep -q -- '--switch-generation' "$commands"
+              grep -q '/nix/var/nix/profiles/system/bin/switch-to-configuration switch' "$commands"
+              if grep -qE -- '--flake \*$' "$commands"; then
+                echo "wildcard flake ref in sudoers" >&2
+                exit 1
+              fi
+              if grep -F '/nix/store/*/bin/switch-to-configuration' "$commands"; then
+                echo "store-path switch-to-configuration wildcard" >&2
+                exit 1
+              fi
+              cp "$commands" "$out"
+            '';
         siteCheck = pkgs.stdenvNoCC.mkDerivation {
           pname = "nix-agent-site-check";
           version = "0.1.0";
@@ -157,6 +204,7 @@
         checks.default = nix-agent-package;
         checks.source-filter = sourceFilterContract;
         checks.site = siteCheck;
+        checks.nixos-module = nixosModuleSudoers;
 
         apps.default = {
           type = "app";

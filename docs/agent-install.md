@@ -122,14 +122,35 @@ If the user keeps host config in a separate file (e.g.
 
 ## 3. Rebuild
 
+This is the first privileged switch. Prefer non-interactive `sudo -n` so
+the installer does not hang on a password prompt. That succeeds when
+NOPASSWD already matches (a previous `privilegedAutomation` generation,
+or equivalent extraRules). Otherwise stop with one TTY command; after
+this generation activates, step 8's `sudo -n` check should pass.
+
 From `${FLAKE_DIR}`:
 
 ```bash
-sudo nixos-rebuild switch --flake .#${HOSTNAME}
+NIXOS_REBUILD="$(realpath "$(command -v nixos-rebuild)")"
+if sudo -n "$NIXOS_REBUILD" switch --flake "${FLAKE_DIR}#${HOSTNAME}"; then
+  echo "rebuild: ok (passwordless)"
+else
+  echo "First rebuild needs a TTY. Run this once in a real terminal, then continue from step 4:"
+  echo "sudo nixos-rebuild switch --flake ${FLAKE_DIR}#${HOSTNAME}"
+  exit 1
+fi
 ```
 
-If the rebuild fails, stop and surface the error to the user. Do not
-attempt to disable safety checks.
+If the binary is not on PATH yet (fresh clone of nix-agent before the
+module is in the system closure), the same probe is:
+
+```bash
+nix run github:JEFF7712/nix-agent -- bootstrap-rebuild "${FLAKE_DIR}#${HOSTNAME}"
+```
+
+Exit 0 means the switch ran. Exit 2 prints JSON with `tty_command`; run
+that in a terminal once. If the rebuild fails for any other reason, stop
+and surface the error. Do not attempt to disable safety checks.
 
 ---
 
@@ -236,7 +257,8 @@ File: `~/.config/opencode/opencode.json`. Merge under `mcp`:
 
 If the file already has an `mcp_servers`, `mcpServers`, or `mcp` block,
 merge, do not overwrite. Reference samples live in
-`examples/codex-config.toml`, `examples/claude-code-mcp.json`, and
+`examples/codex-config.toml`, `examples/claude-code-mcp.json`,
+`examples/cursor-cli-config.json`, and
 `examples/opencode-mcp.json` in the repo.
 
 ---
@@ -251,12 +273,12 @@ Lower trust (host prompts, sudo password) is an opt-down; see below.
 Do not ask. Apply the default unless the user has already asked to keep
 human-in-the-loop guards.
 
-**This step is mandatory for Claude Code.** For other hosts, translate
-the same high-trust intent (all seven MCP tools unprompted, plus
-narrowed Bash activation if that host has a Bash allowlist) into
-whatever permission mechanism the host provides. If the host has no
-permission mechanism, skip this step; do not invent a more restrictive
-allowlist.
+**This step is mandatory for Claude Code, Cursor CLI, and Codex.** For
+other hosts, translate the same high-trust intent (all seven MCP tools
+unprompted, plus narrowed shell activation if that host has a shell
+allowlist) into whatever permission mechanism the host provides. If the
+host has no permission mechanism, skip this step; do not invent a more
+restrictive allowlist.
 
 ### Claude Code
 
@@ -341,15 +363,69 @@ The intent:
   `/etc/nixos/**`; that path is intentionally **not** denied so the
   agent can edit it with its native file tools.
 
+### Cursor CLI
+
+File: `~/.cursor/cli-config.json` (create `{ "permissions": { "allow": [], "deny": [] } }`
+if it does not exist). Merge the following into `permissions.allow`,
+append missing entries, do not replace the array or change
+`approvalMode`. Substitute `${FLAKE_DIR}`. Do not use a wildcard flake
+ref. If `${FLAKE_DIR}` is unknown, omit the `Shell(sudo nixos-rebuild … --flake …)`
+rules; still allow the seven `Mcp(nix-agent, …)` tools.
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Mcp(nix-agent, build)",
+      "Mcp(nix-agent, diff)",
+      "Mcp(nix-agent, eval_config)",
+      "Mcp(nix-agent, locate_option)",
+      "Mcp(nix-agent, check)",
+      "Mcp(nix-agent, switch)",
+      "Mcp(nix-agent, generations)",
+      "Shell(sudo nixos-rebuild dry-activate --flake ${FLAKE_DIR}*)",
+      "Shell(sudo nixos-rebuild switch --flake ${FLAKE_DIR}*)",
+      "Shell(sudo nixos-rebuild switch --rollback)"
+    ]
+  }
+}
+```
+
+A copy with a placeholder path lives in `examples/cursor-cli-config.json`.
+Cursor IDE with unrestricted approval does not need this file; Cursor CLI
+in allowlist mode does.
+
+### Codex
+
+File: `$CODEX_HOME/config.toml` if `CODEX_HOME` is set, otherwise
+`~/.codex/config.toml`. Merge into the existing `[mcp_servers.nix-agent]`
+table from step 6; do not replace unrelated keys. High trust is
+`default_tools_approval_mode = "approve"` (trust every tool on this
+server, including `switch` / `generations`). Do not set a global
+`approval_policy = "never"` just for nix-agent.
+
+```toml
+[mcp_servers.nix-agent]
+command = "nix-agent"
+args = []
+default_tools_approval_mode = "approve"
+```
+
+A copy lives in `examples/codex-config.toml`. Codex shell policy is
+separate; MCP `switch` does not go through the shell allowlist.
+
 ### Lower trust (only if the user asked)
 
 Do not offer this unless the user asked to keep host prompts, a sudo
 password, or other human-in-the-loop guards.
 
-- **Host prompts on activation:** omit `mcp__nix-agent__switch`,
-  `mcp__nix-agent__generations`, and the Bash `nixos-rebuild`
-  dry-activate / switch / rollback allows (or remove them if already
-  present). Inspection, build, diff, and check stay unprompted.
+- **Host prompts on activation:** omit `mcp__nix-agent__switch` /
+  `mcp__nix-agent__generations` (Claude), `Mcp(nix-agent, switch)` /
+  `Mcp(nix-agent, generations)` (Cursor CLI), and the matching
+  Bash/Shell `nixos-rebuild` dry-activate / switch / rollback allows.
+  For Codex, set `default_tools_approval_mode = "prompt"` or omit
+  `switch` / `generations` from `enabled_tools`. Inspection, build,
+  diff, and check stay unprompted.
 - **Sudo password:** set `programs.nix-agent.privilegedAutomation.enable = false`
   (or omit that option) and skip the verify in step 8. Privileged MCP
   tools then return a `privilege` diagnosis (`sudo -n`) until a human
@@ -411,8 +487,9 @@ If anything goes wrong and the user wants to back out:
 2. Remove the `nix-agent` input.
 3. `sudo nixos-rebuild switch --flake .#${HOSTNAME}`
 4. Remove the MCP server entry from the host config file edited in step 6.
-5. Remove the `permissions` entries added in step 7 (default allow,
-   including `switch` / `generations` and the Bash `nixos-rebuild` rules).
+5. Remove the `permissions` entries added in step 7 (Claude
+   `mcp__nix-agent__*` / Bash rules, Cursor `Mcp(nix-agent, …)` / Shell
+   rules, Codex `default_tools_approval_mode`).
 6. Remove any leftover `security.sudo.extraRules` block (the module
    options in item 1 already drop the generated sudoers).
 7. Remove the skill directory installed in step 5.

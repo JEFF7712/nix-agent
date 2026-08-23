@@ -36,6 +36,8 @@ jobs:
       - name: Run flake checks
         if: matrix.check == 'nix-flake-check'
         run: nix flake check --system x86_64-linux
+        # Includes checks.nixos-module (NixOS sudoers eval). GitHub-hosted
+        # runners cannot kvm-boot a live nixos-rebuild switch.
 
       - name: Eval tiny-flake quoting fixture
         if: matrix.check == 'nix-flake-check'

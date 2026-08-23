@@ -7,6 +7,7 @@ def test_flake_exports_package_app_and_nixos_module():
     assert "packages.default" in flake_text
     assert "apps.default" in flake_text
     assert "meta.description" in flake_text
+    assert "checks.nixos-module" in flake_text
     assert "nixosModules.default" in flake_text
     assert "checks.default" in flake_text
     assert "pytestCheckHook" in flake_text
@@ -17,8 +18,10 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.10.0"' in pyproject_text
-    assert 'version = "0.10.0";' in flake_text
+    assert 'version = "0.11.0"' in pyproject_text
+    assert 'version = "0.11.0";' in flake_text
+    assert "## v0.11.0 - 2026-08-22" in changelog_text
+    assert "bootstrap-rebuild" in changelog_text
     assert "## v0.10.0 - 2026-08-22" in changelog_text
     assert "high trust" in changelog_text
     assert "## v0.9.1 - 2026-08-12" in changelog_text
@@ -91,3 +94,20 @@ def test_codex_example_uses_packaged_binary():
     example_text = Path("examples/codex-config.toml").read_text()
 
     assert 'command = "nix-agent"' in example_text
+    assert 'default_tools_approval_mode = "approve"' in example_text
+
+
+def test_cursor_example_allows_all_seven_mcp_tools():
+    example_text = Path("examples/cursor-cli-config.json").read_text()
+
+    for tool in (
+        "build",
+        "diff",
+        "eval_config",
+        "locate_option",
+        "check",
+        "switch",
+        "generations",
+    ):
+        assert f'"Mcp(nix-agent, {tool})"' in example_text
+    assert "Shell(sudo nixos-rebuild switch" in example_text
