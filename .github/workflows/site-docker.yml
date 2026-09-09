@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build-and-push:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab]
 
     steps:
       - name: Checkout
@@ -57,6 +57,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Log in to Local Registry
+        uses: docker/login-action@v4
+        with:
+          registry: registry.rupan.dev
+          username: publisher-nix-agent-site
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -74,6 +81,10 @@ jobs:
           context: .
           file: site/Dockerfile
           push: true
-          tags: ghcr.io/jeff7712/nix-agent-site:${{ steps.version.outputs.tag }}
+          tags: |
+            registry.rupan.dev/apps/nix-agent-site:${{ steps.version.outputs.tag }}
+            registry.rupan.dev/apps/nix-agent-site:latest
+            ghcr.io/jeff7712/nix-agent-site:${{ steps.version.outputs.tag }}
+            ghcr.io/jeff7712/nix-agent-site:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
