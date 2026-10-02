@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pytest
 
@@ -183,6 +182,118 @@ def test_attr_summary_in_event():
         kwargs={"attr": ["a", "b"]},
     )
     assert event["attr"] == {"count": 2, "attrs": ["a", "b"]}
+
+
+def test_detect_client_override_and_inference(monkeypatch):
+    monkeypatch.setenv(metrics.CLIENT_ENV, "my-agent")
+    assert metrics.detect_client() == "my-agent"
+
+    monkeypatch.delenv(metrics.CLIENT_ENV)
+    for key in (
+        "OPENCODE",
+        "OPENCODE_PID",
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CODEX_HOME",
+        "CURSOR_TEST",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("OPENCODE", "1")
+    assert metrics.detect_client() == "opencode"
+
+    monkeypatch.delenv("OPENCODE")
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert metrics.detect_client() == "claude-code"
+
+
+def test_event_carries_context_and_outcome(monkeypatch):
+    monkeypatch.delenv(metrics.CLIENT_ENV, raising=False)
+    event = metrics.event_from_call(
+        tool="switch",
+        duration_ms=2.5,
+        response={
+            "status": "failed",
+            "resolved_target": "flake#host",
+            "raw_bytes": 100,
+            "returned_bytes": 60,
+            "command": ["nixos-rebuild", "switch", "--flake", "flake#host"],
+            "first_error": "error: boom",
+            "failed_derivation": {"drv": "/nix/store/x.drv", "log_tail": "x"},
+            "output": "error: boom",
+        },
+        error=None,
+        kwargs={"mode": "nixos", "validate": True},
+    )
+    assert event["client"]
+    assert event["host"]
+    assert event["cwd"]
+    assert event["command"] == ["nixos-rebuild", "switch", "--flake", "flake#host"]
+    assert event["op"] == "nixos-rebuild switch --flake"
+    assert event["first_error"] == "error: boom"
+    assert event["failed_drv"] == "/nix/store/x.drv"
+    assert event["output_bytes"] == len(b"error: boom")
+    assert event["params"] == {"mode": "nixos", "validate": True}
+    assert event["bytes_saved"] == 40
+
+
+def test_summarize_groups_by_client():
+    events = [
+        {
+            "tool": "diff",
+            "status": "ok",
+            "client": "codex",
+            "ts": "2026-01-02T00:00:00Z",
+        },
+        {
+            "tool": "diff",
+            "status": "ok",
+            "client": "codex",
+            "ts": "2026-01-03T00:00:00Z",
+        },
+        {
+            "tool": "build",
+            "status": "ok",
+            "client": "opencode",
+            "ts": "2026-01-01T00:00:00Z",
+        },
+    ]
+    summary = metrics.summarize(events)
+    assert summary["by_client"] == {"codex": 2, "opencode": 1}
+    assert summary["first_ts"] == "2026-01-01T00:00:00Z"
+    assert summary["last_ts"] == "2026-01-03T00:00:00Z"
+
+
+def test_scan_shell_history_counts_patterns(tmp_path):
+    fish = tmp_path / "fish_history"
+    fish.write_text(
+        "- cmd: sudo nixos-rebuild switch --flake .#laptop\n"
+        "  when: 1700000000\n"
+        "- cmd: ls\n"
+        "  when: 1700000001\n"
+        "- cmd: nix build .#foo\n"
+        "  when: 1700000002\n"
+    )
+    bash = tmp_path / ".bash_history"
+    bash.write_text("statix check .\nls\n")
+    shell = metrics.scan_shell_history([fish, bash])
+    assert shell["shell_nix_commands"] == 3
+    assert shell["files_scanned"] == 2
+    assert shell["by_pattern"]["nixos-rebuild"] == 1
+    assert shell["by_pattern"]["nix build"] == 1
+    assert shell["by_pattern"]["statix"] == 1
+
+
+def test_format_comparison_reports_share():
+    text = metrics.format_comparison(
+        {"events": 3},
+        {
+            "shell_nix_commands": 1,
+            "files_scanned": 2,
+            "by_pattern": {"nixos-rebuild": 1},
+        },
+    )
+    assert "mcp tool calls: 3" in text
+    assert "mcp share: 75%" in text
 
 
 def test_usage_cli(monkeypatch, tmp_path, capsys):

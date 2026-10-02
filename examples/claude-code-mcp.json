@@ -2,7 +2,10 @@
   "mcpServers": {
     "nix-agent": {
       "command": "nix-agent",
-      "args": []
+      "args": [],
+      "env": {
+        "NIX_AGENT_USAGE_LOG": "1"
+      }
     }
   }
 }

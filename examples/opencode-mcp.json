@@ -2,7 +2,10 @@
   "mcp": {
     "nix-agent": {
       "type": "local",
-      "command": ["nix-agent"]
+      "command": ["nix-agent"],
+      "env": {
+        "NIX_AGENT_USAGE_LOG": "1"
+      }
     }
   }
 }

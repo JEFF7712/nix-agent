@@ -21,6 +21,27 @@ Division of labor:
 Default is apply: after a config change, `diff()` then `switch()` without
 waiting. Wait only when the user asked to preview or check, not activate.
 
+## Use MCP tools, not shell, for covered operations
+
+Shelling out for operations below re-pays the context cost this server
+exists to remove (raw `nix eval` on `environment.systemPackages` is ~13 KB
+the size guard collapses to ~400 bytes). Reach for Bash only for what has
+no tool: formatting (`nix fmt`), file edits, and remote-target deploys
+(`--target-host`, `--use-remote-sudo`), which privileged tools reject by
+design.
+
+| Instead of shell | Call |
+|---|---|
+| `nixos-rebuild switch/boot/test`, `home-manager switch` (local) | `switch()` |
+| `nix build ...toplevel`, `nix build ...activationPackage` | `build()` |
+| `nixos-rebuild dry-activate` (local) | `check("dry-activate")` |
+| `nix eval <config attr>` | `eval_config(attr)` (batch lists in one call) |
+| grepping the tree for where an option is set | `locate_option(attr)` |
+| `statix` / `deadnix` directly | `check("lint")` |
+| `nvd diff` / `nix store diff-closures` | `diff()` |
+| `nix log <drv>` after a failed build | read `failed_derivation.log_tail` |
+| `systemctl --failed` after a switch | read `summary.health` |
+
 ## Tool Surface
 
 Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
@@ -187,8 +208,12 @@ boilerplate.
 
 ## Hard Rules
 
+- Prefer the MCP tools over shell for every covered operation in the map
+above. Do not shell out to `nixos-rebuild`, `nix build`, `nix eval`,
+`statix`/`deadnix`, `nvd`, or `nix store diff-closures` when a tool covers
+it; a hook may block such commands and tell you which tool to call instead.
 - Never write secret payloads into config files; reference secrets via
-  sops-nix/agenix and only edit references.
+sops-nix/agenix and only edit references.
 - Never call `switch` when the user asked only to check or preview;
   `diff` is the preview. Otherwise the default is apply: switch after
   `diff()` without waiting.

@@ -53,18 +53,40 @@ call (no network) while dogfooding:
   `~/.local/state/nix-agent/usage.jsonl`)
 - override path with `NIX_AGENT_USAGE_LOG_PATH`
 
-Each event records the tool name, UTC timestamp, duration, envelope
-`status`, `resolved_target` when present, `raw_bytes` / `returned_bytes` /
-`bytes_saved` when byte accounting ran, plus a few request fields (`mode`,
-`flake_uri`, `level`, `action`, `attr`). Write failures are swallowed so
-logging never breaks a tool call.
+Each event records the tool name, UTC timestamp, duration, calling
+`client` (from `NIX_AGENT_CLIENT`, else inferred: opencode / claude-code /
+codex / cursor / parent process), `host`, `cwd`, and `session` when a known
+session env var is present, plus envelope `status`, `resolved_target` when
+present, `raw_bytes` / `returned_bytes` / `bytes_saved` when byte accounting
+ran, outcome details (`command` / `op`, `first_error`, `error_message`,
+`failed_drv`, `output_bytes`, `output_truncated`, `summary`), the full
+sanitized request `params`, and top-level copies of a few request fields
+(`mode`, `flake_uri`, `level`, `action`, `attr`). Write failures are
+swallowed so logging never breaks a tool call. Tag a custom client name
+with `NIX_AGENT_CLIENT=my-agent` alongside `NIX_AGENT_USAGE_LOG=1`.
 
 Summarize with:
 
 ```bash
 nix-agent usage
 nix-agent usage --json
+nix-agent usage --compare-shell
+nix-agent usage --compare-shell --json
 ```
+
+`--compare-shell` scans interactive shell histories (fish, bash, zsh)
+for direct nix commands (`nixos-rebuild`, `home-manager`, `nix
+build`/`eval`/`store`/`log`, `statix`, `deadnix`, `nixfmt`, `nvd`) and
+prints MCP tool calls vs shell commands with an MCP share. It only sees
+interactive shells, not agent Bash tool calls: it estimates *your* shell
+bypass. To measure *agent* bypass (agents shelling out instead of calling
+MCP tools), add a host-side hook that logs matching Bash invocations.
+Recipes: a Claude Code `PreToolUse` hook on `Bash` that appends matching
+commands to `$XDG_STATE_HOME/nix-agent/shell-bypass.jsonl`, a Codex
+`pre_tool_use` hook with the same match list, or an opencode
+`tool.execute.before` hook on `Bash`. Keep the match list identical to the
+`SHELL_PATTERNS` tuple in `src/nix_agent/metrics.py` so both sides count
+the same operations.
 
 ## Install
 

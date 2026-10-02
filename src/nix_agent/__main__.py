@@ -42,13 +42,18 @@ def main() -> None:
         action="store_true",
         help="Print the summary as JSON instead of text.",
     )
+    usage.add_argument(
+        "--compare-shell",
+        action="store_true",
+        help="Also scan interactive shell histories for direct nix commands "
+        "and compare against MCP tool calls.",
+    )
 
     args = parser.parse_args()
 
     if args.command == "inspect-flake":
-        from nix_agent.tools.inspect_flake import inspect_flake
-
         from nix_agent.runner import strip_accounting
+        from nix_agent.tools.inspect_flake import inspect_flake
 
         json.dump(
             strip_accounting(inspect_flake(args.flake_uri)),
@@ -77,13 +82,18 @@ def main() -> None:
 
         path = args.path if args.path is not None else metrics.log_path()
         summary = metrics.summarize(metrics.load_events(path))
+        shell = metrics.scan_shell_history() if args.compare_shell else None
         if args.json:
             payload = dict(summary)
             payload["path"] = str(path)
+            if shell is not None:
+                payload["shell"] = shell
             json.dump(payload, sys.stdout, indent=2)
             sys.stdout.write("\n")
         else:
             sys.stdout.write(metrics.format_summary(summary, path=path))
+            if shell is not None:
+                sys.stdout.write(metrics.format_comparison(summary, shell))
         return
 
     build_server().run(transport="stdio")

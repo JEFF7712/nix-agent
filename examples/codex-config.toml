@@ -2,3 +2,6 @@
 command = "nix-agent"
 args = []
 default_tools_approval_mode = "approve"
+
+[mcp_servers.nix-agent.env]
+NIX_AGENT_USAGE_LOG = "1"

@@ -18,8 +18,10 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.11.0"' in pyproject_text
-    assert 'version = "0.11.0";' in flake_text
+    assert 'version = "0.12.0"' in pyproject_text
+    assert 'version = "0.12.0";' in flake_text
+    assert "## v0.12.0 - 2026-10-02" in changelog_text
+    assert "compare-shell" in changelog_text
     assert "## v0.11.0 - 2026-08-22" in changelog_text
     assert "bootstrap-rebuild" in changelog_text
     assert "## v0.10.0 - 2026-08-22" in changelog_text

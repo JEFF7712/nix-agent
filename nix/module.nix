@@ -10,7 +10,7 @@ let
   cfg = config.programs.nix-agent;
   flakeDir = if cfg.flake == null then null else lib.removeSuffix "/" (toString cfg.flake);
   wrappedPackage =
-    if flakeDir == null then
+    if flakeDir == null && !cfg.usageLog.enable then
       cfg.package
     else
       pkgs.runCommand "${cfg.package.pname or "nix-agent"}-pinned"
@@ -21,7 +21,8 @@ let
         ''
           mkdir -p $out/bin
           makeWrapper ${cfg.package}/bin/nix-agent $out/bin/nix-agent \
-            --set NIX_AGENT_FLAKE ${lib.escapeShellArg flakeDir}
+            ${lib.optionalString (flakeDir != null) "--set NIX_AGENT_FLAKE ${lib.escapeShellArg flakeDir}"} \
+            ${lib.optionalString cfg.usageLog.enable "--set NIX_AGENT_USAGE_LOG 1"}
         '';
   nixosRebuild = "${pkgs.nixos-rebuild}/bin/nixos-rebuild";
   nixEnv = "${pkgs.nix}/bin/nix-env";
@@ -89,6 +90,17 @@ in
     description = ''
       User granted NOPASSWD for nix-agent privileged operations.
       Required when programs.nix-agent.privilegedAutomation.enable is true.
+    '';
+  };
+
+  options.programs.nix-agent.usageLog.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = false;
+    description = ''
+      Set NIX_AGENT_USAGE_LOG=1 on the wrapped nix-agent binary so every
+      MCP tool call appends one JSON line to
+      $XDG_STATE_HOME/nix-agent/usage.jsonl. Summarize with
+      `nix-agent usage` (add --compare-shell for MCP vs shell counts).
     '';
   };
 

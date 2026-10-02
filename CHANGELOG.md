@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.12.0 - 2026-10-02
+
+- Usage events now record the calling `client` (from `NIX_AGENT_CLIENT`,
+  else inferred: opencode / claude-code / codex / cursor / parent process),
+  `host`, `cwd`, `session`, the full sanitized request `params`, and
+  outcome details (`command` / `op`, `first_error`, `error_message`,
+  `failed_drv`, `output_bytes`, truncation flag). `nix-agent usage`
+  groups by client with a time span.
+- `nix-agent usage --compare-shell` scans interactive shell histories
+  (fish, bash, zsh) for direct nix commands and reports MCP tool calls
+  vs shell commands with an MCP share, for measuring adoption vs
+  shell bypass.
+- Examples enable the usage log by default (`NIX_AGENT_USAGE_LOG=1`),
+  and the NixOS module grew `programs.nix-agent.usageLog.enable` to set
+  it on the wrapped binary.
+- The companion skill maps shell commands to their MCP tool (`nixos-rebuild`
+  switch to `switch()`, `nix eval` to `eval_config()`, ...),
+  with a prefer-MCP hard rule.
+
 ## v0.11.0 - 2026-08-22
 
 - First rebuild is `sudo -n` when NOPASSWD already matches; otherwise
