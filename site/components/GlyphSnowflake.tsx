@@ -25,11 +25,14 @@ import { startGlyphRenderLifecycle } from "../lib/glyphRenderLifecycle";
 import { validateAndRevealGlyphRenderer } from "../lib/shaderValidation";
 import {
   type DensityTier,
+  SNOWFLAKE_BASE_DISTANCE,
+  SNOWFLAKE_FOV_DEGREES,
   buildAgentFacePoints,
   buildGlyphPointData,
   concatGlyphPointData,
   seededNoise,
   selectDensityTier,
+  snowflakeCameraDistance,
   snowflakeHorizontalOffset,
 } from "../lib/snowflakeGeometry";
 import { fragmentShader, vertexShader } from "../lib/shaders";
@@ -172,8 +175,8 @@ export function GlyphSnowflake() {
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 10);
-        camera.position.z = 3.15;
+        const camera = new THREE.PerspectiveCamera(SNOWFLAKE_FOV_DEGREES, 1, 0.1, 10);
+        camera.position.z = SNOWFLAKE_BASE_DISTANCE;
         const geometry = new THREE.BufferGeometry();
         let tier = selectDensityTier(host.clientWidth, deviceMemory());
         replaceGeometryAttributes(geometry, mask, tier);
@@ -244,11 +247,12 @@ export function GlyphSnowflake() {
           const height = Math.max(host.clientHeight, 1);
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
+          camera.position.z = snowflakeCameraDistance(width, height);
           camera.updateProjectionMatrix();
           points.position.x = snowflakeHorizontalOffset(width);
           uniforms.uPointScale.value = Math.min(width, height) * 0.038;
           uniforms.uResolution.value.set(width, height);
-          const face = faceCenterNdc(width);
+          const face = faceCenterNdc(width, height, camera.position.z);
           uniforms.uFaceNdc.value.set(face.x, face.y);
           const nextTier = selectDensityTier(width, deviceMemory());
           if (shouldRebuildDensity(tier, nextTier)) {
@@ -269,7 +273,11 @@ export function GlyphSnowflake() {
             uniforms.uAnger.value = 0;
             return;
           }
-          const face = faceCenterNdc(host.clientWidth);
+          const face = faceCenterNdc(
+            host.clientWidth,
+            host.clientHeight,
+            camera.position.z,
+          );
           const pointerAnger = faceAngerFromPointer({
             pointerX,
             pointerY,
@@ -321,7 +329,11 @@ export function GlyphSnowflake() {
             uniforms.uPulseAges.value[slot] = 0;
             uniforms.uPulseScales.value[slot] = scale;
           }
-          const face = faceCenterNdc(host.clientWidth);
+          const face = faceCenterNdc(
+            host.clientWidth,
+            host.clientHeight,
+            camera.position.z,
+          );
           const aspect = Math.max(host.clientWidth, 1) / Math.max(host.clientHeight, 1);
           if (
             shouldTriggerWince({

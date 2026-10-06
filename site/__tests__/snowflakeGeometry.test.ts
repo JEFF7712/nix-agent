@@ -6,11 +6,16 @@ import {
   AGENT_MOUTH,
   AGENT_PUPIL,
   DENSITY_TIERS,
+  SNOWFLAKE_BASE_DISTANCE,
+  SNOWFLAKE_EDGE_LIMIT,
+  SNOWFLAKE_FLAKE_RADIUS,
+  SNOWFLAKE_FOV_DEGREES,
   buildAgentFacePoints,
   buildGlyphPointData,
   concatGlyphPointData,
   seededNoise,
   selectDensityTier,
+  snowflakeCameraDistance,
   snowflakeHorizontalOffset,
 } from "../lib/snowflakeGeometry";
 import { GLYPH_CHARACTERS } from "../lib/glyphCharacters";
@@ -32,6 +37,38 @@ describe("snowflake framing", () => {
   it("centers the mobile composition and shifts the desktop composition right", () => {
     expect(snowflakeHorizontalOffset(390)).toBe(0);
     expect(snowflakeHorizontalOffset(1280)).toBe(0.72);
+  });
+
+  it("keeps ultrawide compositions at the base camera distance", () => {
+    expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
+  });
+
+  it("dollies back on narrower aspects so the flake edge stays inside NDC", () => {
+    const sizes: Array<[number, number]> = [
+      [2560, 1080],
+      [1920, 1080],
+      [1512, 859],
+      [1280, 800],
+      [1024, 768],
+      [390, 844],
+    ];
+    const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
+    for (const [width, height] of sizes) {
+      const offset = snowflakeHorizontalOffset(width);
+      const distance = snowflakeCameraDistance(width, height);
+      const aspect = width / height;
+      const halfWidth = tanHalfFov * distance * aspect;
+      expect(distance).toBeGreaterThanOrEqual(SNOWFLAKE_BASE_DISTANCE);
+      expect(offset + SNOWFLAKE_FLAKE_RADIUS).toBeLessThanOrEqual(
+        halfWidth * SNOWFLAKE_EDGE_LIMIT + 1e-9,
+      );
+    }
+  });
+
+  it("falls back to the base distance for invalid viewports", () => {
+    expect(snowflakeCameraDistance(0, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(1280, 0)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(Number.NaN, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
   });
 });
 

@@ -25,8 +25,31 @@ export function selectDensityTier(
   return DENSITY_TIERS.high;
 }
 
+export const SNOWFLAKE_FOV_DEGREES = 34;
+export const SNOWFLAKE_BASE_DISTANCE = 3.15;
+export const SNOWFLAKE_DESIRED_OFFSET = 0.72;
+export const SNOWFLAKE_FLAKE_RADIUS = 1.06;
+export const SNOWFLAKE_EDGE_LIMIT = 0.96;
+
 export function snowflakeHorizontalOffset(viewportWidth: number): number {
-  return viewportWidth < 768 ? 0 : 0.72;
+  return viewportWidth < 768 ? 0 : SNOWFLAKE_DESIRED_OFFSET;
+}
+
+/** Dolly the camera back just enough that offset + flake radius stays inside NDC. */
+export function snowflakeCameraDistance(viewportWidth: number, viewportHeight: number): number {
+  if (
+    !Number.isFinite(viewportWidth) ||
+    !Number.isFinite(viewportHeight) ||
+    viewportWidth <= 0 ||
+    viewportHeight <= 0
+  ) {
+    return SNOWFLAKE_BASE_DISTANCE;
+  }
+  const desired = snowflakeHorizontalOffset(viewportWidth);
+  const aspect = viewportWidth / viewportHeight;
+  const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
+  const needed = (desired + SNOWFLAKE_FLAKE_RADIUS) / (tanHalfFov * aspect * SNOWFLAKE_EDGE_LIMIT);
+  return Math.max(SNOWFLAKE_BASE_DISTANCE, needed);
 }
 
 export function seededNoise(x: number, y: number, seed: number): number {
