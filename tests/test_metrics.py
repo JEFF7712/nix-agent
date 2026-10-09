@@ -283,6 +283,24 @@ def test_scan_shell_history_counts_patterns(tmp_path):
     assert shell["by_pattern"]["statix"] == 1
 
 
+def test_scan_shell_history_ignores_path_false_positives(tmp_path):
+    fish = tmp_path / "fish_history"
+    fish.write_text(
+        "- cmd: cd modules/home-manager/terminals/\n"
+        "- cmd: git rm --cached modules/home-manager/configs/rofi -f\n"
+        "- cmd: git commit -m \"Add rofi config to home-manager\"\n"
+        "- cmd: sudo pkill -f 'nixos-rebuild.*path:/home/rupan/nixos'\n"
+        "- cmd: z home-manager\n"
+        "- cmd: home-manager switch --flake .#laptop\n"
+        "- cmd: nix run github:astro/deadnix\n"
+    )
+    shell = metrics.scan_shell_history([fish])
+    assert shell["shell_nix_commands"] == 2
+    assert shell["by_pattern"]["home-manager"] == 1
+    assert shell["by_pattern"]["deadnix"] == 1
+    assert "nixos-rebuild" not in shell["by_pattern"]
+
+
 def test_format_comparison_reports_share():
     text = metrics.format_comparison(
         {"events": 3},

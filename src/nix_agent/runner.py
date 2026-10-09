@@ -116,16 +116,28 @@ def run(
 
 def extract_first_error(output: str) -> str | None:
     """First line of Nix stderr that looks like an error; the actionable
-    signal in an otherwise verbose log."""
+    signal in an otherwise verbose log.
+
+    If the error line is a bare 'error:' header with no inline message
+    (common in multiline Nix diagnostics and evaluation traces), this looks
+    for a subsequent concrete error line or formats the next non-empty line.
+    """
     if not output:
         return None
-    for line in output.splitlines():
+    lines = output.splitlines()
+    _ERROR_STARTS = ("error:", "error (", "error[")
+    for i, line in enumerate(lines):
         stripped = line.strip()
-        if (
-            stripped.startswith("error:")
-            or stripped.startswith("error (")
-            or stripped.startswith("error[")
-        ):
+        if stripped.startswith(_ERROR_STARTS):
+            if stripped == "error:":
+                for next_line in lines[i + 1 :]:
+                    next_stripped = next_line.strip()
+                    if next_stripped.startswith(_ERROR_STARTS) and next_stripped != "error:":
+                        return next_stripped
+                for next_line in lines[i + 1 :]:
+                    next_stripped = next_line.strip()
+                    if next_stripped:
+                        return f"error: {next_stripped}"
             return stripped
     return None
 

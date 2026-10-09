@@ -1,7 +1,13 @@
 import json
 
 from nix_agent import hostattr, runner
-from nix_agent.target import TargetError, attr_candidates, config_attr, resolve_target
+from nix_agent.target import (
+    Target,
+    TargetError,
+    attr_candidates,
+    config_attr,
+    resolve_target,
+)
 
 
 def _missing_config_attr(output: str) -> bool:
@@ -88,6 +94,7 @@ def _eval_one(
         tried.append(candidate)
         envelope = _eval_installable(target, candidate, attr)
         if envelope["status"] == "ok":
+            envelope["_candidate"] = candidate
             return envelope
         failed = envelope
         output = str(envelope.get("output") or "")
@@ -149,6 +156,14 @@ def eval_config(
         raw_total = 0
         for one in attr:
             envelope = _eval_one(target, candidates, one, mode=mode)
+            if envelope.get("status") == "unknown_host":
+                return envelope
+            winning = envelope.pop("_candidate", None)
+            if winning and not target.attr:
+                target = Target(
+                    flake_dir=target.flake_dir, attr=str(winning), mode=target.mode
+                )
+                candidates = [str(winning)]
             raw_total += envelope.get("raw_bytes") or 0
             entry: dict[str, object] = {
                 "attr": one,

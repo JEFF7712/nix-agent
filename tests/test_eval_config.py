@@ -269,6 +269,64 @@ def test_eval_batched_envelope_accounted(monkeypatch):
     assert out["returned_bytes"] > 0
 
 
+def test_eval_batched_unknown_host_early_exit(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"h1": {}, "h2": {}}}),
+                command=argv,
+            )
+        return _result(
+            False,
+            stderr="error: flake does not provide attribute 'nixosConfigurations.\"wrong\"'",
+            command=argv,
+        )
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(["attr1", "attr2", "attr3"], flake_uri="/x#wrong")
+    assert out["status"] == "unknown_host"
+    assert out["hosts"] == ["h1", "h2"]
+    # Early exit must stop after first attr instead of evaluating attr2 and attr3
+    assert len([c for c in calls if "eval" in c]) == 1
+
+
+def test_eval_batched_locks_winning_host(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "flake" in argv and "show" in argv:
+            return _result(
+                True,
+                stdout=json.dumps({"nixosConfigurations": {"host-b": {}}}),
+                command=argv,
+            )
+        if 'nixosConfigurations."guess"' in argv[2]:
+            return _result(
+                False,
+                stderr="error: flake does not provide attribute 'nixosConfigurations.\"guess\"'",
+                command=argv,
+            )
+        return _result(True, stdout='"val"\n', command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["guess"])
+    out = eval_config(["attr1", "attr2"], flake_uri="/x")
+    assert out["status"] == "ok"
+    assert len(out["results"]) == 2
+    # First attr tried guess, failed, queried show, then tried host-b.
+    # Second attr must directly query host-b without re-trying guess or show!
+    eval_calls = [c for c in calls if "eval" in c]
+    assert len(eval_calls) == 3
+    assert 'nixosConfigurations."guess"' in eval_calls[0][2]
+    assert 'nixosConfigurations."host-b"' in eval_calls[1][2]
+    assert 'nixosConfigurations."host-b"' in eval_calls[2][2]
+
+
 def test_eval_unique_host_fallback(monkeypatch):
     calls = []
 

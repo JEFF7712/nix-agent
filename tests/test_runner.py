@@ -97,6 +97,36 @@ def test_extract_first_error():
     )
 
 
+def test_extract_first_error_bare_header_nested_error():
+    output = (
+        "error:\n"
+        "       … while selecting an attribute\n"
+        "         at «string»:1:15:\n"
+        "            1| let x = 1; in x.foo\n"
+        "             |               ^\n\n"
+        "       error: expected a set but found an integer: 1\n"
+    )
+    assert (
+        runner.extract_first_error(output)
+        == "error: expected a set but found an integer: 1"
+    )
+
+
+def test_extract_first_error_bare_header_indented_message():
+    output = (
+        "error:\n"
+        "       cannot build derivation '/nix/store/xyz.drv': 1 dependencies couldn't be built\n"
+    )
+    assert (
+        runner.extract_first_error(output)
+        == "error: cannot build derivation '/nix/store/xyz.drv': 1 dependencies couldn't be built"
+    )
+
+
+def test_extract_first_error_bare_header_only():
+    assert runner.extract_first_error("error:\n") == "error:"
+
+
 def test_envelope_failure_includes_first_error():
     result = runner.RunResult(
         ok=False, command=["nix", "eval"], stdout="", stderr="error: nope"

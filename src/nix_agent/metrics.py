@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import time
 from collections.abc import Mapping
@@ -460,6 +461,34 @@ def shell_history_paths() -> list[Path]:
     return [p for p in candidates if p.is_file()]
 
 
+def compile_shell_pattern(pattern: str) -> re.Pattern:
+    """Build a regex matching command execution of `pattern` in shell history.
+    Avoids false positives from directory paths (e.g. `modules/home-manager/...`)
+    or arguments to other tools (e.g. `git`, `cd`, `rm`)."""
+    prefix = r"(?:^|[;&|(`]\s*)"
+    wrappers = r"(?:(?:sudo|doas|exec|env|time|nohup)(?:\s+-[^\s]+)*\s+)*"
+    if " " in pattern:
+        parts = pattern.split()
+        pattern_str = (
+            rf"{prefix}{wrappers}(?:[^\s;&|()]*/)?{re.escape(parts[0])}"
+            rf"(?:\s+-[^\s]+)*\s+{re.escape(parts[1])}(?=[\s;&|)`']|$)"
+        )
+    else:
+        direct = (
+            rf"{prefix}{wrappers}(?:[^\s;&|()]*/)?{re.escape(pattern)}"
+            rf"(?=[\s;&|)`']|$)"
+        )
+        nix_run = (
+            rf"{prefix}{wrappers}(?:[^\s;&|()]*/)?nix(?:\s+-[^\s]+)*\s+run"
+            rf"\s+[^\s;&|]*[#/]{re.escape(pattern)}(?=[\s;&|)`']|$)"
+        )
+        pattern_str = rf"(?:{direct})|(?:{nix_run})"
+    return re.compile(pattern_str)
+
+
+_COMPILED_SHELL_PATTERNS = {p: compile_shell_pattern(p) for p in SHELL_PATTERNS}
+
+
 def scan_shell_history(paths: list[Path] | None = None) -> dict[str, Any]:
     """Count shell-history lines that overlap nix-agent's tool surface.
 
@@ -482,8 +511,8 @@ def scan_shell_history(paths: list[Path] | None = None) -> dict[str, Any]:
             files += 1
         for command in commands:
             matched = False
-            for pattern in SHELL_PATTERNS:
-                if pattern in command:
+            for pattern, regex in _COMPILED_SHELL_PATTERNS.items():
+                if regex.search(command):
                     by_pattern[pattern] += 1
                     matched = True
             if matched:

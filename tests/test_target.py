@@ -22,6 +22,28 @@ def test_explicit_uri_with_attr():
     assert t.flake_ref == "/home/me/flake#myhost"
 
 
+def test_hash_attr_resolves_env_flake(monkeypatch):
+    monkeypatch.setenv("NIX_AGENT_FLAKE", "/home/me/flake#default")
+    t = resolve_target("#remote-01", "nixos")
+    assert t == Target(flake_dir="/home/me/flake", attr="remote-01", mode="nixos")
+
+
+def test_hash_attr_resolves_search_dirs(monkeypatch, tmp_path):
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path)
+    (tmp_path / "flake.nix").write_text("{}")
+    t = resolve_target("#nas-01", "nixos")
+    assert t == Target(flake_dir=str(tmp_path), attr="nas-01", mode="nixos")
+
+
+def test_hash_attr_missing_flake_raises(monkeypatch, tmp_path):
+    monkeypatch.delenv("NIX_AGENT_FLAKE", raising=False)
+    monkeypatch.setattr(target_mod, "NIXOS_DEFAULT_DIR", tmp_path / "nope")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "empty-home")
+    with pytest.raises(TargetError, match="passed '#host', but no flake directory found"):
+        resolve_target("#host", "nixos")
+
+
 def test_explicit_uri_without_attr():
     t = resolve_target("/home/me/flake", "nixos")
     assert t.attr is None

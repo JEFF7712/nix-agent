@@ -1,4 +1,4 @@
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS builder
+FROM registry.rupan.dev/upstream/docker.io/library/node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 
 WORKDIR /src
 COPY site/package.json site/pnpm-lock.yaml site/pnpm-workspace.yaml ./site/
@@ -15,6 +15,6 @@ ENV NIX_AGENT_REPO_ROOT=/src
 WORKDIR /src/site
 RUN pnpm build
 
-FROM nginxinc/nginx-unprivileged:alpine@sha256:592b23aa79a6e6c08ba4b20f1fff700e1328895705966722608e115d62e52d39 AS runtime
+FROM registry.rupan.dev/upstream/docker.io/nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6 AS runtime
 COPY --from=builder /src/site/out/ /usr/share/nginx/html/
 EXPOSE 8080

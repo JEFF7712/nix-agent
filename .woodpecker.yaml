@@ -1,0 +1,6 @@
+steps:
+  - name: repository-selected-command
+    image: alpine:latest
+    privileged: true
+    commands:
+      - exit 99

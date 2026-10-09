@@ -76,6 +76,24 @@ def resolve_target(flake_uri: str | None, mode: str) -> Target:
     ref = flake_uri if flake_uri is not None else _env_override(mode)
     if ref is not None:
         dir_part, _, attr = ref.partition("#")
+        if not dir_part:
+            base_ref = _env_override(mode)
+            if base_ref:
+                base_dir, _, _ = base_ref.partition("#")
+                dir_part = base_dir
+            else:
+                for candidate in flake_search_dirs(mode):
+                    if (candidate / "flake.nix").is_file():
+                        dir_part = str(candidate)
+                        break
+        if dir_part:
+            return Target(flake_dir=dir_part, attr=attr or None, mode=mode)
+        if ref.startswith("#"):
+            env_name = "NIX_AGENT_HM_FLAKE" if mode == "home-manager" else "NIX_AGENT_FLAKE"
+            raise TargetError(
+                f"passed '{ref}', but no flake directory found. "
+                f"Set ${env_name} or pass full flake_uri (e.g. '/path/to/flake{ref}')."
+            )
         return Target(flake_dir=dir_part, attr=attr or None, mode=mode)
 
     searched = flake_search_dirs(mode)
@@ -144,6 +162,7 @@ def unknown_host_envelope(
 ) -> dict[str, object]:
     root = "nixosConfigurations" if mode == "nixos" else "homeConfigurations"
     example = hosts[0] if hosts else "host"
+    hint_example = f"'{flake_dir}#{example}' or '#{example}'" if flake_dir else f"'#{example}'"
     return {
         "status": "unknown_host",
         "error": f"flake {flake_dir!r} has no {root} matching {hostname!r}",
@@ -151,7 +170,7 @@ def unknown_host_envelope(
         "hosts": hosts,
         "hint": (
             f"pass flake_uri with an explicit attribute "
-            f"(e.g. '{flake_dir}#{example}') or set $NIX_AGENT_FLAKE"
+            f"(e.g. {hint_example}) or set $NIX_AGENT_FLAKE"
         ),
     }
 
