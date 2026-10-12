@@ -7,22 +7,22 @@ import { ALL_DOC_PAGES } from "../lib/docsCatalog";
 
 describe("DocsSidebar", () => {
   it("renders a link for every doc page with the correct href", () => {
-    render(<DocsSidebar currentHref="/docs" />);
+    render(<DocsSidebar currentHref="/docs/" />);
 
-    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/docs");
-    expect(screen.getByRole("link", { name: "Usage" })).toHaveAttribute("href", "/docs/usage");
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/docs/");
+    expect(screen.getByRole("link", { name: "Usage" })).toHaveAttribute("href", "/docs/usage/");
     expect(screen.getByRole("link", { name: "Agent install" })).toHaveAttribute(
       "href",
-      "/docs/agent-install",
+      "/docs/agent-install/",
     );
     expect(screen.getByRole("link", { name: "Privileged automation" })).toHaveAttribute(
       "href",
-      "/docs/privileged-automation",
+      "/docs/privileged-automation/",
     );
   });
 
   it("renders every ALL_DOC_PAGES entry", () => {
-    render(<DocsSidebar currentHref="/docs" />);
+    render(<DocsSidebar currentHref="/docs/" />);
 
     for (const page of ALL_DOC_PAGES) {
       expect(screen.getByRole("link", { name: page.title })).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe("DocsSidebar", () => {
   });
 
   it("marks the current page's link as active", () => {
-    render(<DocsSidebar currentHref="/docs/usage" />);
+    render(<DocsSidebar currentHref="/docs/usage/" />);
 
     const activeLink = screen.getByRole("link", { name: "Usage" });
     const overviewLink = screen.getByRole("link", { name: "Overview" });
@@ -43,7 +43,7 @@ describe("DocsSidebar", () => {
 describe("DocsArticle", () => {
   const page = {
     slug: "usage",
-    href: "/docs/usage",
+    href: "/docs/usage/",
     title: "Usage",
     sourcePath: "docs/usage.md",
     githubEditUrl: "https://github.com/JEFF7712/nix-agent/edit/main/docs/usage.md",

@@ -5,7 +5,7 @@ describe("docsCatalog", () => {
   it("publishes overview plus the three public docs in sidebar order", () => {
     expect(OVERVIEW_PAGE).toMatchObject({
       slug: null,
-      href: "/docs",
+      href: "/docs/",
       title: "Overview",
       sourcePath: "README.md",
       githubEditUrl: "https://github.com/JEFF7712/nix-agent/edit/main/README.md",

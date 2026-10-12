@@ -33,12 +33,12 @@ describe("docs markdown pipeline", () => {
     const { page, html } = await loadDocHtml("usage");
     expect(page.title).toBe("Usage");
     expect(html).toContain("nix-agent usage");
-    expect(html).toContain('href="/docs/agent-install"');
+    expect(html).toContain('href="/docs/agent-install/"');
   });
 
   it("renders overview from README and points the banner at /banner.png", async () => {
     const { html } = await loadDocHtml(null);
     expect(html).toContain('src="/banner.png"');
-    expect(html).toContain('href="/docs/usage#install"');
+    expect(html).toContain('href="/docs/usage/#install"');
   });
 });

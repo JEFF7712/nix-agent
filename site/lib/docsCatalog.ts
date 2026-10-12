@@ -11,7 +11,7 @@ const githubEdit = (sourcePath: string) =>
 
 export const OVERVIEW_PAGE: DocPage = {
   slug: null,
-  href: "/docs",
+  href: "/docs/",
   title: "Overview",
   sourcePath: "README.md",
   githubEditUrl: githubEdit("README.md"),
@@ -20,21 +20,21 @@ export const OVERVIEW_PAGE: DocPage = {
 export const DOC_PAGES: DocPage[] = [
   {
     slug: "usage",
-    href: "/docs/usage",
+    href: "/docs/usage/",
     title: "Usage",
     sourcePath: "docs/usage.md",
     githubEditUrl: githubEdit("docs/usage.md"),
   },
   {
     slug: "agent-install",
-    href: "/docs/agent-install",
+    href: "/docs/agent-install/",
     title: "Agent install",
     sourcePath: "docs/agent-install.md",
     githubEditUrl: githubEdit("docs/agent-install.md"),
   },
   {
     slug: "privileged-automation",
-    href: "/docs/privileged-automation",
+    href: "/docs/privileged-automation/",
     title: "Privileged automation",
     sourcePath: "docs/privileged-automation.md",
     githubEditUrl: githubEdit("docs/privileged-automation.md"),

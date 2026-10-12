@@ -36,7 +36,7 @@ export function rewriteDocsHref(href: string, sourcePath: string): string {
   const repoPath = resolveRepoRelative(pathPart, sourcePath);
 
   if (repoPath === "README.md") {
-    return `/docs${hash}`;
+    return `/docs/${hash}`;
   }
 
   const publishedPage = findPublishedPage(repoPath);

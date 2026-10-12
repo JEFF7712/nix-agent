@@ -3,11 +3,11 @@ import { rewriteDocsHref, rewriteDocsSrc } from "../lib/docsLinks";
 
 describe("rewriteDocsHref", () => {
   it("maps published markdown paths to site routes and preserves hashes", () => {
-    expect(rewriteDocsHref("docs/usage.md", "README.md")).toBe("/docs/usage");
-    expect(rewriteDocsHref("docs/usage.md#install", "README.md")).toBe("/docs/usage#install");
-    expect(rewriteDocsHref("agent-install.md", "docs/usage.md")).toBe("/docs/agent-install");
+    expect(rewriteDocsHref("docs/usage.md", "README.md")).toBe("/docs/usage/");
+    expect(rewriteDocsHref("docs/usage.md#install", "README.md")).toBe("/docs/usage/#install");
+    expect(rewriteDocsHref("agent-install.md", "docs/usage.md")).toBe("/docs/agent-install/");
     expect(rewriteDocsHref("privileged-automation.md", "docs/usage.md")).toBe(
-      "/docs/privileged-automation",
+      "/docs/privileged-automation/",
     );
   });
 

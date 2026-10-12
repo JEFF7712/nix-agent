@@ -7,7 +7,7 @@ const links = [
   },
   {
     external: false,
-    href: "/docs",
+    href: "/docs/",
     name: "Documentation",
     path: "M5 3h10l4 4v14H5V3Zm2 2v14h10V8h-3V5H7Zm2 7h6v2H9v-2Zm0 4h6v2H9v-2Z",
   },

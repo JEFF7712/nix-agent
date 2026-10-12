@@ -21,7 +21,7 @@ describe("IconLinks", () => {
     render(<IconLinks />);
 
     const link = screen.getByRole("link", { name: "Documentation" });
-    expect(link).toHaveAttribute("href", "/docs");
+    expect(link).toHaveAttribute("href", "/docs/");
     expect(link).toHaveAttribute("title", "Documentation");
     expect(link).not.toHaveAttribute("target");
     expect(link).not.toHaveAttribute("rel");
