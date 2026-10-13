@@ -35,6 +35,8 @@ Or do it by hand, see [docs/usage.md](docs/usage.md#install).
 - [skills/nix-agent/SKILL.md](skills/nix-agent/SKILL.md): companion workflow skill
 - [skills/nix-agent-init/SKILL.md](skills/nix-agent-init/SKILL.md): repo onboarding skill
 
+The published documentation pages are generated directly from these Markdown files.
+
 ---
 
 The nix-agent logo adapts the Nix snowflake from [NixOS/nixos-artwork](https://github.com/NixOS/nixos-artwork), licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
