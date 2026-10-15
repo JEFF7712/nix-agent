@@ -2,6 +2,13 @@
 
 ## Test walkthroughs for the new tool surface
 
+### Tool availability and remote fallback
+
+- Inspect the host's tool catalog for the seven nix-agent tools. Verify that an installed skill or running process is not reported as proof of callable tools.
+- With tools absent, confirm that the agent reports the availability gap and follows the repository's permitted shell workflow. A hook requiring MCP must be handled through host registration.
+- For a repository-supported remote deployment, retain the running and profile realpaths and failed-unit baseline. Verify the copied closure, profile update, activation outcome, warnings, runtime behavior, and recovery reference separately.
+- Confirm that an empty package diff between different closure paths is reported as no package changes, without claiming identical configuration or unchanged service behavior.
+
 ### Evaluation and discovery
 
 - Call `eval_config("environment.systemPackages")` to read the live system's resolved package list.
@@ -30,7 +37,7 @@
 
 - Touch a `.nix` file (e.g., syntax error or eval error).
 - Call `check("dry-build")` and confirm `first_error` surfaces the actionable error line, and `error_detail` (`{message, file, line, column, trace}`) is present when the output is an eval error.
-- Call `build()` on a working config and verify it completes with a store path.
+- Call `build()` on a working config, keep `job_id`, and poll `build(job_id=...)` until it completes with a store path. Verify live log tails while running and reconnect after an MCP server restart to retrieve the same job.
 - Introduce a builder failure (a package whose build phase exits non-zero) and confirm the failed `build()` carries `failed_derivation` (`{drv, log_tail}`) instead of forcing a separate `nix log`.
 
 ### Diffing and switching

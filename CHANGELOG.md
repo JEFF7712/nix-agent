@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.13.0 - 2026-10-14
+
+- **Build API change:** `build(flake_uri?, mode?)` now starts a persistent
+  background job and returns `job_id` promptly. Poll `build(job_id=...)`
+  for bounded live log tails and completion, including `store_path` on
+  success and structured builder diagnostics on failure. Running jobs
+  survive MCP disconnects and server process restarts; concurrent starts
+  for the same target reuse the running job.
+- **Evaluation status change:** mixed `eval_config` batches now return
+  `partial`, with `succeeded_count`, `failed_count`, and the first available
+  `first_error`. Successful attributes remain available in `results`.
+  Text fallback and truncated values include guidance to request narrower
+  leaf attributes.
+- Successful build/check responses return a short output tail with
+  `log_truncated` and private `log_paths` to complete local logs. Failed
+  calls retain capped diagnostics. Command timeouts preserve partial output.
+- Switch summaries expose a bounded, deduplicated `warnings` list from
+  recognized log messages, separately from systemd health.
+- Workflow guidance checks tool availability, respects repository gates
+  and fleet deployment, documents remote activation and rollback
+  bookkeeping, and explains empty package diffs. A reusable session
+  feedback prompt records version, dates, and availability evidence;
+  local reports stay outside version control and package inputs.
+- Nix site checks use the canonical npm lockfile and run npm validation
+  offline with lockfile-pinned dependencies.
+
 ## v0.12.0 - 2026-10-02
 
 - Usage events now record the calling `client` (from `NIX_AGENT_CLIENT`,

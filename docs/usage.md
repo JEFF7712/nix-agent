@@ -147,6 +147,21 @@ Point your MCP host at:
 See `examples/codex-config.toml`, `examples/claude-code-mcp.json`,
 `examples/cursor-cli-config.json`, and `examples/opencode-mcp.json`.
 
+### Check session availability
+
+Inspect the agent host's exposed tool catalog or MCP tool-discovery facility
+for the seven nix-agent tools. This is a cheap availability check requiring
+no Nix operation. Installing the skill or binary, observing a server process,
+or listing MCP resources does not establish tool access in the active session.
+To verify a connection after registration, call
+`eval_config("networking.hostName", flake_uri=...)` on an explicit known
+target, as in the [installation smoke test](agent-install.md#9-smoke-test).
+
+If tools are missing, report that once and use the repository's supported
+shell workflow within existing permissions and deployment gates. If shell
+hooks require MCP, restore host registration instead of bypassing them.
+Record non-use as an availability issue, keeping it separate from tool errors.
+
 ## Companion skills
 
 The MCP exposes the tools; the skills teach the correct workflow. The
@@ -199,7 +214,7 @@ Operational core:
 
 | Tool | What it does |
 |------|-------------|
-| `build(flake_uri?, mode?)` | Build the closure, no activation. A failed build carries `failed_derivation` (`{drv, log_tail}`). |
+| `build(flake_uri?, mode?, job_id?)` | Start a persistent background build, no activation. Returns `job_id` promptly; poll `build(job_id=...)` for live log tails and the final result. Success carries `store_path`; a failed builder carries `failed_derivation` (`{drv, log_tail}`). Repeated starts for the same running target return its existing job. |
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this in the reply and switch unless the user asked only to preview or check. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). Activation with newly failed units returns `status: "degraded"` and a rollback hint. `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. Privileged argv uses `sudo -n`. |
 | `generations(action="list"\|"rollback", mode?, generation?)` | List or roll back generations. NixOS list entries include `path` (realpath of the profile link) when that link exists. After `switch`, undo with `generations(action="rollback", generation=<rollback_generation or id>)`. Bare `generations(action="rollback")` is previous-generation only, and is only the right default when nothing else has switched since. A `generation` that matches nothing returns `unknown_generation` and runs no command. |
@@ -208,9 +223,18 @@ Config introspection:
 
 | Tool | What it does |
 |------|-------------|
-| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`. All attrs ok → `ok`; mixed results → `ok` with failures in `results`; every attr failed → `failed`, `results` unchanged, `first_error` from the first failed entry that has one. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. A missing hostname attr falls back to a unique flake host or returns `unknown_host` with `hosts`. In NixOS mode, a missing option is retried under `home-manager.users.<user>.…` (`hm_rewritten: true`). |
+| `eval_config(attr, flake_uri?, mode?)` | Final merged value of any config attribute on this machine (after all modules/overlays). `mcp-nixos` tells you what an option means; this tells you what it resolves to. `attr` also takes a list, evaluating each in one call and returning per-attr `results`, `succeeded_count`, and `failed_count`. All attrs ok → `ok`; mixed results → `partial`; every attr failed → `failed`. Partial and failed batches include the first available `first_error`. Successful values remain in `results`. Values above ~2 KB degrade to attr names / length / a head slice with `truncated: true`. Text fallback and truncation include a `hint` to request narrower leaf attributes; fallback text may contain unevaluated option errors and is not structured JSON. A missing hostname attr falls back to a unique flake host or returns `unknown_host` with `hosts`. In NixOS mode, a missing option is retried under `home-manager.users.<user>.…` (`hm_rewritten: true`). |
 | `locate_option(attr, flake_uri?, mode?)` | Which file sets an option: `declarations` (files declaring it) and `definitions` (`{file, value}` entries, one per file defining it; large values degrade under the same size guard as `eval_config`, marked `truncated: true` per entry). Earns its slot as that which-file answer, not as a firehose cap; the measured `environment.systemPackages` case is 24 KB → 20 KB. For non-options, `status` is `not_an_option`. For integrated Home Manager, spell the attr `home-manager.users.<user>.<attr>` with `mode="nixos"`; if you pass the unprefixed attr, the tool retries that spelling and sets `hm_rewritten: true`. A missing hostname attr is `unknown_host` with `hosts`. |
 | `check(level, flake_uri?, mode?)` | Validation ladder, fast to slow: `"lint"` (statix + deadnix, structured `findings` list), `"dry-build"`, `"dry-activate"` (NixOS only; same remote/pin classifier as `switch`, `privilege` on sudo auth failure). |
+
+An `ok` diff with `packages: {added: [], removed: [], changed: []}` means
+no reported package changes. `current_closure` and `store_path` identify
+the closures compared; differing paths can still contain changed config
+or embedded code. An empty package diff does not establish that those
+closures are identical or that activation is safe. A failed diff has a
+failure status; absent `packages` means no structured package diff was
+available. The baseline is the caller machine's running closure, so remote
+deployments must compare against the remote host's recorded closure.
 
 Repo onboarding is a CLI subcommand, not a runtime tool: `nix-agent
 inspect-flake [flake_uri]` prints structured facts about a config repo as JSON
@@ -237,7 +261,87 @@ failures, only the first 5 newly failed units (sorted) include a tail, the
 rest list the unit name alone. When systemctl probing is unavailable, a
 top-level `health_note` replaces `summary.health`.
 
+`summary.warnings` lists recognizable warning/error lines from the captured
+switch output, including `could not create target` activation messages.
+ANSI coloring and duplicate lines are removed. The list is limited to 10
+entries, each at most 500 characters plus a truncation marker;
+`summary.warnings_truncated` signals omitted entries or shortened lines.
+The fields are omitted when no warning is recognized. Systemd unit health
+continues to determine `degraded`; warnings need separate interpretation
+even when `newly_failed` is empty. This parser covers those log patterns,
+so an absent warning list does not prove every activation step was clean.
+
+### Persistent build jobs
+
+`build(flake_uri="/home/you/nixos#host")` starts a detached local worker and
+returns `job_id` without waiting for the closure. Use
+`build(job_id="<returned ID>")` to read its status, bounded `log_tail.stdout`
+and `log_tail.stderr`, and the saved completion result. Polling never starts
+a build. Status is `running` until a result is recorded, then `ok` or
+`failed` (or a target diagnostic such as `unknown_host`). An invalid or
+missing ID returns `unknown_job`.
+
+Workers and results survive MCP disconnects and server restarts. If the
+initial response is lost, repeat the same build request to retrieve the
+existing running job. Starting again after completion creates a new job.
+`interrupted` means the worker exited without recording a result; it does
+not prove that Nix daemon work was cancelled. Check its logs before retrying.
+The configured command timeout still applies to each worker command; a
+timeout records a failure with the output captured so far.
+
+Job records and logs live under `$XDG_STATE_HOME/nix-agent/jobs`, defaulting
+to `~/.local/state/nix-agent/jobs`. Job directories are private (`0700`) and
+files are `0600`. `log_paths` points to the full local stdout/stderr logs;
+tool responses return bounded live tails, a short success output tail, and
+the usual capped failure diagnostics. Successful results carry
+`log_truncated` to indicate whether the output was shortened.
+Records are retained until removed locally. Persistence does not restart a
+build after reboot or preserve its store output against garbage collection.
+`diff`, `switch`, and `check` remain synchronous and can still encounter
+MCP host timeouts; build the closure first when a long build is expected.
+
+## Repository gates and fleet deployment
+
+Follow the configuration repository's prescribed validation gates and
+deployment workflow. `switch` activates the local machine and reports
+systemd health. Hosts that need coordinated rollout, including Kubernetes
+workers requiring cordon/drain, cluster preflight, readiness checks, and
+uncordon, should be deployed through the repository's fleet orchestrator.
+Use SSH, kubectl, and service APIs for hardware, cluster, and application
+probes required by that workflow. nix-agent's systemd health summary covers
+unit failures; application acceptance still needs its own runtime checks.
+
+Introspection can supplement those workflows when a specific question
+arises. For example, `locate_option("services.openssh.enable",
+flake_uri="/path/to/flake#worker")` identifies the defining files, and
+`eval_config(["networking.hostName", "services.openssh.enable"],
+flake_uri="/path/to/flake#worker")` checks their merged values. These calls
+inspect that flake's configuration; remote runtime state requires remote
+probes. Keep the repository's required gates and deploy script in the path.
+
+### Remote activation fallback
+
+For hosts whose repository supports manual remote deployment, the
+[companion skill](../skills/nix-agent/SKILL.md#remote-activation-fallback)
+documents the fallback when a remote `nixos-rebuild` cannot perform the
+operation: validate and build the explicit host closure, record the remote
+running/profile realpaths and failed-unit baseline, copy the closure,
+compare the remote closures, set the remote system profile, and activate
+the copied closure with `switch-to-configuration switch`. Verify running
+closure identity, new unit failures, activation warnings, and application
+behavior. Keep required fleet drain/readiness/uncordon orchestration in
+the repository deployer.
+
+If profile setting succeeds and activation fails, record both outcomes and
+recover using the captured baseline: restore the previous profile target,
+activate the previous running closure, and verify recovery. Manual remote
+operations have no local MCP rollback or health envelope; report the
+remote measurements and retained rollback paths explicitly.
+
 ## Basic workflow
+
+This workflow applies to local activation. Use the repository's orchestrator
+when the target requires coordinated deployment as described above.
 
 1. Discovery: query `mcp-nixos` for packages/options; use `eval_config` to see what the user's machine currently resolves.
 2. Edit `.nix` files with the agent's native file tools (Read/Edit/Write).
@@ -284,10 +388,19 @@ if the pointer moves and activation fails, the envelope includes
 `current_generation` and a `note`.
 
 The command runner truncates each stdout and stderr stream independently at
-64,000 Python characters. A successful `switch` is more compact: it returns a
-2,000-character tail of the activation log by default. Pass `full_log=True` to
-return the full successful switch log, still subject to the runner's
-per-stream limit.
+64,000 Python characters. Successful `build` and `check` results return a
+2,000-character output tail plus an omission marker when needed, with
+`log_truncated` and `log_paths` to the complete local stdout/stderr logs.
+Build jobs keep logs in their job directory; checks and internal closure
+builds save private (`0700` directory, `0600` files) logs under
+`$XDG_STATE_HOME/nix-agent/logs` (default `~/.local/state/nix-agent/logs`).
+Logs are retained until removed locally. Failures retain the capped output
+and structured errors, with saved logs available for the rest.
+
+A successful `switch` also returns a 2,000-character tail by default.
+Pass `full_log=True` to return its full successful switch log, still subject
+to the runner's per-stream limit. Recognized warnings are extracted into
+`summary.warnings` before this success tail is selected.
 
 ### Byte accounting
 

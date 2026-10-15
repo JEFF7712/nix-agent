@@ -67,6 +67,8 @@ def test_eval_non_json_fallback(monkeypatch):
     assert out["status"] == "ok"
     assert out["value"] == "<LAMBDA>"
     assert out["json_fallback"] is True
+    assert "Nix text" in out["hint"]
+    assert "leaf attributes" in out["hint"]
 
 
 def test_eval_truncated_json_does_not_crash(monkeypatch):
@@ -79,6 +81,7 @@ def test_eval_truncated_json_does_not_crash(monkeypatch):
     assert out["status"] == "ok"
     assert out["value"] == '{"a": 1, "b": ... [truncated]'
     assert out["json_parse_failed"] is True
+    assert "structured JSON" in out["hint"]
 
 
 def test_eval_real_failure(monkeypatch):
@@ -223,7 +226,10 @@ def test_eval_batched_partial_failure(monkeypatch):
 
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     out = eval_config(["services.nope", "services.openssh.enable"], flake_uri="/x#h")
-    assert out["status"] == "ok"
+    assert out["status"] == "partial"
+    assert out["failed_count"] == 1
+    assert out["succeeded_count"] == 1
+    assert out["first_error"] == "error: attribute 'nope' missing"
     assert out["results"][0]["attr"] == "services.nope"
     assert out["results"][0]["status"] == "failed"
     assert "first_error" in out["results"][0]
@@ -241,6 +247,8 @@ def test_eval_batched_all_failed(monkeypatch):
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     out = eval_config(["services.nope", "services.also"], flake_uri="/x#h")
     assert out["status"] == "failed"
+    assert out["failed_count"] == 2
+    assert out["succeeded_count"] == 0
     assert out["first_error"] == "error: attribute 'nope' missing"
     assert len(out["results"]) == 2
     assert all(entry["status"] == "failed" for entry in out["results"])
@@ -267,6 +275,25 @@ def test_eval_batched_envelope_accounted(monkeypatch):
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     out = eval_config(["services.openssh.enable"], flake_uri="/x#h")
     assert out["returned_bytes"] > 0
+
+
+def test_eval_batched_truncated_fallback_has_leaf_guidance(monkeypatch):
+    def fake_run(argv, cwd=None):
+        if "--json" in argv:
+            return _result(
+                False, stderr="error: cannot convert a function to JSON", command=argv
+            )
+        return _result(True, stdout="{ option = <LAMBDA>; }" * 300, command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(["systemd.network.networks"], flake_uri="/x#h")
+    entry = out["results"][0]
+    assert entry["json_fallback"] is True
+    assert entry["truncated"] is True
+    assert "incomplete" in entry["hint"]
+    assert "leaf attributes" in entry["hint"]
+    assert "unevaluated option errors" in entry["hint"]
+    assert len(entry["value"]) < 3000
 
 
 def test_eval_batched_unknown_host_early_exit(monkeypatch):

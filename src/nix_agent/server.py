@@ -22,9 +22,14 @@ _TOOLS = [
     (
         build,
         "build",
-        "Build the full system/HM closure without activating it. "
-        "Returns the output store path; a failed build carries "
-        "failed_derivation{drv, log_tail}.",
+        "Start a persistent background build of the system/HM closure, without "
+        "activation. Returns job_id promptly. Poll build(job_id=...) for bounded "
+        "live log tails and status: running, ok, failed, or interrupted. Jobs "
+        "survive MCP disconnects and server restarts; repeated starts for the "
+        "same running target reuse its job. On success returns store_path; "
+        "successful output is a short tail with log_truncated and full local "
+        "log_paths. "
+        "on build failure includes failed_derivation{drv, log_tail} when available.",
     ),
     (
         diff,
@@ -33,7 +38,8 @@ _TOOLS = [
         "(nvd, falling back to nix store diff-closures): package "
         "additions, removals, version changes. Include the changeset in "
         "the reply and switch unless the user asked only to preview or "
-        "check.",
+        "check. For hosts requiring coordinated fleet deployment, use the "
+        "repository's deployment orchestrator.",
     ),
     (
         switch,
@@ -41,12 +47,14 @@ _TOOLS = [
         "Activate the configuration (sudo -n nixos-rebuild switch / "
         "home-manager switch). Records rollback_generation first. Returns a "
         "structured 'summary' (units changed, derivations built, package "
-        "delta, systemd health) plus gen before/after; on success the raw "
+        "delta, systemd health, and a bounded warnings list from the captured "
+        "switch log) plus gen before/after; on success the raw "
         "log is trimmed to a tail (pass full_log=True for all of it). Status "
         "is 'degraded' when activation succeeded but units newly failed. No "
         "implicit validation by default; pass validate=True to gate on "
         "check('dry-build') first. On a sudo auth failure returns a "
-        "'privilege' diagnosis.",
+        "'privilege' diagnosis. Local activation only; hosts requiring cluster "
+        "cordon/drain and readiness gating must use their fleet orchestrator.",
     ),
     (
         generations,
@@ -65,9 +73,12 @@ _TOOLS = [
         "actual NixOS/Home Manager configuration via `nix eval` "
         "(e.g. attr='services.openssh.enable'). flake_uri and mode "
         "auto-resolve when omitted. Pass a list of attrs to batch several "
-        "evals into one call, returning per-attr results. Values above the "
+        "evals into one call, returning per-attr results and failed_count / "
+        "succeeded_count. Mixed results have status='partial', all failed "
+        "have status='failed'. Values above the "
         "size guard degrade to attr names / length / a head slice "
-        "(truncated: true).",
+        "(truncated: true). Text fallback and truncation include a hint to "
+        "request narrower leaf attributes.",
     ),
     (
         locate_option,
@@ -84,7 +95,9 @@ _TOOLS = [
         "Validation ladder for the configuration, fast to slow: "
         "level='lint' (statix+deadnix; returns a structured findings "
         "list), 'dry-build' (evaluate and plan the closure build), "
-        "'dry-activate' (NixOS only, shows what activation would change).",
+        "'dry-activate' (NixOS only, shows what activation would change). "
+        "Successful output is a short tail with log_truncated and full local "
+        "log_paths; failures retain their capped diagnostics.",
     ),
 ]
 

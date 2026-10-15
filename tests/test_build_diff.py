@@ -1,6 +1,11 @@
 from nix_agent.runner import RunResult
+from nix_agent.target import resolve_target
 from nix_agent.tools import build as build_mod
-from nix_agent.tools.build import build, diff
+from nix_agent.tools.build import build_closure, diff
+
+
+def build(flake_uri, mode="nixos"):
+    return build_closure(resolve_target(flake_uri, mode))
 
 
 def _result(ok, stdout="", stderr="", command=("nix",)):
@@ -234,7 +239,6 @@ def test_diff_empty_diff_closures_is_empty_packages(monkeypatch):
 def test_build_failure_attaches_failed_derivation(monkeypatch):
     from nix_agent.runner import RunResult
     from nix_agent.tools import build as build_mod
-    from nix_agent.tools.build import build
 
     def fake_run(argv, cwd=None):
         if argv[:2] == ["nix", "log"]:

@@ -2,7 +2,6 @@
   "name": "nix-agent-site",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "predev": "node scripts/sync-docs-assets.mjs",
     "prebuild": "node scripts/sync-docs-assets.mjs",

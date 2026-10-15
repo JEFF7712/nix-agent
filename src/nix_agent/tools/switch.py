@@ -2,14 +2,15 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import cast
 
-from nix_agent import health, hostattr, runner
+from nix_agent import health, hostattr, logparse, runner
 from nix_agent.privilege import sudo_argv, sudo_diagnosis
 from nix_agent.target import (
     Target,
     TargetError,
-    prepare_privileged_target,
     current_hm_profile,
+    prepare_privileged_target,
     resolve_target,
 )
 from nix_agent.tools.build import closure_diff
@@ -60,6 +61,7 @@ def _summarize_switch(output: str) -> dict[str, object]:
     if units:
         summary["units"] = units
     summary["changed"] = bool(units) or built > 0
+    summary.update(logparse.activation_warnings(output))
     return summary
 
 
@@ -386,7 +388,7 @@ def generations(
         listed = _list_nixos()
         if listed.get("status") != "ok":
             return listed
-        gens = list(listed.get("generations") or [])
+        gens = list(cast(list[dict[str, object]], listed.get("generations") or []))
         matched = _match_generation(gens, generation)
         if matched is None:
             return _unknown_generation(generation)

@@ -2,7 +2,6 @@ import json
 import re
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 README = (REPOSITORY_ROOT / "README.md").read_text()
 BANNER = (REPOSITORY_ROOT / "assets/banner.svg").read_text()
@@ -97,9 +96,15 @@ def test_usage_documents_runtime_dependencies_and_timeout_boundaries():
 def test_usage_documents_output_caps_and_full_switch_log_escape_hatch():
     failure_envelopes = _usage_section("Basic workflow")
     runtime = _paragraph_containing(failure_envelopes, "`full_log=True`")
+    command_logs = _paragraph_containing(
+        failure_envelopes, "each stdout and stderr stream"
+    )
 
-    assert "each stdout and stderr stream" in runtime
-    assert "64,000 Python characters" in runtime
+    assert "64,000 Python characters" in command_logs
+    assert "Successful `build` and `check`" in command_logs
+    assert "2,000-character output tail" in command_logs
+    assert "`log_paths`" in command_logs
+    assert "`log_truncated`" in command_logs
     assert "2,000-character tail" in runtime
     assert "successful `switch`" in runtime
     assert "`full_log=True`" in runtime
