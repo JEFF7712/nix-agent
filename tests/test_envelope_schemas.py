@@ -6,12 +6,11 @@ from nix_agent.target import Target
 from nix_agent.tools import build as build_mod
 from nix_agent.tools import locate as locate_mod
 from nix_agent.tools import switch as switch_mod
-from nix_agent.tools.build import build, diff
+from nix_agent.tools.build import build_closure, diff
 from nix_agent.tools.check import check
 from nix_agent.tools.eval import eval_config
 from nix_agent.tools.locate import locate_option
 from nix_agent.tools.switch import generations, switch
-
 
 SNAPSHOT = Path("tests/snapshots/tool_envelopes.json")
 
@@ -95,7 +94,7 @@ def test_public_tool_envelope_schemas_match_snapshot(monkeypatch, tmp_path):
 
     monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
     monkeypatch.setattr(build_mod.runner, "run", nvd_aware_run)
-    build_ok = build(flake_uri="/x#h")
+    build_ok = build_closure(Target(flake_dir="/x", attr="h", mode="nixos"))
     diff_ok = diff(flake_uri="/x#h")
 
     systemctl_ok = iter(["[]", "[]"])

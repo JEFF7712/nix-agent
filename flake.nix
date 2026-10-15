@@ -35,6 +35,7 @@
               ".venv"
               "__pycache__"
               "coverage"
+              "feedback"
               "node_modules"
               "out"
               "research_nextjs_static_3d"
@@ -53,7 +54,7 @@
         siteSource = cleanSource ./site;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.12.0";
+          version = "0.13.0";
           format = "pyproject";
           src = packageSource;
           nativeBuildInputs =
@@ -87,25 +88,21 @@
           assert !(sourceFilter ./. "${./.}/research_nextjs_static_3d" "directory");
           assert !(sourceFilter ./. "${./.}/.venv" "directory");
           assert !(sourceFilter ./. "${./.}/.direnv" "directory");
+          assert !(sourceFilter ./. "${./.}/feedback" "directory");
           assert !(sourceFilter ./site "${./site}/node_modules" "directory");
           assert !(sourceFilter ./site "${./site}/coverage" "directory");
           assert !(sourceFilter ./site "${./site}/tsconfig.tsbuildinfo" "regular");
           assert sourceFilter ./site "${./site}/public/nix-snowflake.svg" "regular";
           assert sourceFilter ./site "${./site}/app/fonts/ibm-plex-mono-latin-400-normal.woff2" "regular";
           assert sourceFilter ./site "${./site}/__tests__/page.test.tsx" "regular";
-          assert sourceFilter ./site "${./site}/pnpm-lock.yaml" "regular";
+          assert sourceFilter ./site "${./site}/package-lock.json" "regular";
           assert sourceFilter ./. "${./.}/src/nix_agent/server.py" "regular";
           assert sourceFilter ./. "${./.}/tests/test_server.py" "regular";
           pkgs.runCommand "nix-agent-source-filter-contract" { } ''
             touch "$out"
           '';
-        sitePnpmDeps = pkgs.fetchPnpmDeps {
-          pname = "nix-agent-site";
-          version = "0.1.0";
-          src = siteSource;
-          pnpm = pkgs.pnpm_11;
-          fetcherVersion = 4;
-          hash = "sha256-jv6vDHJadvFN/83et5EhAajW7VDearhst8mZ9xilox0=";
+        siteNpmDeps = pkgs.importNpmLock {
+          npmRoot = siteSource;
         };
         siteDocsInputs = pkgs.runCommand "nix-agent-site-docs-inputs" { } ''
           mkdir -p "$out/site" "$out/docs" "$out/assets"
@@ -168,13 +165,13 @@
           version = "0.1.0";
           src = siteDocsInputs;
           dontUnpack = true;
-          pnpmDeps = sitePnpmDeps;
+          npmDeps = siteNpmDeps;
+          npmFlags = [ "--legacy-peer-deps" ];
           CI = "true";
           NEXT_TELEMETRY_DISABLED = "1";
           nativeBuildInputs = [
             pkgs.nodejs_24
-            pkgs.pnpm_11
-            pkgs.pnpmConfigHook
+            pkgs.importNpmLock.npmConfigHook
           ];
           preConfigure = ''
             cp -a "$src/." repo
@@ -184,10 +181,10 @@
           '';
           buildPhase = ''
             runHook preBuild
-            pnpm lint
-            pnpm test
-            pnpm typecheck
-            pnpm build
+            npm run lint
+            npm test
+            npm run typecheck
+            npm run build
             runHook postBuild
           '';
           installPhase = ''
@@ -216,7 +213,6 @@
           buildInputs = [
             devPython
             pkgs.nodejs_24
-            pkgs.pnpm_11
             pkgs.statix
             pkgs.deadnix
             pkgs.nixfmt

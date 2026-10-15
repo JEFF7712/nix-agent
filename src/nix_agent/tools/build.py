@@ -18,6 +18,7 @@ def closure_installable(target: Target, candidate: str) -> str:
     return f"{config_attr(target, candidate)}.activationPackage"
 
 
+@runner.logged_operation
 def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
     """Shared by build(), diff(), and check(level='dry-build')."""
     pending = list(attr_candidates(target))
@@ -65,12 +66,17 @@ def build_closure(target: Target, dry_run: bool = False) -> dict[str, object]:
 def build(
     flake_uri: str | None = None,
     mode: str = "nixos",
+    job_id: str | None = None,
 ) -> dict[str, object]:
+    from nix_agent import jobs
+
+    if job_id is not None:
+        return jobs.status(job_id)
     try:
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
-    return build_closure(target)
+    return jobs.start(target)
 
 
 def _current_closure(mode: str) -> str | None:

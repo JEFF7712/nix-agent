@@ -141,6 +141,33 @@ def test_switch_full_log(monkeypatch):
     assert "log_truncated" not in full
 
 
+def test_switch_warnings_survive_tail_without_changing_unit_health(monkeypatch):
+    _unlock(monkeypatch)
+    warning = "could not create target /etc/subuid"
+    output = warning + "\n" + "switch progress\n" * 300 + "activation finished\n"
+
+    monkeypatch.setattr(
+        switch_mod.runner,
+        "run",
+        lambda argv, cwd=None: _result(True, stdout=output, command=argv),
+    )
+    monkeypatch.setattr(
+        switch_mod.runner, "resolve_binary", lambda name: f"/bin/{name}"
+    )
+    monkeypatch.setattr(switch_mod, "_current_generation", lambda mode: "gen")
+    monkeypatch.setattr(switch_mod.health, "failed_units", lambda mode: ([], None))
+    healthy = {"newly_failed": [], "resolved": [], "still_failed": []}
+    monkeypatch.setattr(
+        switch_mod.health, "health_report", lambda before, mode: healthy
+    )
+    result = switch(flake_uri="/x#h")
+    assert result["status"] == "ok"
+    assert result["log_truncated"] is True
+    assert warning not in result["output"]
+    assert result["summary"]["warnings"] == [warning]
+    assert result["summary"]["health"] == healthy
+
+
 def test_switch_sudo_diagnosis(monkeypatch):
     _unlock(monkeypatch)
 

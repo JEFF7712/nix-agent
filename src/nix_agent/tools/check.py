@@ -160,6 +160,7 @@ def _lint(target: Target) -> dict[str, object]:
     )
 
 
+@runner.logged_operation
 def check(
     level: str,
     flake_uri: str | None = None,

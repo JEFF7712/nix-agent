@@ -10,7 +10,7 @@ publishing, signing, promotion, or infrastructure credentials.
 
 The required source check is `ci/woodpecker/application-validation`. Validation
 enforces the node-service contract: digest-pinned local upstream base images,
-committed pnpm-lock.yaml, and self-contained builds without external cache dependencies.
+committed package-lock.json, and self-contained builds without external cache dependencies.
 
 Production runs the digest-pinned `registry.rupan.dev/apps/nix-agent-site` image from
 the homelab's Zot registry. Flux owns deployment configuration under

@@ -110,7 +110,36 @@ _NVD_SECTIONS = {
 }
 _NVD_ENTRY = re.compile(r"^\[[^\]]+\]\s+#\d+\s+(\S+)\s+(.+)$")
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+_ACTIVATION_WARNING = re.compile(
+    r"(?:^|\s)(?:warning:|error:|could not create target\b)", re.IGNORECASE
+)
+WARNING_CAP = 10
+WARNING_LINE_CAP = 500
 _DIFF_CLOSURES = re.compile(r"^(\S+): (.+?) → (.+?)(?:, [+-]?[\d.]+\s+\S+)?$")
+
+
+def activation_warnings(text: str) -> dict[str, object]:
+    warnings: list[str] = []
+    seen: set[str] = set()
+    truncated = False
+    for line in text.splitlines():
+        normalized = _ANSI_ESCAPE.sub("", line).strip()
+        if not _ACTIVATION_WARNING.search(normalized) or normalized in seen:
+            continue
+        seen.add(normalized)
+        if len(warnings) == WARNING_CAP:
+            truncated = True
+            continue
+        if len(normalized) > WARNING_LINE_CAP:
+            normalized = normalized[:WARNING_LINE_CAP] + "... [truncated]"
+            truncated = True
+        warnings.append(normalized)
+    result: dict[str, object] = {}
+    if warnings:
+        result["warnings"] = warnings
+    if truncated:
+        result["warnings_truncated"] = True
+    return result
 
 
 def parse_nvd(text: str) -> dict[str, list[dict[str, str]]] | None:

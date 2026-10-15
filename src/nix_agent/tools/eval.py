@@ -50,6 +50,20 @@ def _ok_eval(
     payload: dict[str, object] = {"value": guarded, "output": "", **extra}
     if truncated:
         payload["truncated"] = True
+    if extra.get("json_fallback") or extra.get("json_parse_failed"):
+        payload["hint"] = (
+            "Value is Nix text, not structured JSON; it may contain unevaluated "
+            "option errors. Request narrower leaf attributes with eval_config."
+        )
+        if truncated:
+            payload["hint"] = "Value is incomplete and truncated. " + str(
+                payload["hint"]
+            )
+    elif truncated:
+        payload["hint"] = (
+            "Value is incomplete and truncated; request a child attribute "
+            "or list index with eval_config."
+        )
     return runner.envelope("ok", installable, result, **payload)
 
 
@@ -164,7 +178,9 @@ def eval_config(
                     flake_dir=target.flake_dir, attr=str(winning), mode=target.mode
                 )
                 candidates = [str(winning)]
-            raw_total += envelope.get("raw_bytes") or 0
+            raw_bytes = envelope.get("raw_bytes")
+            if isinstance(raw_bytes, int):
+                raw_total += raw_bytes
             entry: dict[str, object] = {
                 "attr": one,
                 "status": envelope["status"],
@@ -188,14 +204,19 @@ def eval_config(
         # Each _eval_one already ran through envelope(), which stamped
         # raw_bytes on it; summing those per-attr sizes is essentially free,
         # so the batched envelope reports a real (not omitted) raw_bytes.
+        failed_count = sum(entry["status"] != "ok" for entry in results)
+        status = "ok"
+        if failed_count:
+            status = "failed" if failed_count == len(results) else "partial"
         response: dict[str, object] = {
-            "status": "ok",
+            "status": status,
             "resolved_target": target.flake_ref,
             "results": results,
+            "failed_count": failed_count,
+            "succeeded_count": len(results) - failed_count,
             "raw_bytes": raw_total,
         }
-        if results and all(entry.get("status") != "ok" for entry in results):
-            response["status"] = "failed"
+        if failed_count:
             first = next(
                 (entry["first_error"] for entry in results if entry.get("first_error")),
                 None,

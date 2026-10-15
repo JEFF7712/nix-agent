@@ -7,7 +7,7 @@ description: Operate on this machine's NixOS or Home Manager configuration with 
 
 ## Overview
 
-`nix-agent` MCP tools do NOT read or write files. They build, diff, switch,
+`nix-agent` MCP tools do not edit configuration files. They build, diff, switch,
 and manage generations (the operational core), and evaluate, locate, and
 check the live config (introspection), handing every result back as a
 compact JSON envelope. Read the envelope: it already holds what you would
@@ -18,10 +18,26 @@ Division of labor:
 - **`mcp-nixos`** discovers packages and options (what exists, what it means).
 - **`nix-agent`** operates on the user's actual configuration (what their machine resolves, whether it builds, what a switch would change).
 
-Default is apply: after a config change, `diff()` then `switch()` without
-waiting. Wait only when the user asked to preview or check, not activate.
+Default is apply for local activation: after a config change, `diff()`
+then `switch()` without waiting, unless the user asked to preview or check.
+Follow the repository's deployment workflow for coordinated fleet rollout.
 
-## Use MCP tools, not shell, for covered operations
+## Check tool availability
+
+Inspect the session's exposed tool catalog, or the host's MCP tool-discovery
+facility, once for this server's seven tools before planning around them.
+This needs no build, check, or activation call. A skill, installed binary,
+running server process, or MCP resource listing does not establish that the
+tools are callable in this session.
+
+If tools are absent, state that once and use the repository's supported
+shell workflow for the missing operations, within its existing permissions
+and deployment gates. If a hook blocks those commands, report the unavailable
+MCP capability and restore host registration; do not bypass the hook. To
+verify a restored connection, evaluate `networking.hostName` for an explicit
+known target. Report that evaluation separately from catalog discovery.
+
+## Use MCP tools when available for covered operations
 
 Shelling out for operations below re-pays the context cost this server
 exists to remove (raw `nix eval` on `environment.systemPackages` is ~13 KB
@@ -29,6 +45,20 @@ the size guard collapses to ~400 bytes). Reach for Bash only for what has
 no tool: formatting (`nix fmt`), file edits, and remote-target deploys
 (`--target-host`, `--use-remote-sudo`), which privileged tools reject by
 design.
+
+The repository's required validation gates remain authoritative. Deploy
+hosts requiring fleet coordination through the repository's orchestrator,
+including Kubernetes cordon/drain, cluster preflight, readiness checks, and
+uncordon. Use SSH, kubectl, and service APIs for hardware and application
+runtime probes. `switch` performs local activation and systemd health
+checks; it has no fleet orchestration hooks.
+
+Use introspection for specific questions alongside those workflows:
+`locate_option("services.openssh.enable", flake_uri="/path/to/flake#worker")`
+finds option ownership, and
+`eval_config(["networking.hostName", "services.openssh.enable"],
+flake_uri="/path/to/flake#worker")` checks merged values. These inspect the
+named flake, so remote runtime state still needs remote probes.
 
 | Instead of shell | Call |
 |---|---|
@@ -42,6 +72,45 @@ design.
 | `nix log <drv>` after a failed build | read `failed_derivation.log_tail` |
 | `systemctl --failed` after a switch | read `summary.health` |
 
+## Remote activation fallback
+
+Use the repository's fleet deployer for coordinated hosts. Where manual
+remote activation is supported by that workflow, or a remote rebuild fails
+before activation, follow this recipe on the explicitly selected host:
+
+1. Run the repository's validation and deployment preflight for the exact
+   source revision. Keep required drain/readiness orchestration in place.
+2. Over SSH, record the realpaths of `/run/current-system` and
+   `/nix/var/nix/profiles/system`, generation IDs, and failed systemd units.
+   Keep the running closure and profile target separately for rollback.
+3. Build that host's `config.system.build.toplevel`. Use MCP `build` and
+   poll its job when available; otherwise use the repository's shell build
+   recipe or `nix build --no-link --print-out-paths` with the explicit flake
+   and quoted host attribute. Keep the resulting store path.
+4. Copy the closure with `nix copy --to` and the target's verified SSH store
+   URL. Follow its documented store-trust workflow if copying is rejected.
+5. On the remote host, compare the recorded running closure and the new
+   closure with `nix store diff-closures`, checking the exit status.
+   Empty successful output means no reported package changes. Different
+   closure paths can still contain changed config or embedded code; inspect
+   the intended change and its runtime acceptance criteria.
+6. On that host, set the system profile with
+   `sudo -n nix-env -p /nix/var/nix/profiles/system --set` and the new store
+   path, then run that closure's `bin/switch-to-configuration switch` under
+   `sudo -n`. Record each exit status; profile movement alone is not proof
+   of activation.
+7. Verify `/run/current-system`, compare failed units with the baseline,
+   inspect activation warnings, and perform service/cluster runtime probes.
+   If recovery is needed, restore the recorded profile target with
+   `nix-env --set` on that profile and activate the recorded previous running
+   closure, both under `sudo -n` on the remote host. Verify recovery and
+   finish the repository's readiness/uncordon steps.
+
+This recipe creates no local MCP `rollback_generation` or health envelope.
+Retain the remote baseline and report the measured activation and health
+results explicitly. MCP `diff()` compares against the caller machine's
+running closure; a remote deployment needs the remote baseline.
+
 ## Tool Surface
 
 Seven tools in two tiers. All auto-resolve the target when `flake_uri` is
@@ -49,8 +118,15 @@ omitted and echo back what they resolved and ran (`resolved_target` and
 `command`, or `commands` for `check("lint")`).
 
 Operational core:
-- `build(flake_uri?, mode?)`: build the closure, no activation. A failed
-  build carries `failed_derivation`.
+- `build(flake_uri?, mode?, job_id?)`: start a persistent background build,
+  no activation. Keep the returned `job_id` and poll `build(job_id=...)`
+  for live log tails and the final result. `running` means wait; `ok`
+  carries `store_path`; a failed builder carries `failed_derivation`.
+  Successful output is a short tail with `log_truncated` and `log_paths`
+  to the full local logs. Failures retain their capped diagnostics.
+  Repeated starts for the same running target reuse its job. Jobs survive
+  MCP disconnects and server restarts. `interrupted` means the worker
+  exited without a result, not proof that Nix daemon work was cancelled.
 - `diff(flake_uri?, mode?)`: what a switch would change (adds/removes/
   version bumps), plus a structured `packages` object when it parses.
   Include this in the reply and switch unless the user asked only to
@@ -59,6 +135,9 @@ Operational core:
   `rollback_generation`, returns a `summary` (units changed, derivations
   built, `packages` vs the rollback generation, `health`), and trims the
   log to a tail on success. `validate=True` gates on `check("dry-build")`.
+  `summary.warnings` preserves recognizable warning/error lines from the
+  captured switch log, independently of unit health. It deduplicates and
+  caps the list; `warnings_truncated` marks omissions or shortened lines.
   Remote refs and pin mismatches exit as `remote_ref_rejected` /
   `target_locked` before sudo or dry-build. `.` / `./` resolve to the
   pin when `$NIX_AGENT_FLAKE` is set. Newly failed units after
@@ -77,10 +156,14 @@ Config introspection:
   config attribute on THIS machine, after all modules/overlays.
   `mcp-nixos` says what an option means; this says what it is. Pass a
   **list** for `attr` to evaluate many in one call (per-attr `results`).
-  All attrs ok or mixed → `ok` (failures in `results`); every attr
-  failed → `failed` with `first_error` from the first failed entry that
-  has one. Values above ~2 KB degrade to attr names / length / a head
-  slice, marked `truncated: true`. A missing hostname attr falls back to
+  All attrs ok → `ok`; mixed → `partial`; every attr failed → `failed`.
+  Batches carry `succeeded_count` and `failed_count`; partial and failed
+  batches include the first available `first_error`. Values above ~2 KB
+  degrade to attr names / length / a head slice, marked `truncated: true`.
+  Text fallback and truncation include a `hint` to request narrower leaf
+  attributes. Fallback is Nix text and can contain unevaluated option
+  errors, so do not treat it as complete structured JSON. A missing hostname
+  attr falls back to
   a unique flake host or returns `unknown_host` with `hosts`. In NixOS
   mode, a missing option is retried as `home-manager.users.<user>.<attr>`
   (`hm_rewritten: true`).
@@ -97,6 +180,8 @@ Config introspection:
   `"lint"` (statix + deadnix, structured `findings`), `"dry-build"`,
   `"dry-activate"` (NixOS only). Dry-activate uses the same remote/pin
   classifier as `switch` and attaches `privilege` on sudo auth failure.
+  Success returns a short output tail with `log_truncated` and `log_paths`
+  to full local logs; failures retain their capped diagnostics.
 
 Formatting is not a tool: format edited files with the flake's own
 formatter (`nix fmt`, or `nixfmt` on the files) via your Bash tool. Repo
@@ -183,15 +268,29 @@ do not re-fetch.
   tails for the first five newly failed units; `summary.packages` reports changes
   vs the rollback generation. These replace running `systemctl --failed`
   or a second `diff()`.
+- **Read switch warnings separately.** `summary.warnings` contains
+  recognizable warning/error lines such as activation target-creation
+  failures. Healthy units alone do not establish clean activation output.
+  Interpret those diagnostics before reporting activation acceptance.
 - **Batch attr checks.** `eval_config([...])` answers N questions in one
-  call. Mixed results stay `ok` with failures in `results`; if every
-  attr failed, top-level `status` is `failed` with `first_error` from
-  the first failed entry that has one. A `truncated: true` value means
+  call. Mixed results have `status: "partial"`; if every attr failed,
+  status is `failed`. Check `failed_count`, `first_error`, and each result.
+  Successful values remain available. A `truncated: true` value means
   eval a child attr for the part you need, NOT retry for full output.
+- **Keep build job IDs.** Poll `build(job_id=...)` while `running`, using
+  its live log tails. A lost MCP connection does not cancel the worker.
+  Repeating the same start retrieves the existing running job; it does
+  not start a duplicate. `interrupted` requires inspecting the saved
+  logs before retrying.
 - **`locate_option` before grepping.** It answers "which file sets this"
   in one call; a tree-wide grep does not. That is why it has a slot, not
   because it caps a firehose (24 KB → 20 KB on
   `environment.systemPackages`).
+- **Read empty diffs precisely.** An `ok` response with empty `packages`
+  lists means no reported package additions, removals, or version changes.
+  Compare `current_closure` and `store_path` to establish whether the
+  closure path changed. An empty package diff alone does not establish
+  identical configuration or unchanged service behavior.
 - **Byte accounting is off the envelope.** `raw_bytes` / `returned_bytes`
   live in the usage log (`NIX_AGENT_USAGE_LOG=1`, then `nix-agent usage`),
   not on the tool response. Do not look for them in MCP results.
@@ -208,15 +307,17 @@ boilerplate.
 
 ## Hard Rules
 
-- Prefer the MCP tools over shell for every covered operation in the map
+- When callable, prefer the MCP tools over shell for every covered operation in the map
 above. Do not shell out to `nixos-rebuild`, `nix build`, `nix eval`,
 `statix`/`deadnix`, `nvd`, or `nix store diff-closures` when a tool covers
 it; a hook may block such commands and tell you which tool to call instead.
+When tools are unavailable, use the availability fallback above.
 - Never write secret payloads into config files; reference secrets via
 sops-nix/agenix and only edit references.
 - Never call `switch` when the user asked only to check or preview;
-  `diff` is the preview. Otherwise the default is apply: switch after
-  `diff()` without waiting.
+  `diff` is the preview. For local activation, the default is apply:
+  switch after `diff()` without waiting. Use the repository's orchestrator
+  for targets requiring coordinated fleet deployment.
 - `status: "degraded"` means activation succeeded but units newly
   failed; report `summary.health` and roll back unless the user asked
   to leave those units failed.

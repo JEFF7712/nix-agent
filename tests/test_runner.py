@@ -46,6 +46,28 @@ def test_run_timeout_returns_failed_result(monkeypatch):
     assert "timed out after 0.01 seconds" in result.output
 
 
+def test_run_timeout_preserves_byte_output(monkeypatch):
+    def fake_run(argv, **kwargs):
+        raise subprocess.TimeoutExpired(
+            argv,
+            kwargs["timeout"],
+            output=b"partial stdout\n",
+            stderr=b"error: partial stderr\n",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    result = runner.run(["nix", "build"], timeout=0.01)
+    assert not result.ok
+    assert result.stdout == "partial stdout\n"
+    assert "error: partial stderr" in result.stderr
+    assert "timed out after 0.01 seconds" in result.stderr
+    assert result.raw_bytes == len(result.stdout.encode()) + len(result.stderr.encode())
+    assert (
+        runner.envelope("failed", "/test#host", result)["first_error"]
+        == "error: partial stderr"
+    )
+
+
 def test_run_uses_timeout_from_environment(monkeypatch):
     seen = []
 

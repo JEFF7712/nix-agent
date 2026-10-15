@@ -237,6 +237,37 @@ def test_parsers_empty_input_returns_none():
     assert logparse.parse_diff_closures("") is None
 
 
+def test_activation_warnings_deduplicates_and_ignores_progress():
+    text = (
+        "activating the configuration...\n"
+        "could not create target /etc/subuid\n"
+        "\x1b[33mcould not create target /etc/subuid\x1b[0m\n"
+        "could not create target /etc/subgid\n"
+        "warning: activation script needs attention\n"
+        "error: nonfatal script error\n"
+        "starting the following units: warning.service\n"
+    )
+    assert logparse.activation_warnings(text) == {
+        "warnings": [
+            "could not create target /etc/subuid",
+            "could not create target /etc/subgid",
+            "warning: activation script needs attention",
+            "error: nonfatal script error",
+        ]
+    }
+    assert (
+        logparse.activation_warnings("starting the following units: foo.service") == {}
+    )
+
+
+def test_activation_warnings_caps_count_and_line_length():
+    text = "\n".join(f"warning: {index} " + "x" * 1000 for index in range(30))
+    summary = logparse.activation_warnings(text)
+    assert len(summary["warnings"]) == logparse.WARNING_CAP
+    assert all(len(warning) < 550 for warning in summary["warnings"])
+    assert summary["warnings_truncated"] is True
+
+
 def test_parse_nvd_header_without_entries_is_drift():
     text = "Version changes:\ncompletely reshaped entry format we cannot read"
     assert logparse.parse_nvd(text) is None

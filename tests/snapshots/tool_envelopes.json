@@ -4,6 +4,11 @@
       "str"
     ],
     "output": "str",
+    "log_truncated": "bool",
+    "log_paths": {
+      "stdout": "str",
+      "stderr": "str"
+    },
     "resolved_target": "str",
     "status": "str",
     "store_path": "str"

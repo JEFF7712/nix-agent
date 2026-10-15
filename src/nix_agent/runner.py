@@ -1,8 +1,16 @@
-from dataclasses import dataclass
+import functools
 import json
 import os
 import shutil
+import signal
 import subprocess
+import tempfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
+from pathlib import Path
+from typing import ParamSpec
 
 from nix_agent import logparse
 
@@ -10,6 +18,8 @@ OUTPUT_CAP = 64_000
 TAIL_CAP = 2_000
 COMMAND_TIMEOUT = 30 * 60
 COMMAND_TIMEOUT_ENV = "NIX_AGENT_COMMAND_TIMEOUT"
+_LOG_DIR: ContextVar[Path | None] = ContextVar("build_log_dir", default=None)
+_PARAMS = ParamSpec("_PARAMS")
 
 
 @dataclass(frozen=True)
@@ -71,12 +81,119 @@ def command_timeout() -> float:
     return timeout if timeout > 0 else COMMAND_TIMEOUT
 
 
+@contextmanager
+def log_to(directory: Path) -> Iterator[None]:
+    token = _LOG_DIR.set(directory)
+    try:
+        yield
+    finally:
+        _LOG_DIR.reset(token)
+
+
+def state_dir() -> Path:
+    state = os.environ.get("XDG_STATE_HOME")
+    return (
+        (Path(state) if state else Path.home() / ".local/state") / "nix-agent"
+    ).absolute()
+
+
+@contextmanager
+def operation_logs() -> Iterator[Path]:
+    directory = _LOG_DIR.get()
+    if directory is None:
+        root = state_dir() / "logs"
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        directory = Path(tempfile.mkdtemp(prefix="operation-", dir=root))
+        for name in ("stdout.log", "stderr.log"):
+            (directory / name).touch(mode=0o600)
+    with log_to(directory):
+        yield directory
+
+
+def logged_operation(
+    function: Callable[_PARAMS, dict[str, object]],
+) -> Callable[_PARAMS, dict[str, object]]:
+    @functools.wraps(function)
+    def wrapper(*args: _PARAMS.args, **kwargs: _PARAMS.kwargs) -> dict[str, object]:
+        with operation_logs() as directory:
+            response = function(*args, **kwargs)
+        output = response.get("output")
+        if not isinstance(output, str):
+            return response
+        response["log_paths"] = {
+            "stdout": str(directory / "stdout.log"),
+            "stderr": str(directory / "stderr.log"),
+        }
+        if response.get("status") == "ok" and "log_truncated" not in response:
+            compact = tail(output)
+            response["output"] = compact
+            response["log_truncated"] = compact != output
+        return account(response)
+
+    return wrapper
+
+
+def _logged_output(path: Path, offset: int) -> tuple[str, int]:
+    with path.open("rb") as stream:
+        size = max(0, os.fstat(stream.fileno()).st_size - offset)
+        stream.seek(offset)
+        if size <= OUTPUT_CAP * 4:
+            data = stream.read(size)
+            text = data.decode("utf-8", errors="replace")
+        else:
+            head = stream.read(OUTPUT_CAP * 2).decode("utf-8", errors="replace")
+            stream.seek(offset + size - OUTPUT_CAP * 2)
+            end = stream.read(OUTPUT_CAP * 2).decode("utf-8", errors="replace")
+            text = head + "\n... [nix-agent: log truncated] ...\n" + end
+    return truncate_output(text), size
+
+
+def _run_logged(
+    argv: list[str], cwd: str | None, timeout: float, directory: Path
+) -> RunResult:
+    stdout_path = directory / "stdout.log"
+    stderr_path = directory / "stderr.log"
+    with stdout_path.open("ab") as stdout, stderr_path.open("ab") as stderr:
+        stdout_offset, stderr_offset = stdout.tell(), stderr.tell()
+        try:
+            proc = subprocess.Popen(
+                argv,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                cwd=cwd,
+                start_new_session=True,
+            )
+        except FileNotFoundError:
+            stderr.write(f"{argv[0]}: command not found\n".encode())
+            ok = False
+        else:
+            try:
+                ok = proc.wait(timeout=timeout) == 0
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                proc.wait()
+                stderr.write(
+                    f"\n{argv[0]}: timed out after {timeout} seconds\n".encode()
+                )
+                ok = False
+    out, out_bytes = _logged_output(stdout_path, stdout_offset)
+    err, err_bytes = _logged_output(stderr_path, stderr_offset)
+    return RunResult(ok, list(argv), out, err, out_bytes + err_bytes)
+
+
 def run(
     argv: list[str],
     cwd: str | None = None,
     timeout: float | None = None,
 ) -> RunResult:
     effective_timeout = command_timeout() if timeout is None else timeout
+    directory = _LOG_DIR.get()
+    if directory is not None:
+        return _run_logged(argv, cwd, effective_timeout, directory)
     try:
         proc = subprocess.run(
             argv,
@@ -96,13 +213,22 @@ def run(
             raw_bytes=len(stderr),
         )
     except subprocess.TimeoutExpired as exc:
-        stderr = f"{argv[0]}: timed out after {exc.timeout} seconds"
+        stdout = (exc.stdout or b"").decode("utf-8", errors="replace")
+        captured_stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+        stderr = "\n".join(
+            part
+            for part in (
+                captured_stderr,
+                f"{argv[0]}: timed out after {exc.timeout} seconds",
+            )
+            if part
+        )
         return RunResult(
             ok=False,
             command=list(argv),
-            stdout=exc.stdout or "",
-            stderr=stderr,
-            raw_bytes=len(stderr.encode()),
+            stdout=truncate_output(stdout),
+            stderr=truncate_output(stderr),
+            raw_bytes=len(stdout.encode()) + len(stderr.encode()),
         )
     raw = len((proc.stdout or "").encode()) + len((proc.stderr or "").encode())
     return RunResult(
@@ -132,7 +258,10 @@ def extract_first_error(output: str) -> str | None:
             if stripped == "error:":
                 for next_line in lines[i + 1 :]:
                     next_stripped = next_line.strip()
-                    if next_stripped.startswith(_ERROR_STARTS) and next_stripped != "error:":
+                    if (
+                        next_stripped.startswith(_ERROR_STARTS)
+                        and next_stripped != "error:"
+                    ):
                         return next_stripped
                 for next_line in lines[i + 1 :]:
                     next_stripped = next_line.strip()
