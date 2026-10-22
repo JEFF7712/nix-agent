@@ -214,7 +214,7 @@ Operational core:
 
 | Tool | What it does |
 |------|-------------|
-| `build(flake_uri?, mode?, job_id?)` | Start a persistent background build, no activation. Returns `job_id` promptly; poll `build(job_id=...)` for live log tails and the final result. Success carries `store_path`; a failed builder carries `failed_derivation` (`{drv, log_tail}`). Repeated starts for the same running target return its existing job. |
+| `build(flake_uri?, mode?, job_id?, log_offset?)` | Start a persistent background build, no activation. Returns `job_id` promptly; poll `build(job_id=...)` for live log tails and the final result. Success carries `store_path`; a failed builder carries `failed_derivation` (`{drv, log_tail}`). Repeated starts for the same running target return its existing job. |
 | `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this in the reply and switch unless the user asked only to preview or check. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). Activation with newly failed units returns `status: "degraded"` and a rollback hint. `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. Privileged argv uses `sudo -n`. |
 | `generations(action="list"\|"rollback", mode?, generation?)` | List or roll back generations. NixOS list entries include `path` (realpath of the profile link) when that link exists. After `switch`, undo with `generations(action="rollback", generation=<rollback_generation or id>)`. Bare `generations(action="rollback")` is previous-generation only, and is only the right default when nothing else has switched since. A `generation` that matches nothing returns `unknown_generation` and runs no command. |
@@ -276,7 +276,10 @@ so an absent warning list does not prove every activation step was clean.
 `build(flake_uri="/home/you/nixos#host")` starts a detached local worker and
 returns `job_id` without waiting for the closure. Use
 `build(job_id="<returned ID>")` to read its status, bounded `log_tail.stdout`
-and `log_tail.stderr`, and the saved completion result. Polling never starts
+and `log_tail.stderr`, and the saved completion result. A running poll also
+returns `log_offset`; pass it back as `build(job_id=..., log_offset=...)` to
+receive only stderr written since that poll. A finished result carries its
+log tail as `output` instead of `log_tail`. Polling never starts
 a build. Status is `running` until a result is recorded, then `ok` or
 `failed` (or a target diagnostic such as `unknown_host`). An invalid or
 missing ID returns `unknown_job`.

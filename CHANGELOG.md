@@ -8,6 +8,9 @@
 - `nix-agent usage` counts only `failed` as a failure, reports `running`
   polls separately, and breaks out early exits such as `unknown_host`.
   Usage events record the build `job_id`.
+- `build(job_id=..., log_offset=...)` returns only stderr written after the
+  previous poll's `log_offset`. Finished jobs no longer repeat their log
+  tail as `log_tail` next to `output`.
 
 ## v0.13.0 - 2026-10-14
 

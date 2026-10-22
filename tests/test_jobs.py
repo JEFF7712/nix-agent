@@ -143,7 +143,7 @@ def test_large_job_logs_are_bounded_and_keep_store_path(fake_nix, monkeypatch):
     assert result["store_path"] == "/nix/store/test-system"
     assert len(result["output"]) < 2200
     assert result["log_truncated"] is True
-    assert len(result["log_tail"]["stdout"]) < 2200
+    assert "log_tail" not in result
     assert Path(result["log_paths"]["stdout"]).stat().st_size > 300000
 
 
@@ -183,7 +183,22 @@ def test_job_timeout_records_failure_and_partial_log(fake_nix, monkeypatch):
     result = wait_for_job(job_id)
     assert result["status"] == "failed"
     assert "timed out after 0.3 seconds" in result["output"]
-    assert "building test closure" in result["log_tail"]["stderr"]
+    assert "building test closure" in result["output"]
+
+
+def test_log_offset_returns_only_new_stderr(fake_nix):
+    job_id = build("/test#host")["job_id"]
+
+    def live_logs():
+        result = build(job_id=job_id)
+        if "building test closure" in result["log_tail"]["stderr"]:
+            return result
+
+    first = eventually(live_logs)
+    again = build(job_id=job_id, log_offset=first["log_offset"])
+    assert again["status"] == "running"
+    assert again["log_tail"]["stderr"] == ""
+    assert again["log_offset"] == first["log_offset"]
 
 
 def test_unknown_job_does_not_start_build(fake_nix):

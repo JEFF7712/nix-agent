@@ -24,7 +24,8 @@ _TOOLS = [
         "build",
         "Start a persistent background build of the system/HM closure, without "
         "activation. Returns job_id promptly. Poll build(job_id=...) for bounded "
-        "live log tails and status: running, ok, failed, or interrupted. Jobs "
+        "live log tails and status: running, ok, failed, or interrupted. Pass "
+        "the previous poll's log_offset to receive only new stderr. Jobs "
         "survive MCP disconnects and server restarts; repeated starts for the "
         "same running target reuse its job. On success returns store_path; "
         "successful output is a short tail with log_truncated and full local "

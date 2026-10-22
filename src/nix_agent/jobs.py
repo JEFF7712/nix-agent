@@ -39,16 +39,19 @@ def _active(directory: Path) -> bool:
         return False
 
 
-def _log_tail(path: Path) -> str:
+def _log_tail(path: Path, offset: int = 0) -> tuple[str, int]:
+    """Tail of the log after `offset`, and the log's current size."""
     with path.open("rb") as stream:
         stream.seek(0, os.SEEK_END)
-        stream.seek(max(0, stream.tell() - runner.TAIL_CAP * 4))
-        return runner.tail(
-            stream.read(runner.TAIL_CAP * 4).decode("utf-8", errors="replace")
-        )
+        size = stream.tell()
+        stream.seek(max(0, min(offset, size), size - runner.TAIL_CAP * 4))
+        text = stream.read(runner.TAIL_CAP * 4).decode("utf-8", errors="replace")
+        return runner.tail(text), size
 
 
-def status(job_id: str, root: Path | None = None) -> dict[str, object]:
+def status(
+    job_id: str, root: Path | None = None, log_offset: int | None = None
+) -> dict[str, object]:
     root = jobs_dir() if root is None else root
     if not re.fullmatch(r"[0-9a-f]{32}", job_id):
         return {
@@ -88,15 +91,17 @@ def status(job_id: str, root: Path | None = None) -> dict[str, object]:
         elapsed_seconds=round(
             max(0, response.get("finished_at", time.time()) - request["started_at"]), 1
         ),
-        log_tail={
-            "stdout": _log_tail(directory / "stdout.log"),
-            "stderr": _log_tail(directory / "stderr.log"),
-        },
         log_paths={
             "stdout": str(directory / "stdout.log"),
             "stderr": str(directory / "stderr.log"),
         },
     )
+    # A finished result already carries the log tail as `output`.
+    if "output" not in response:
+        stdout, _ = _log_tail(directory / "stdout.log")
+        stderr, stderr_size = _log_tail(directory / "stderr.log", log_offset or 0)
+        response["log_tail"] = {"stdout": stdout, "stderr": stderr}
+        response["log_offset"] = stderr_size
     return runner.account(response)
 
 

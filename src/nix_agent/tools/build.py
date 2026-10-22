@@ -67,11 +67,12 @@ def build(
     flake_uri: str | None = None,
     mode: str = "nixos",
     job_id: str | None = None,
+    log_offset: int | None = None,
 ) -> dict[str, object]:
     from nix_agent import jobs
 
     if job_id is not None:
-        return jobs.status(job_id)
+        return jobs.status(job_id, log_offset=log_offset)
     try:
         target = resolve_target(flake_uri, mode)
     except TargetError as exc:

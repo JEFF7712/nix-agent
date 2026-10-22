@@ -118,9 +118,10 @@ omitted and echo back what they resolved and ran (`resolved_target` and
 `command`, or `commands` for `check("lint")`).
 
 Operational core:
-- `build(flake_uri?, mode?, job_id?)`: start a persistent background build,
-  no activation. Keep the returned `job_id` and poll `build(job_id=...)`
-  for live log tails and the final result. `running` means wait; `ok`
+- `build(flake_uri?, mode?, job_id?, log_offset?)`: start a persistent
+  background build, no activation. Keep the returned `job_id` and poll
+  `build(job_id=..., log_offset=<previous poll's log_offset>)` for new log
+  lines and the final result. `running` means wait; `ok`
   carries `store_path`; a failed builder carries `failed_derivation`.
   Successful output is a short tail with `log_truncated` and `log_paths`
   to the full local logs. Failures retain their capped diagnostics.
@@ -277,8 +278,9 @@ do not re-fetch.
   status is `failed`. Check `failed_count`, `first_error`, and each result.
   Successful values remain available. A `truncated: true` value means
   eval a child attr for the part you need, NOT retry for full output.
-- **Keep build job IDs.** Poll `build(job_id=...)` while `running`, using
-  its live log tails. A lost MCP connection does not cancel the worker.
+- **Keep build job IDs.** Poll `build(job_id=...)` while `running`, passing
+  back each poll's `log_offset` so repeated polls do not resend the same
+  tail. A lost MCP connection does not cancel the worker.
   Repeating the same start retrieves the existing running job; it does
   not start a duplicate. `interrupted` requires inspecting the saved
   logs before retrying.
