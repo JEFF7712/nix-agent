@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.14.0 - 2026-10-22
 
 - `diff` no longer returns the nvd text twice next to the parsed
   `packages`. A parsed diff returns `packages` plus `closure_size`; the raw
