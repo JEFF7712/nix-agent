@@ -106,19 +106,27 @@ def test_summarize_and_format(tmp_path):
                 json.dumps(
                     {"tool": "switch", "error": "RuntimeError", "duration_ms": 5}
                 ),
+                json.dumps({"tool": "build", "status": "running", "duration_ms": 1}),
+                json.dumps(
+                    {"tool": "eval_config", "status": "unknown_host", "duration_ms": 1}
+                ),
                 "not-json",
             ]
         )
         + "\n"
     )
     summary = metrics.summarize(metrics.load_events(path))
-    assert summary["events"] == 3
+    assert summary["events"] == 5
     assert summary["ok"] == 1
     assert summary["failed"] == 1
+    assert summary["running"] == 1
+    assert summary["other"] == {"unknown_host": 1}
+    assert summary["by_tool"]["build"]["failed"] == 0
+    assert summary["by_tool"]["eval_config"]["other"] == {"unknown_host": 1}
     assert summary["errors"] == 1
     assert summary["bytes_saved"] == 60
-    assert summary["by_tool"]["eval_config"]["calls"] == 2
-    assert summary["by_tool"]["eval_config"]["avg_duration_ms"] == 15.0
+    assert summary["by_tool"]["eval_config"]["calls"] == 3
+    assert summary["by_tool"]["eval_config"]["avg_duration_ms"] == round(31 / 3, 1)
 
     text = metrics.format_summary(summary, path=path)
     assert str(path) in text
@@ -288,7 +296,7 @@ def test_scan_shell_history_ignores_path_false_positives(tmp_path):
     fish.write_text(
         "- cmd: cd modules/home-manager/terminals/\n"
         "- cmd: git rm --cached modules/home-manager/configs/rofi -f\n"
-        "- cmd: git commit -m \"Add rofi config to home-manager\"\n"
+        '- cmd: git commit -m "Add rofi config to home-manager"\n'
         "- cmd: sudo pkill -f 'nixos-rebuild.*path:/home/rupan/nixos'\n"
         "- cmd: z home-manager\n"
         "- cmd: home-manager switch --flake .#laptop\n"
