@@ -157,6 +157,9 @@ Config introspection:
   config attribute on THIS machine, after all modules/overlays.
   `mcp-nixos` says what an option means; this says what it is. Pass a
   **list** for `attr` to evaluate many in one call (per-attr `results`).
+  Pass attrs relative to the host config (`services.x`); a leading
+  `config.` or `nixosConfigurations.<host>.config.` is stripped, and an
+  embedded host is used when `flake_uri` names none.
   All attrs ok → `ok`; mixed → `partial`; every attr failed → `failed`.
   Batches carry `succeeded_count` and `failed_count`; partial and failed
   batches include the first available `first_error`. Values above ~2 KB

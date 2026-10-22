@@ -1,4 +1,5 @@
 import json
+import re
 
 from nix_agent import hostattr, runner
 from nix_agent.target import (
@@ -15,6 +16,21 @@ def _missing_config_attr(output: str) -> bool:
 
 
 GUARD_CAP = 2048
+
+# Agents often pass a full flake attr path or a leading `config.`; both
+# would otherwise be appended after `.config.` and miss.
+_ATTR_PREFIX = re.compile(
+    r'^(?:(?:nixos|home)Configurations\.("[^"]+"|[^."]+)\.)?config\.(?=.)'
+)
+
+
+def split_attr(attr: str) -> tuple[str | None, str]:
+    """(embedded host or None, attr relative to the host's config)."""
+    match = _ATTR_PREFIX.match(attr)
+    if match is None:
+        return None, attr
+    host = match.group(1)
+    return (host.strip('"') if host else None), attr[match.end() :]
 
 
 def guard_value(value: object) -> tuple[object, bool]:
@@ -160,6 +176,15 @@ def eval_config(
     except TargetError as exc:
         return {"status": "no_target", "error": str(exc)}
 
+    requested = attr if isinstance(attr, list) else [attr]
+    split = [split_attr(one) for one in requested]
+    hosts = {host for host, _ in split if host}
+    if len(hosts) == 1 and not target.attr:
+        host = hosts.pop()
+        target = Target(flake_dir=target.flake_dir, attr=host, mode=target.mode)
+        candidates = [host]
+    relative = {one: rest for one, (_, rest) in zip(requested, split, strict=True)}
+
     if isinstance(attr, list):
         if not attr:
             return {
@@ -169,7 +194,7 @@ def eval_config(
         results = []
         raw_total = 0
         for one in attr:
-            envelope = _eval_one(target, candidates, one, mode=mode)
+            envelope = _eval_one(target, candidates, relative[one], mode=mode)
             if envelope.get("status") == "unknown_host":
                 return envelope
             winning = envelope.pop("_candidate", None)
@@ -185,6 +210,8 @@ def eval_config(
                 "attr": one,
                 "status": envelope["status"],
             }
+            if relative[one] != one:
+                entry["evaluated_attr"] = relative[one]
             for key in (
                 "value",
                 "truncated",
@@ -224,4 +251,8 @@ def eval_config(
             if first is not None:
                 response["first_error"] = first
         return runner.account(response)
-    return _eval_one(target, candidates, attr, mode=mode)
+    response = _eval_one(target, candidates, relative[attr], mode=mode)
+    if relative[attr] != attr and response.get("status") != "unknown_host":
+        response["requested_attr"] = attr
+        runner.account(response)
+    return response
