@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.14.0 - 2026-10-22
+
+- `diff` no longer returns the nvd text twice next to the parsed
+  `packages`. A parsed diff returns `packages` plus `closure_size`; the raw
+  text appears as `diff` only when it does not parse.
+- `nix-agent usage` counts only `failed` as a failure, reports `running`
+  polls separately, and breaks out early exits such as `unknown_host`.
+  Usage events record the build `job_id`.
+- `build(job_id=..., log_offset=...)` returns only stderr written after the
+  previous poll's `log_offset`. Finished jobs no longer repeat their log
+  tail as `log_tail` next to `output`.
+- `eval_config` strips a leading `config.` or
+  `nixosConfigurations.<host>.config.` from attrs instead of evaluating
+  `config.config.…`, and uses the embedded host when `flake_uri` names none.
+
 ## v0.13.0 - 2026-10-14
 
 - **Build API change:** `build(flake_uri?, mode?)` now starts a persistent

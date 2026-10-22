@@ -54,7 +54,7 @@
         siteSource = cleanSource ./site;
         nix-agent-package = pkgs.python3Packages.buildPythonApplication {
           pname = "nix-agent";
-          version = "0.13.0";
+          version = "0.14.0";
           format = "pyproject";
           src = packageSource;
           nativeBuildInputs =

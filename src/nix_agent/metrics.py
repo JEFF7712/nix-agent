@@ -202,6 +202,9 @@ def event_from_call(
         target = response.get("resolved_target")
         if target is not None:
             event["resolved_target"] = target
+        job_id = response.get("job_id")
+        if isinstance(job_id, str) and job_id:
+            event["job_id"] = job_id
         raw = response.get("raw_bytes")
         returned = response.get("returned_bytes")
         if isinstance(raw, int):
@@ -286,6 +289,8 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
     accounted = 0
     ok = 0
     failed = 0
+    running = 0
+    other: dict[str, int] = {}
     errors = 0
     first_ts: str | None = None
     last_ts: str | None = None
@@ -306,6 +311,8 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
                 "calls": 0,
                 "ok": 0,
                 "failed": 0,
+                "running": 0,
+                "other": {},
                 "errors": 0,
                 "duration_ms_total": 0.0,
                 "raw_bytes": 0,
@@ -326,9 +333,16 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
         if status == "ok":
             bucket["ok"] += 1
             ok += 1
-        elif status is not None:
+        elif status == "failed":
             bucket["failed"] += 1
             failed += 1
+        elif status == "running":
+            bucket["running"] += 1
+            running += 1
+        elif status is not None:
+            name = str(status)
+            bucket["other"][name] = bucket["other"].get(name, 0) + 1
+            other[name] = other.get(name, 0) + 1
 
         raw = event.get("raw_bytes")
         returned = event.get("returned_bytes")
@@ -351,6 +365,8 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
             "calls": calls,
             "ok": bucket["ok"],
             "failed": bucket["failed"],
+            "running": bucket["running"],
+            "other": dict(sorted(bucket["other"].items())),
             "errors": bucket["errors"],
             "avg_duration_ms": (
                 round(bucket["duration_ms_total"] / calls, 1) if calls else 0.0
@@ -366,6 +382,8 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
         "events": len(events),
         "ok": ok,
         "failed": failed,
+        "running": running,
+        "other": dict(sorted(other.items())),
         "errors": errors,
         "raw_bytes": total_raw,
         "returned_bytes": total_returned,
@@ -378,12 +396,19 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _format_counts(counts: Mapping[str, int]) -> str:
+    return ", ".join(f"{name}={count}" for name, count in counts.items())
+
+
 def format_summary(summary: Mapping[str, Any], *, path: Path) -> str:
     lines = [
         f"usage log: {path}",
         f"events: {summary['events']}  ok: {summary['ok']}  "
-        f"failed: {summary['failed']}  errors: {summary['errors']}",
+        f"failed: {summary['failed']}  running: {summary['running']}  "
+        f"errors: {summary['errors']}",
     ]
+    if summary.get("other"):
+        lines.append("other statuses: " + _format_counts(summary["other"]))
     first_ts = summary.get("first_ts")
     last_ts = summary.get("last_ts")
     if first_ts and last_ts:
@@ -407,8 +432,12 @@ def format_summary(summary: Mapping[str, Any], *, path: Path) -> str:
                 f"  {tool}: calls={entry['calls']}",
                 f"ok={entry['ok']}",
                 f"failed={entry['failed']}",
-                f"avg_ms={entry['avg_duration_ms']}",
             ]
+            if entry["running"]:
+                parts.append(f"running={entry['running']}")
+            if entry["other"]:
+                parts.append(f"other=({_format_counts(entry['other'])})")
+            parts.append(f"avg_ms={entry['avg_duration_ms']}")
             if "bytes_saved" in entry:
                 parts.append(f"saved={entry['bytes_saved']}")
             lines.append("  ".join(parts))

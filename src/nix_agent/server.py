@@ -24,7 +24,8 @@ _TOOLS = [
         "build",
         "Start a persistent background build of the system/HM closure, without "
         "activation. Returns job_id promptly. Poll build(job_id=...) for bounded "
-        "live log tails and status: running, ok, failed, or interrupted. Jobs "
+        "live log tails and status: running, ok, failed, or interrupted. Pass "
+        "the previous poll's log_offset to receive only new stderr. Jobs "
         "survive MCP disconnects and server restarts; repeated starts for the "
         "same running target reuse its job. On success returns store_path; "
         "successful output is a short tail with log_truncated and full local "
@@ -36,7 +37,9 @@ _TOOLS = [
         "diff",
         "Build the new closure and diff it against the running system "
         "(nvd, falling back to nix store diff-closures): package "
-        "additions, removals, version changes. Include the changeset in "
+        "additions, removals, version changes as structured packages plus "
+        "closure_size; the raw diff text only when it does not parse. "
+        "Include the changeset in "
         "the reply and switch unless the user asked only to preview or "
         "check. For hosts requiring coordinated fleet deployment, use the "
         "repository's deployment orchestrator.",

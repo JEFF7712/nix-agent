@@ -419,3 +419,51 @@ def test_eval_hm_rewrite(monkeypatch):
     assert out["value"] is True
     assert out["hm_rewritten"] is True
     assert out["requested_attr"] == "programs.git.enable"
+
+
+def test_split_attr_strips_config_and_flake_prefixes():
+    assert eval_mod.split_attr("services.x.enable") == (None, "services.x.enable")
+    assert eval_mod.split_attr("config.services.x") == (None, "services.x")
+    assert eval_mod.split_attr("nixosConfigurations.h-1.config.a.b") == ("h-1", "a.b")
+    assert eval_mod.split_attr('nixosConfigurations."h.1".config.a') == ("h.1", "a")
+    assert eval_mod.split_attr("configFile") == (None, "configFile")
+
+
+def test_eval_strips_leading_config(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return _result(True, stdout="true\n", command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config("config.services.openssh.enable", flake_uri="/etc/nixos#zen")
+    assert out["status"] == "ok"
+    assert out["requested_attr"] == "config.services.openssh.enable"
+    assert calls[0][2] == (
+        '/etc/nixos#nixosConfigurations."zen".config.services.openssh.enable'
+    )
+
+
+def test_eval_batched_uses_embedded_host(monkeypatch):
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return _result(True, stdout='"v"\n', command=argv)
+
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["guess"])
+    out = eval_config(
+        [
+            "nixosConfigurations.homelab-04.config.a.b",
+            "nixosConfigurations.homelab-04.config.c",
+        ],
+        flake_uri="/x",
+    )
+    assert out["status"] == "ok"
+    assert out["results"][0]["evaluated_attr"] == "a.b"
+    assert [c[2] for c in calls] == [
+        '/x#nixosConfigurations."homelab-04".config.a.b',
+        '/x#nixosConfigurations."homelab-04".config.c',
+    ]

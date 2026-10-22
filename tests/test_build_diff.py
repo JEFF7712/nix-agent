@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from nix_agent.runner import RunResult
 from nix_agent.target import resolve_target
 from nix_agent.tools import build as build_mod
 from nix_agent.tools.build import build_closure, diff
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def build(flake_uri, mode="nixos"):
@@ -89,6 +93,7 @@ def test_diff_runs_nvd(monkeypatch):
     out = diff(flake_uri="/etc/nixos#zen", mode="nixos")
     assert out["status"] == "ok"
     assert "firefox" in out["diff"]
+    assert "output" not in out
     assert calls[-1] == [
         "/bin/nvd",
         "diff",
@@ -216,6 +221,7 @@ def test_diff_degrades_without_packages(monkeypatch):
     assert out["status"] == "ok"
     assert "packages" not in out
     assert out["diff"] == "garbled output"
+    assert "output" not in out
 
 
 def test_diff_empty_diff_closures_is_empty_packages(monkeypatch):
@@ -304,3 +310,23 @@ def test_build_unique_host_fallback(monkeypatch):
     assert out["status"] == "ok"
     assert out["store_path"] == "/nix/store/sys"
     assert any('nixosConfigurations."laptop"' in argv[-1] for argv in calls)
+
+
+def test_diff_keeps_nvd_closure_size(monkeypatch):
+    nvd_output = (FIXTURES / "nvd-diff.txt").read_text()
+
+    def fake_run(argv, cwd=None):
+        if argv[0] == "/bin/nvd":
+            return RunResult(ok=True, command=argv, stdout=nvd_output, stderr="")
+        return RunResult(
+            ok=True, command=argv, stdout="/nix/store/new-toplevel\n", stderr=""
+        )
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["closure_size"].startswith("4348 -> 4606")
+    assert out["returned_bytes"] < len(nvd_output)
