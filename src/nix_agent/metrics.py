@@ -202,6 +202,9 @@ def event_from_call(
         target = response.get("resolved_target")
         if target is not None:
             event["resolved_target"] = target
+        job_id = response.get("job_id")
+        if isinstance(job_id, str) and job_id:
+            event["job_id"] = job_id
         raw = response.get("raw_bytes")
         returned = response.get("returned_bytes")
         if isinstance(raw, int):

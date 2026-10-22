@@ -348,3 +348,14 @@ def test_usage_cli(monkeypatch, tmp_path, capsys):
     assert payload["events"] == 1
     assert payload["path"] == str(path)
     assert payload["by_tool"]["diff"]["bytes_saved"] == 6
+
+
+def test_event_records_build_job_id():
+    event = metrics.event_from_call(
+        tool="build",
+        duration_ms=1.0,
+        response={"status": "running", "job_id": "a" * 32},
+        error=None,
+        kwargs={"mode": "nixos"},
+    )
+    assert event["job_id"] == "a" * 32
