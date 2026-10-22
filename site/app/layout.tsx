@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -29,7 +30,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={mono.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Script src="https://tally.rupan.dev/t.js" data-website-id="e8777c6b-0876-4b6e-8495-3bfee147cf8a" data-domains="nix-agent.rupan.dev" strategy="afterInteractive" />
+      </body>
     </html>
   );
 }
