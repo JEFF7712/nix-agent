@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `diff` no longer returns the nvd text twice next to the parsed
+  `packages`. A parsed diff returns `packages` plus `closure_size`; the raw
+  text appears as `diff` only when it does not parse.
+- `nix-agent usage` counts only `failed` as a failure, reports `running`
+  polls separately, and breaks out early exits such as `unknown_host`.
+  Usage events record the build `job_id`.
+
 ## v0.13.0 - 2026-10-14
 
 - **Build API change:** `build(flake_uri?, mode?)` now starts a persistent

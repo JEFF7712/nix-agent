@@ -36,7 +36,9 @@ _TOOLS = [
         "diff",
         "Build the new closure and diff it against the running system "
         "(nvd, falling back to nix store diff-closures): package "
-        "additions, removals, version changes. Include the changeset in "
+        "additions, removals, version changes as structured packages plus "
+        "closure_size; the raw diff text only when it does not parse. "
+        "Include the changeset in "
         "the reply and switch unless the user asked only to preview or "
         "check. For hosts requiring coordinated fleet deployment, use the "
         "repository's deployment orchestrator.",

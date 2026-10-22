@@ -134,12 +134,25 @@ def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]
         }
 
     result, packages = closure_diff(current, new_path)
-    status = "ok" if result.ok else "failed"
-    extra: dict[str, object] = {
-        "diff": result.output,
-        "store_path": new_path,
-        "current_closure": current,
-    }
-    if packages is not None:
+    extra: dict[str, object] = {"store_path": new_path, "current_closure": current}
+    if not result.ok:
+        return runner.envelope("failed", str(built["resolved_target"]), result, **extra)
+    if packages is None:
+        extra["diff"] = result.output
+    else:
         extra["packages"] = packages
-    return runner.envelope(status, str(built["resolved_target"]), result, **extra)
+        closure_size = _closure_size(result.output)
+        if closure_size is not None:
+            extra["closure_size"] = closure_size
+    response = runner.envelope("ok", str(built["resolved_target"]), result, **extra)
+    # The parsed packages (or the raw diff) already carry the output.
+    del response["output"]
+    return runner.account(response)
+
+
+def _closure_size(output: str) -> str | None:
+    for line in reversed(output.splitlines()):
+        stripped = line.strip()
+        if stripped.startswith("Closure size:"):
+            return stripped.removeprefix("Closure size:").strip()
+    return None

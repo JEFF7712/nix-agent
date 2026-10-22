@@ -134,8 +134,6 @@
       "str"
     ],
     "current_closure": "str",
-    "diff": "str",
-    "output": "str",
     "packages": {
       "added": [],
       "changed": [
