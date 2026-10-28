@@ -27,7 +27,7 @@ export function selectDensityTier(
 
 export const SNOWFLAKE_FOV_DEGREES = 34;
 export const SNOWFLAKE_BASE_DISTANCE = 3.15;
-export const SNOWFLAKE_DESIRED_OFFSET = 0.8;
+export const SNOWFLAKE_DESIRED_OFFSET = 0.7;
 export const SNOWFLAKE_FLAKE_RADIUS = 0.94;
 export const SNOWFLAKE_EDGE_LIMIT = 0.99;
 
@@ -35,7 +35,7 @@ export function snowflakeHorizontalOffset(viewportWidth: number): number {
   return viewportWidth < 768 ? 0 : SNOWFLAKE_DESIRED_OFFSET;
 }
 
-/** Dolly the camera back just enough that offset + flake radius stays inside NDC. */
+/** Keep desktop snowflake big at base distance; dolly back only on mobile to fit the frame. */
 export function snowflakeCameraDistance(
   viewportWidth: number,
   viewportHeight: number,
@@ -44,7 +44,8 @@ export function snowflakeCameraDistance(
     !Number.isFinite(viewportWidth) ||
     !Number.isFinite(viewportHeight) ||
     viewportWidth <= 0 ||
-    viewportHeight <= 0
+    viewportHeight <= 0 ||
+    viewportWidth >= 768
   ) {
     return SNOWFLAKE_BASE_DISTANCE;
   }
@@ -52,10 +53,7 @@ export function snowflakeCameraDistance(
   const aspect = viewportWidth / viewportHeight;
   const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
   const needed = (offset + SNOWFLAKE_FLAKE_RADIUS) / (tanHalfFov * aspect * SNOWFLAKE_EDGE_LIMIT);
-  if (needed <= SNOWFLAKE_BASE_DISTANCE + 1e-6) {
-    return SNOWFLAKE_BASE_DISTANCE;
-  }
-  return needed;
+  return Math.max(SNOWFLAKE_BASE_DISTANCE, needed);
 }
 
 export function seededNoise(x: number, y: number, seed: number): number {
