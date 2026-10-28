@@ -7,6 +7,7 @@ import {
   AGENT_PUPIL,
   DENSITY_TIERS,
   SNOWFLAKE_BASE_DISTANCE,
+  SNOWFLAKE_DESIRED_OFFSET,
   SNOWFLAKE_EDGE_LIMIT,
   SNOWFLAKE_FLAKE_RADIUS,
   SNOWFLAKE_FOV_DEGREES,
@@ -36,33 +37,26 @@ describe("snowflake density", () => {
 describe("snowflake framing", () => {
   it("centers the mobile composition and shifts the desktop composition right", () => {
     expect(snowflakeHorizontalOffset(390)).toBe(0);
-    expect(snowflakeHorizontalOffset(1280)).toBe(0.72);
+    expect(snowflakeHorizontalOffset(1280)).toBe(SNOWFLAKE_DESIRED_OFFSET);
   });
 
-  it("keeps ultrawide compositions at the base camera distance", () => {
+  it("keeps wide desktop compositions at the base camera distance and desired offset", () => {
+    expect(snowflakeHorizontalOffset(2560)).toBe(SNOWFLAKE_DESIRED_OFFSET);
     expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeHorizontalOffset(1920)).toBe(SNOWFLAKE_DESIRED_OFFSET);
   });
 
-  it("dollies back on narrower aspects so the flake edge stays inside NDC", () => {
-    const sizes: Array<[number, number]> = [
-      [2560, 1080],
-      [1920, 1080],
-      [1512, 859],
-      [1280, 800],
-      [1024, 768],
-      [390, 844],
-    ];
+  it.each([[390, 844], [1920, 1080], [1600, 1000], [1280, 800], [800, 1000]])(
+    "fits the snowflake within a %i by %i canvas", (width, height) => {
     const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
-    for (const [width, height] of sizes) {
-      const offset = snowflakeHorizontalOffset(width);
-      const distance = snowflakeCameraDistance(width, height);
-      const aspect = width / height;
-      const halfWidth = tanHalfFov * distance * aspect;
-      expect(distance).toBeGreaterThanOrEqual(SNOWFLAKE_BASE_DISTANCE);
-      expect(offset + SNOWFLAKE_FLAKE_RADIUS).toBeLessThanOrEqual(
-        halfWidth * SNOWFLAKE_EDGE_LIMIT + 1e-9,
-      );
-    }
+    const offset = snowflakeHorizontalOffset(width);
+    const distance = snowflakeCameraDistance(width, height);
+    const aspect = width / height;
+    const halfWidth = tanHalfFov * (distance - DENSITY_TIERS.high.zDepth) * aspect;
+    expect(distance).toBeGreaterThanOrEqual(SNOWFLAKE_BASE_DISTANCE);
+    expect(offset + SNOWFLAKE_FLAKE_RADIUS).toBeLessThanOrEqual(
+      halfWidth * SNOWFLAKE_EDGE_LIMIT + 1e-9,
+    );
   });
 
   it("falls back to the base distance for invalid viewports", () => {

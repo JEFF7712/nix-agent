@@ -129,10 +129,15 @@ export function smoothEmotion(current: number, target: number, dt: number, attac
 }
 
 /** Host-NDC estimate of the agent face center for the current layout. */
-export function faceCenterNdc(viewportWidth: number, viewportHeight?: number, cameraZ?: number) {
+export function faceCenterNdc(
+  viewportWidth: number,
+  viewportHeight?: number,
+  cameraZ?: number,
+) {
   if (viewportWidth < 768) {
     return { x: 0, y: 0.1 };
   }
+  const offset = snowflakeHorizontalOffset(viewportWidth);
   if (
     viewportHeight === undefined ||
     cameraZ === undefined ||
@@ -141,12 +146,10 @@ export function faceCenterNdc(viewportWidth: number, viewportHeight?: number, ca
     viewportHeight <= 0 ||
     cameraZ <= 0
   ) {
-    // Matches the snowflake's projected face in host canvas NDC.
-    return { x: 0.38, y: 0.1 };
+    return { x: offset > 0 ? 0.38 : 0, y: 0.1 };
   }
   const aspect = viewportWidth / viewportHeight;
   const focal = 1 / Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
-  const offset = snowflakeHorizontalOffset(viewportWidth);
   return {
     x: (offset * focal) / (aspect * cameraZ),
     y: 0.1,

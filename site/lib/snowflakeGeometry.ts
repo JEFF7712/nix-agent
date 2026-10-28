@@ -27,16 +27,18 @@ export function selectDensityTier(
 
 export const SNOWFLAKE_FOV_DEGREES = 34;
 export const SNOWFLAKE_BASE_DISTANCE = 3.15;
-export const SNOWFLAKE_DESIRED_OFFSET = 0.72;
-export const SNOWFLAKE_FLAKE_RADIUS = 1.06;
+export const SNOWFLAKE_DESIRED_OFFSET = 0.7;
+export const SNOWFLAKE_FLAKE_RADIUS = 0.94;
 export const SNOWFLAKE_EDGE_LIMIT = 0.96;
 
 export function snowflakeHorizontalOffset(viewportWidth: number): number {
   return viewportWidth < 768 ? 0 : SNOWFLAKE_DESIRED_OFFSET;
 }
 
-/** Dolly the camera back just enough that offset + flake radius stays inside NDC. */
-export function snowflakeCameraDistance(viewportWidth: number, viewportHeight: number): number {
+export function snowflakeCameraDistance(
+  viewportWidth: number,
+  viewportHeight: number,
+): number {
   if (
     !Number.isFinite(viewportWidth) ||
     !Number.isFinite(viewportHeight) ||
@@ -45,10 +47,11 @@ export function snowflakeCameraDistance(viewportWidth: number, viewportHeight: n
   ) {
     return SNOWFLAKE_BASE_DISTANCE;
   }
-  const desired = snowflakeHorizontalOffset(viewportWidth);
+  const offset = snowflakeHorizontalOffset(viewportWidth);
   const aspect = viewportWidth / viewportHeight;
   const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
-  const needed = (desired + SNOWFLAKE_FLAKE_RADIUS) / (tanHalfFov * aspect * SNOWFLAKE_EDGE_LIMIT);
+  const needed = (offset + SNOWFLAKE_FLAKE_RADIUS) / (tanHalfFov * aspect * SNOWFLAKE_EDGE_LIMIT)
+    + DENSITY_TIERS.high.zDepth;
   return Math.max(SNOWFLAKE_BASE_DISTANCE, needed);
 }
 

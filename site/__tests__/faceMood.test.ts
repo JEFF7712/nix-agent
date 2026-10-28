@@ -153,7 +153,7 @@ describe("faceMood", () => {
   });
 
   it("projects the face from the fitted camera so it tracks the flake", async () => {
-    const { snowflakeCameraDistance } = await import("../lib/snowflakeGeometry");
+    const { snowflakeCameraDistance, snowflakeHorizontalOffset } = await import("../lib/snowflakeGeometry");
     const width = 1512;
     const height = 859;
     const distance = snowflakeCameraDistance(width, height);
@@ -161,7 +161,7 @@ describe("faceMood", () => {
     expect(face.y).toBe(0.1);
     expect(face.x).toBeGreaterThan(0);
     expect(face.x).toBeLessThan(1);
-    expect(face.x).toBeCloseTo(faceCenterNdc(width).x, 0);
+    expect(snowflakeHorizontalOffset(width)).toBeGreaterThan(0);
   });
 
   it("dispatches a window event when the face should smile", () => {

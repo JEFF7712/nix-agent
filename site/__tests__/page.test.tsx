@@ -27,7 +27,9 @@ describe("Home", () => {
     const css = readFileSync(`${process.cwd()}/app/globals.css`, "utf8");
 
     expect(css).toMatch(/\.hero\s*{[^}]*position:\s*relative/);
+    expect(css).toMatch(/\.hero\s*{[^}]*width:\s*100%/);
     expect(css).toMatch(/\.hero-copy\s*{[^}]*z-index:\s*1/);
+    expect(css).toMatch(/\.hero-copy\s*{[^}]*margin-left:\s*max\(0px,\s*\(100% - 100rem\)\s*\/\s*2\)/);
     expect(css).toMatch(/\.snowflake-region\s*{[^}]*position:\s*absolute[^}]*inset:\s*0/);
     expect(css).toMatch(/@media \(max-width: 48rem\)[\s\S]*\.snowflake-region\s*{[^}]*position:\s*relative[^}]*inset:\s*auto/);
   });
