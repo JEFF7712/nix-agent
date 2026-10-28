@@ -6,11 +6,16 @@ import {
   AGENT_MOUTH,
   AGENT_PUPIL,
   DENSITY_TIERS,
+  SNOWFLAKE_BASE_DISTANCE,
+  SNOWFLAKE_EDGE_LIMIT,
+  SNOWFLAKE_FLAKE_RADIUS,
+  SNOWFLAKE_FOV_DEGREES,
   buildAgentFacePoints,
   buildGlyphPointData,
   concatGlyphPointData,
   seededNoise,
   selectDensityTier,
+  snowflakeCameraDistance,
   snowflakeHorizontalOffset,
 } from "../lib/snowflakeGeometry";
 import { GLYPH_CHARACTERS } from "../lib/glyphCharacters";
@@ -32,6 +37,50 @@ describe("snowflake framing", () => {
   it("centers the mobile composition and shifts the desktop composition right", () => {
     expect(snowflakeHorizontalOffset(390)).toBe(0);
     expect(snowflakeHorizontalOffset(1280)).toBe(0.72);
+  });
+
+  it("keeps ultrawide compositions at the base camera distance and desired offset", () => {
+    expect(snowflakeHorizontalOffset(2560, 1080)).toBe(0.72);
+    expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
+  });
+
+  it("slides offset left on moderate desktop aspects to stay full size without cutoff", () => {
+    expect(snowflakeHorizontalOffset(1920, 1080)).toBeLessThan(0.72);
+    expect(snowflakeHorizontalOffset(1920, 1080)).toBeGreaterThan(0.5);
+    expect(snowflakeCameraDistance(1920, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
+
+    expect(snowflakeHorizontalOffset(1280, 800)).toBeLessThan(0.72);
+    expect(snowflakeHorizontalOffset(1280, 800)).toBeGreaterThan(0.35);
+    expect(snowflakeCameraDistance(1280, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
+  });
+
+  it("keeps flake edge inside NDC across all aspect ratios", () => {
+    const sizes: Array<[number, number]> = [
+      [2560, 1080],
+      [1920, 1080],
+      [1512, 859],
+      [1280, 800],
+      [1057, 973],
+      [1024, 768],
+      [390, 844],
+    ];
+    const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
+    for (const [width, height] of sizes) {
+      const offset = snowflakeHorizontalOffset(width, height);
+      const distance = snowflakeCameraDistance(width, height);
+      const aspect = width / height;
+      const halfWidth = tanHalfFov * distance * aspect;
+      expect(distance).toBeGreaterThanOrEqual(SNOWFLAKE_BASE_DISTANCE);
+      expect(offset + SNOWFLAKE_FLAKE_RADIUS).toBeLessThanOrEqual(
+        halfWidth * SNOWFLAKE_EDGE_LIMIT + 1e-9,
+      );
+    }
+  });
+
+  it("falls back to the base distance for invalid viewports", () => {
+    expect(snowflakeCameraDistance(0, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(1280, 0)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(Number.NaN, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
   });
 });
 
