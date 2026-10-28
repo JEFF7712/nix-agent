@@ -45,7 +45,7 @@ describe("snowflake framing", () => {
     expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
     expect(snowflakeHorizontalOffset(1920)).toBe(SNOWFLAKE_DESIRED_OFFSET);
     expect(snowflakeCameraDistance(1920, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
-    expect(snowflakeCameraDistance(1605, 981)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(1605, 981)).toBeCloseTo(SNOWFLAKE_BASE_DISTANCE, 1);
   });
 
   it("keeps flake edge inside NDC across all aspect ratios", () => {

@@ -27,8 +27,8 @@ export function selectDensityTier(
 
 export const SNOWFLAKE_FOV_DEGREES = 34;
 export const SNOWFLAKE_BASE_DISTANCE = 3.15;
-export const SNOWFLAKE_DESIRED_OFFSET = 0.6;
-export const SNOWFLAKE_FLAKE_RADIUS = 0.95;
+export const SNOWFLAKE_DESIRED_OFFSET = 0.64;
+export const SNOWFLAKE_FLAKE_RADIUS = 0.94;
 export const SNOWFLAKE_EDGE_LIMIT = 0.99;
 
 export function snowflakeHorizontalOffset(viewportWidth: number): number {
