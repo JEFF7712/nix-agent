@@ -187,7 +187,7 @@ void main() {
   float pointerDistance = length(pointerDelta * vec2(aspect, 1.0));
   float repelField = exp(-pointerDistance * pointerDistance / (0.10 * 0.10)) * motionEnabled * pointerLive;
   vec2 repelDir = normalize(pointerDelta + vec2(1e-5, 1e-5));
-  float repel = repelField * (1.0 - isFace);
+  float repel = repelField;
 
   for (int i = 0; i < 8; i++) {
     float pulseAge = uPulseAges[i];

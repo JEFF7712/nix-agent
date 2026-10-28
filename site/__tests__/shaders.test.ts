@@ -50,9 +50,10 @@ describe("glyph shaders", () => {
     expect(vertexShader).toMatch(/transformed\.xy\s*\+=\s*repelDir\s*\*\s*repel/);
   });
 
-  it("exempts the agent face from the repulsion field", () => {
+  it("applies the repulsion field to the agent face as well", () => {
     expect(vertexShader).toMatch(/isFace\s*=\s*step\(0\.25,\s*agent\)/);
-    expect(vertexShader).toMatch(/repel\s*=\s*repelField\s*\*\s*\(1\.0\s*-\s*isFace\)/);
+    expect(vertexShader).toMatch(/float\s+repel\s*=\s*repelField\s*;/);
+    expect(vertexShader).not.toMatch(/repelField\s*\*\s*\(1\.0\s*-\s*isFace\)/);
   });
 
   it("brightens the pushed rim without recoloring it", () => {
