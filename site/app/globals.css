@@ -42,8 +42,8 @@ input {
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
-  width: min(100%, 100rem);
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
   min-height: 100svh;
   margin: 0 auto;
   overflow: hidden;
@@ -54,7 +54,9 @@ input {
   container-type: inline-size;
   display: flex;
   grid-column: 1;
+  width: min(42%, 42rem);
   min-width: 0;
+  margin-left: max(0px, (100% - 100rem) / 2);
   padding: clamp(2rem, 6vw, 6rem) clamp(1.5rem, 4vw, 4.5rem);
   flex-direction: column;
   justify-content: center;
@@ -373,7 +375,9 @@ input {
   }
 
   .hero-copy {
+    width: auto;
     min-height: 100svh;
+    margin-left: 0;
   }
 
   .snowflake-region {

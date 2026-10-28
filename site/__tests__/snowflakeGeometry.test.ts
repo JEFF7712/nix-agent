@@ -40,21 +40,19 @@ describe("snowflake framing", () => {
     expect(snowflakeHorizontalOffset(1280)).toBe(SNOWFLAKE_DESIRED_OFFSET);
   });
 
-  it("keeps desktop compositions at the base camera distance and desired offset", () => {
+  it("keeps wide desktop compositions at the base camera distance and desired offset", () => {
     expect(snowflakeHorizontalOffset(2560)).toBe(SNOWFLAKE_DESIRED_OFFSET);
     expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
     expect(snowflakeHorizontalOffset(1920)).toBe(SNOWFLAKE_DESIRED_OFFSET);
-    expect(snowflakeCameraDistance(1920, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
-    expect(snowflakeCameraDistance(1605, 981)).toBe(SNOWFLAKE_BASE_DISTANCE);
-    expect(snowflakeCameraDistance(1280, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
   });
 
-  it("dollies back on mobile so the centered flake stays inside NDC", () => {
+  it.each([[390, 844], [1920, 1080], [1600, 1000], [1280, 800], [800, 1000]])(
+    "fits the snowflake within a %i by %i canvas", (width, height) => {
     const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
-    const offset = snowflakeHorizontalOffset(390);
-    const distance = snowflakeCameraDistance(390, 844);
-    const aspect = 390 / 844;
-    const halfWidth = tanHalfFov * distance * aspect;
+    const offset = snowflakeHorizontalOffset(width);
+    const distance = snowflakeCameraDistance(width, height);
+    const aspect = width / height;
+    const halfWidth = tanHalfFov * (distance - DENSITY_TIERS.high.zDepth) * aspect;
     expect(distance).toBeGreaterThanOrEqual(SNOWFLAKE_BASE_DISTANCE);
     expect(offset + SNOWFLAKE_FLAKE_RADIUS).toBeLessThanOrEqual(
       halfWidth * SNOWFLAKE_EDGE_LIMIT + 1e-9,
