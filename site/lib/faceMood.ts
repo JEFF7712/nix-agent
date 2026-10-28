@@ -1,8 +1,3 @@
-import {
-  SNOWFLAKE_FOV_DEGREES,
-  snowflakeHorizontalOffset,
-} from "./snowflakeGeometry";
-
 export const FACE_HAPPY_EVENT = "nix-agent-face-happy";
 export const PULSE_SLOT_COUNT = 8;
 
@@ -129,26 +124,10 @@ export function smoothEmotion(current: number, target: number, dt: number, attac
 }
 
 /** Host-NDC estimate of the agent face center for the current layout. */
-export function faceCenterNdc(viewportWidth: number, viewportHeight?: number, cameraZ?: number) {
-  if (viewportWidth < 768) {
-    return { x: 0, y: 0.1 };
-  }
-  if (
-    viewportHeight === undefined ||
-    cameraZ === undefined ||
-    !Number.isFinite(viewportHeight) ||
-    !Number.isFinite(cameraZ) ||
-    viewportHeight <= 0 ||
-    cameraZ <= 0
-  ) {
-    // Matches the snowflake's projected face in host canvas NDC.
-    return { x: 0.38, y: 0.1 };
-  }
-  const aspect = viewportWidth / viewportHeight;
-  const focal = 1 / Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
-  const offset = snowflakeHorizontalOffset(viewportWidth);
+export function faceCenterNdc(viewportWidth: number) {
   return {
-    x: (offset * focal) / (aspect * cameraZ),
+    // Matches the snowflake's projected face in host canvas NDC.
+    x: viewportWidth < 768 ? 0 : 0.38,
     y: 0.1,
   };
 }
