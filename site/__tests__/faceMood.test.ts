@@ -161,7 +161,7 @@ describe("faceMood", () => {
     expect(face.y).toBe(0.1);
     expect(face.x).toBeGreaterThan(0);
     expect(face.x).toBeLessThan(1);
-    expect(snowflakeHorizontalOffset(width, height)).toBeGreaterThan(0);
+    expect(snowflakeHorizontalOffset(width)).toBeGreaterThan(0);
   });
 
   it("dispatches a window event when the face should smile", () => {

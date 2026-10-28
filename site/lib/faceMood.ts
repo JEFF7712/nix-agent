@@ -137,7 +137,7 @@ export function faceCenterNdc(
   if (viewportWidth < 768) {
     return { x: 0, y: 0.1 };
   }
-  const offset = snowflakeHorizontalOffset(viewportWidth, viewportHeight);
+  const offset = snowflakeHorizontalOffset(viewportWidth);
   if (
     viewportHeight === undefined ||
     cameraZ === undefined ||

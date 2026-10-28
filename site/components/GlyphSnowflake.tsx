@@ -249,7 +249,7 @@ export function GlyphSnowflake() {
           camera.aspect = width / height;
           camera.position.z = snowflakeCameraDistance(width, height);
           camera.updateProjectionMatrix();
-          points.position.x = snowflakeHorizontalOffset(width, height);
+          points.position.x = snowflakeHorizontalOffset(width);
           uniforms.uPointScale.value = Math.min(width, height) * 0.038;
           uniforms.uResolution.value.set(width, height);
           const face = faceCenterNdc(width, height, camera.position.z);

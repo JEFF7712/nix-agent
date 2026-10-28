@@ -7,6 +7,7 @@ import {
   AGENT_PUPIL,
   DENSITY_TIERS,
   SNOWFLAKE_BASE_DISTANCE,
+  SNOWFLAKE_DESIRED_OFFSET,
   SNOWFLAKE_EDGE_LIMIT,
   SNOWFLAKE_FLAKE_RADIUS,
   SNOWFLAKE_FOV_DEGREES,
@@ -36,28 +37,22 @@ describe("snowflake density", () => {
 describe("snowflake framing", () => {
   it("centers the mobile composition and shifts the desktop composition right", () => {
     expect(snowflakeHorizontalOffset(390)).toBe(0);
-    expect(snowflakeHorizontalOffset(1280)).toBe(0.72);
+    expect(snowflakeHorizontalOffset(1280)).toBe(SNOWFLAKE_DESIRED_OFFSET);
   });
 
-  it("keeps ultrawide compositions at the base camera distance and desired offset", () => {
-    expect(snowflakeHorizontalOffset(2560, 1080)).toBe(0.72);
+  it("keeps ultrawide and 16:9 compositions at the base camera distance and desired offset", () => {
+    expect(snowflakeHorizontalOffset(2560)).toBe(SNOWFLAKE_DESIRED_OFFSET);
     expect(snowflakeCameraDistance(2560, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
-  });
-
-  it("slides offset left on moderate desktop aspects to stay full size without cutoff", () => {
-    expect(snowflakeHorizontalOffset(1920, 1080)).toBeLessThan(0.72);
-    expect(snowflakeHorizontalOffset(1920, 1080)).toBeGreaterThan(0.5);
+    expect(snowflakeHorizontalOffset(1920)).toBe(SNOWFLAKE_DESIRED_OFFSET);
     expect(snowflakeCameraDistance(1920, 1080)).toBe(SNOWFLAKE_BASE_DISTANCE);
-
-    expect(snowflakeHorizontalOffset(1280, 800)).toBeLessThan(0.72);
-    expect(snowflakeHorizontalOffset(1280, 800)).toBeGreaterThan(0.35);
-    expect(snowflakeCameraDistance(1280, 800)).toBe(SNOWFLAKE_BASE_DISTANCE);
+    expect(snowflakeCameraDistance(1605, 981)).toBe(SNOWFLAKE_BASE_DISTANCE);
   });
 
   it("keeps flake edge inside NDC across all aspect ratios", () => {
     const sizes: Array<[number, number]> = [
       [2560, 1080],
       [1920, 1080],
+      [1605, 981],
       [1512, 859],
       [1280, 800],
       [1057, 973],
@@ -66,7 +61,7 @@ describe("snowflake framing", () => {
     ];
     const tanHalfFov = Math.tan(((SNOWFLAKE_FOV_DEGREES * Math.PI) / 360));
     for (const [width, height] of sizes) {
-      const offset = snowflakeHorizontalOffset(width, height);
+      const offset = snowflakeHorizontalOffset(width);
       const distance = snowflakeCameraDistance(width, height);
       const aspect = width / height;
       const halfWidth = tanHalfFov * distance * aspect;
