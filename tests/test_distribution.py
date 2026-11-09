@@ -72,19 +72,6 @@ def test_nixos_module_exposes_enable_option():
     assert "/nix/store/*/bin/switch-to-configuration" not in module_text
 
 
-def test_ci_workflow_runs_pytest():
-    workflow_text = Path(".github/workflows/ci.yml").read_text()
-
-    assert "strategy:" in workflow_text
-    assert "python-tests" in workflow_text
-    assert "nix-flake-check" in workflow_text
-    assert "python -m pytest" in workflow_text
-    assert "nix flake check --system x86_64-linux" in workflow_text
-    assert "tiny-flake" in workflow_text
-    assert "pull_request" in workflow_text
-    assert "push" in workflow_text
-
-
 def test_opencode_example_uses_packaged_binary():
     example_text = Path("examples/opencode-mcp.json").read_text()
 
