@@ -15,8 +15,6 @@ The documented default is high trust: unprompted `switch` / `generations`
 and passwordless sudo narrowed to this machine's flake. Lower trust (host
 prompts, a sudo password) is an opt-down.
 
-> **Experimental and a work in progress.** Feedback and contributions welcome.
-
 ## Install
 
 Paste this to a coding agent (Codex, Claude Code, opencode, ...) and it does the install:
