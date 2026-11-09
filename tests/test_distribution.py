@@ -18,9 +18,9 @@ def test_release_metadata_has_current_changelog_entry():
     flake_text = Path("flake.nix").read_text()
     changelog_text = Path("CHANGELOG.md").read_text()
 
-    assert 'version = "0.14.0"' in pyproject_text
-    assert 'version = "0.14.0";' in flake_text
-    assert "## v0.14.0 - 2026-10-22" in changelog_text
+    assert 'version = "0.14.1"' in pyproject_text
+    assert 'version = "0.14.1";' in flake_text
+    assert "## v0.14.1 - 2026-11-09" in changelog_text
     assert "Build API change" in changelog_text
     assert "## v0.12.0 - 2026-10-02" in changelog_text
     assert "compare-shell" in changelog_text
@@ -70,19 +70,6 @@ def test_nixos_module_exposes_enable_option():
     assert "rupan" not in module_text
     assert "--flake *" not in module_text
     assert "/nix/store/*/bin/switch-to-configuration" not in module_text
-
-
-def test_ci_workflow_runs_pytest():
-    workflow_text = Path(".github/workflows/ci.yml").read_text()
-
-    assert "strategy:" in workflow_text
-    assert "python-tests" in workflow_text
-    assert "nix-flake-check" in workflow_text
-    assert "python -m pytest" in workflow_text
-    assert "nix flake check --system x86_64-linux" in workflow_text
-    assert "tiny-flake" in workflow_text
-    assert "pull_request" in workflow_text
-    assert "push" in workflow_text
 
 
 def test_opencode_example_uses_packaged_binary():

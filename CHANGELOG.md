@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.1 - 2026-11-09
+
+- Fix `nix run github:JEFF7712/nix-agent` failing in the package check
+  phase: a distribution test still read the retired GitHub Actions
+  workflow.
+
 ## v0.14.0 - 2026-10-22
 
 - `diff` no longer returns the nvd text twice next to the parsed
