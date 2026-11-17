@@ -53,17 +53,18 @@ call (no network) while dogfooding:
   `~/.local/state/nix-agent/usage.jsonl`)
 - override path with `NIX_AGENT_USAGE_LOG_PATH`
 
-Each event records the tool name, UTC timestamp, duration, calling
-`client` (from `NIX_AGENT_CLIENT`, else inferred: opencode / claude-code /
-codex / cursor / parent process), `host`, `cwd`, and `session` when a known
-session env var is present, plus envelope `status`, `resolved_target` when
-present, `raw_bytes` / `returned_bytes` / `bytes_saved` when byte accounting
-ran, outcome details (`command` / `op`, `first_error`, `error_message`,
-`failed_drv`, `output_bytes`, `output_truncated`, `summary`), the full
-sanitized request `params`, and top-level copies of a few request fields
-(`mode`, `flake_uri`, `level`, `action`, `attr`). Write failures are
-swallowed so logging never breaks a tool call. Tag a custom client name
-with `NIX_AGENT_CLIENT=my-agent` alongside `NIX_AGENT_USAGE_LOG=1`.
+Each event records the tool name, UTC timestamp, duration, `version`,
+`server_pid`, calling `client` (from `NIX_AGENT_CLIENT`, else inferred:
+opencode / claude-code / codex / cursor / antigravity / parent process),
+`host`, `cwd`, and `session` when a known session env var is present, plus
+envelope `status`, `resolved_target` when present, `raw_bytes` /
+`returned_bytes` / `bytes_saved` when byte accounting ran, outcome details
+(`command` / `op`, `first_error`, `error_message`, `failed_drv`,
+`output_bytes`, `output_truncated`, `summary`), the full sanitized request
+`params`, and top-level copies of a few request fields (`mode`, `flake_uri`,
+`level`, `action`, `attr`). Write failures are swallowed so logging never
+breaks a tool call. Tag a custom client name with
+`NIX_AGENT_CLIENT=my-agent` alongside `NIX_AGENT_USAGE_LOG=1`.
 
 Summarize with:
 
@@ -215,9 +216,9 @@ Operational core:
 | Tool | What it does |
 |------|-------------|
 | `build(flake_uri?, mode?, job_id?, log_offset?)` | Start a persistent background build, no activation. Returns `job_id` promptly; poll `build(job_id=...)` for live log tails and the final result. Success carries `store_path`; a failed builder carries `failed_derivation` (`{drv, log_tail}`). Repeated starts for the same running target return its existing job. |
-| `diff(flake_uri?, mode?)` | What a switch would change (package adds/removes/version bumps). Also returns a structured `packages` object alongside the human-readable diff, when the diff output parses: `added` and `removed` entries are `{name, version}`, `changed` entries are `{name, old, new}`. Show this in the reply and switch unless the user asked only to preview or check. |
+| `diff(flake_uri?, mode?, store_path?, against?)` | What a switch would change (package adds/removes/version bumps), reusing an already-built `store_path` when given and comparing against the running closure or an explicit `against` baseline store path. Returns a structured `packages` object (`added` / `removed` as `{name, version}`, `changed` as `{name, old, new}`) plus `closure_size` when the diff output parses; the raw `diff` text only when it does not parse. Show this in the reply and switch unless the user asked only to preview or check. |
 | `switch(flake_uri?, mode?, validate?, full_log?)` | Activate. Records `rollback_generation`. Returns a structured `summary` (units changed, derivations built, a `packages` object with package-level changes vs the rollback generation, and a `health` object with systemd units that newly failed, resolved, or are still failing after activation) and trims the log to a tail on success (`full_log=True` for all of it). Activation with newly failed units returns `status: "degraded"` and a rollback hint. `validate=True` gates on `check("dry-build")` first; a sudo auth failure returns a `privilege` diagnosis. Privileged argv uses `sudo -n`. |
-| `generations(action="list"\|"rollback", mode?, generation?)` | List or roll back generations. NixOS list entries include `path` (realpath of the profile link) when that link exists. After `switch`, undo with `generations(action="rollback", generation=<rollback_generation or id>)`. Bare `generations(action="rollback")` is previous-generation only, and is only the right default when nothing else has switched since. A `generation` that matches nothing returns `unknown_generation` and runs no command. |
+| `generations(action="list"\|"rollback", mode?, generation?, limit?)` | List or roll back generations. `list` caps at `limit=20` newest entries by default (always preserving `current` and attaching `total_generations` + `generations_truncated` when trimmed; pass `limit=None` for all) and omits duplicate raw `output`. NixOS list entries include `path` (realpath of the profile link) when that link exists. After `switch`, undo with `generations(action="rollback", generation=<rollback_generation or id>)`. Bare `generations(action="rollback")` is previous-generation only, and is only the right default when nothing else has switched since. A `generation` that matches nothing returns `unknown_generation` and runs no command. |
 
 Config introspection:
 
@@ -298,10 +299,12 @@ files are `0600`. `log_paths` points to the full local stdout/stderr logs;
 tool responses return bounded live tails, a short success output tail, and
 the usual capped failure diagnostics. Successful results carry
 `log_truncated` to indicate whether the output was shortened.
-Records are retained until removed locally. Persistence does not restart a
+Completed job records older than 7 days are pruned opportunistically when
+new jobs start. Persistence does not restart a
 build after reboot or preserve its store output against garbage collection.
 `diff`, `switch`, and `check` remain synchronous and can still encounter
-MCP host timeouts; build the closure first when a long build is expected.
+MCP host timeouts; build the closure first with `build()` and pass the
+returned `store_path` to `diff(store_path=...)` when a long build is expected.
 
 ## Repository gates and fleet deployment
 
@@ -396,8 +399,9 @@ The command runner truncates each stdout and stderr stream independently at
 `log_truncated` and `log_paths` to the complete local stdout/stderr logs.
 Build jobs keep logs in their job directory; checks and internal closure
 builds save private (`0700` directory, `0600` files) logs under
-`$XDG_STATE_HOME/nix-agent/logs` (default `~/.local/state/nix-agent/logs`).
-Logs are retained until removed locally. Failures retain the capped output
+`$XDG_STATE_HOME/nix-agent/logs` (default `~/.local/state/nix-agent/logs`),
+pruning `operation-*` directories older than 7 days when new operations run.
+Failures retain the capped output
 and structured errors, with saved logs available for the rest.
 
 A successful `switch` also returns a 2,000-character tail by default.

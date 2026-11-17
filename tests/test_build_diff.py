@@ -330,3 +330,95 @@ def test_diff_keeps_nvd_closure_size(monkeypatch):
     out = diff(flake_uri="/x#h")
     assert out["closure_size"].startswith("4348 -> 4606")
     assert out["returned_bytes"] < len(nvd_output)
+
+
+def test_diff_reuses_store_path_without_rebuilding(monkeypatch, tmp_path):
+    built_dir = tmp_path / "new-system"
+    built_dir.mkdir()
+    cur_dir = tmp_path / "cur-system"
+    cur_dir.mkdir()
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return RunResult(ok=True, command=argv, stdout=NVD_FIXTURE, stderr="")
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: str(cur_dir.resolve())
+    )
+    out = diff(store_path=str(built_dir))
+    assert out["status"] == "ok"
+    assert out["store_path"] == str(built_dir.resolve())
+    assert calls == [["/bin/nvd", "diff", str(cur_dir.resolve()), str(built_dir.resolve())]]
+
+
+def test_diff_against_explicit_baseline_closure(monkeypatch, tmp_path):
+    built_dir = tmp_path / "remote-new"
+    built_dir.mkdir()
+    base_dir = tmp_path / "remote-old"
+    base_dir.mkdir()
+    calls = []
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        return RunResult(ok=True, command=argv, stdout=NVD_FIXTURE, stderr="")
+
+    monkeypatch.setattr(build_mod.runner, "run", fake_run)
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = diff(
+        flake_uri="/homelab#homelab-04",
+        store_path=str(built_dir),
+        against=str(base_dir),
+    )
+    assert out["status"] == "ok"
+    assert out["resolved_target"] == "/homelab#homelab-04"
+    assert out["current_closure"] == str(base_dir.resolve())
+    assert out["store_path"] == str(built_dir.resolve())
+    assert calls == [["/bin/nvd", "diff", str(base_dir.resolve()), str(built_dir.resolve())]]
+
+
+def test_diff_missing_store_path_or_against_fails_cleanly(monkeypatch, tmp_path):
+    built_dir = tmp_path / "ok-store"
+    built_dir.mkdir()
+    calls = []
+    monkeypatch.setattr(build_mod.runner, "run", lambda argv, cwd=None: calls.append(argv))
+
+    bad_store = diff(store_path=str(tmp_path / "missing"))
+    assert bad_store["status"] == "failed"
+    assert "store_path" in bad_store["error"]
+
+    bad_against = diff(store_path=str(built_dir), against=str(tmp_path / "missing-base"))
+    assert bad_against["status"] == "failed"
+    assert "baseline" in bad_against["error"]
+    assert calls == []
+
+
+def test_diff_accounts_for_suppressed_build_raw_bytes(monkeypatch):
+    def fake_build_closure(target, dry_run=False):
+        return {
+            "status": "ok",
+            "resolved_target": "/x#h",
+            "command": ["nix", "build"],
+            "output": "tail",
+            "store_path": "/nix/store/new-toplevel",
+            "raw_bytes": 50_000,
+        }
+
+    monkeypatch.setattr(build_mod, "build_closure", fake_build_closure)
+    monkeypatch.setattr(
+        build_mod.runner,
+        "run",
+        lambda argv, cwd=None: RunResult(
+            ok=True, command=argv, stdout=NVD_FIXTURE, stderr="", raw_bytes=500
+        ),
+    )
+    monkeypatch.setattr(build_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    monkeypatch.setattr(
+        build_mod, "_current_closure", lambda mode: "/run/current-system"
+    )
+    out = diff(flake_uri="/x#h")
+    assert out["status"] == "ok"
+    assert out["raw_bytes"] == 50_500
+    assert out["raw_bytes"] > out["returned_bytes"]

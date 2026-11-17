@@ -178,7 +178,6 @@
         "path": "str"
       }
     ],
-    "output": "str",
     "resolved_target": "str",
     "status": "str"
   },

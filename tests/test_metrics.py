@@ -359,3 +359,69 @@ def test_event_records_build_job_id():
         kwargs={"mode": "nixos"},
     )
     assert event["job_id"] == "a" * 32
+    assert "version" in event
+    assert isinstance(event["server_pid"], int)
+
+
+def test_summarize_groups_build_job_bytes_without_double_counting_raw():
+    jid = "b" * 32
+    events = [
+        {
+            "tool": "build",
+            "status": "running",
+            "job_id": jid,
+            "duration_ms": 5,
+            "returned_bytes": 600,
+        },
+        {
+            "tool": "build",
+            "status": "running",
+            "job_id": jid,
+            "duration_ms": 5,
+            "returned_bytes": 2000,
+        },
+        {
+            "tool": "build",
+            "status": "ok",
+            "job_id": jid,
+            "duration_ms": 10,
+            "raw_bytes": 50000,
+            "returned_bytes": 3000,
+        },
+        # Duplicate poll of already-finished job must not double-count raw_bytes
+        {
+            "tool": "build",
+            "status": "ok",
+            "job_id": jid,
+            "duration_ms": 2,
+            "raw_bytes": 50000,
+            "returned_bytes": 3000,
+        },
+    ]
+    summary = metrics.summarize(events)
+    assert summary["raw_bytes"] == 50000
+    assert summary["returned_bytes"] == 8600
+    assert summary["bytes_saved"] == 41400
+    assert summary["accounted_calls"] == 4
+    assert summary["by_tool"]["build"]["raw_bytes"] == 50000
+    assert summary["by_tool"]["build"]["returned_bytes"] == 8600
+    assert summary["by_tool"]["build"]["bytes_saved"] == 41400
+
+
+def test_detect_client_normalizes_parent_comm(monkeypatch):
+    for key in (
+        metrics.CLIENT_ENV,
+        "OPENCODE",
+        "OPENCODE_PID",
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CODEX_HOME",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    for key in list(metrics.os.environ):
+        if key.startswith(("CODEX_", "CURSOR_", "ANTIGRAVITY_")):
+            monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(metrics, "_parent_comm", lambda: "codex")
+    assert metrics.detect_client() == "codex"
+    monkeypatch.setattr(metrics, "_parent_comm", lambda: "custom-shell")
+    assert metrics.detect_client() == "proc:custom-shell"
