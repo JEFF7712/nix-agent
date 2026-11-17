@@ -3,6 +3,7 @@ from pathlib import Path
 
 from nix_agent import hostattr, logparse, runner
 from nix_agent.target import (
+    VALID_MODES,
     Target,
     TargetError,
     attr_candidates,
@@ -111,33 +112,79 @@ def closure_diff(
     return result, parse(result.output)
 
 
-def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]:
-    """Diff the freshly built closure against the live system."""
-    try:
-        target = resolve_target(flake_uri, mode)
-    except TargetError as exc:
-        return {"status": "no_target", "error": str(exc)}
-
-    built = build_closure(target)
-    if built["status"] != "ok":
-        return built
-    new_path = str(built["store_path"])
-
-    current = _current_closure(mode)
-    if current is None:
+def diff(
+    flake_uri: str | None = None,
+    mode: str = "nixos",
+    store_path: str | None = None,
+    against: str | None = None,
+) -> dict[str, object]:
+    """Diff a built closure (or freshly built target closure) against the
+    live system or an explicit ``against`` baseline closure."""
+    if mode not in VALID_MODES:
         return {
-            "status": "failed",
-            "resolved_target": built["resolved_target"],
-            "command": built["command"],
-            "output": built["output"],
-            "error": f"could not locate the current {mode} closure to diff against",
-            "store_path": new_path,
+            "status": "no_target",
+            "error": f"mode must be one of {list(VALID_MODES)}, got {mode!r}",
         }
 
+    built: dict[str, object] | None = None
+    build_raw_bytes = 0
+    if store_path is not None:
+        if not store_path.strip() or not os.path.exists(store_path):
+            return {
+                "status": "failed",
+                "error": f"store_path does not exist: {store_path!r}",
+                "store_path": store_path,
+            }
+        new_path = os.path.realpath(store_path)
+        resolved_target = flake_uri if flake_uri is not None else new_path
+    else:
+        try:
+            target = resolve_target(flake_uri, mode)
+        except TargetError as exc:
+            return {"status": "no_target", "error": str(exc)}
+
+        built = build_closure(target)
+        if built["status"] != "ok":
+            return built
+        new_path = str(built["store_path"])
+        resolved_target = str(built["resolved_target"])
+        if isinstance(built.get("raw_bytes"), int):
+            build_raw_bytes = int(built["raw_bytes"])  # type: ignore[arg-type]
+
+    if against is not None:
+        if not against.strip() or not os.path.exists(against):
+            return {
+                "status": "failed",
+                "resolved_target": resolved_target,
+                "error": f"baseline closure does not exist: {against!r}",
+                "store_path": new_path,
+            }
+        current: str | None = os.path.realpath(against)
+    else:
+        current = _current_closure(mode)
+        if current is None:
+            failure: dict[str, object] = {
+                "status": "failed",
+                "resolved_target": resolved_target,
+                "error": f"could not locate the current {mode} closure to diff against",
+                "store_path": new_path,
+            }
+            if built is not None:
+                failure["command"] = built["command"]
+                failure["output"] = built["output"]
+            return failure
+
     result, packages = closure_diff(current, new_path)
+    diff_raw_bytes = (
+        result.raw_bytes
+        if result.raw_bytes is not None
+        else len(result.stdout) + len(result.stderr)
+    )
     extra: dict[str, object] = {"store_path": new_path, "current_closure": current}
     if not result.ok:
-        return runner.envelope("failed", str(built["resolved_target"]), result, **extra)
+        response = runner.envelope("failed", resolved_target, result, **extra)
+        response["raw_bytes"] = build_raw_bytes + diff_raw_bytes
+        return runner.account(response)
     if packages is None:
         extra["diff"] = result.output
     else:
@@ -145,9 +192,10 @@ def diff(flake_uri: str | None = None, mode: str = "nixos") -> dict[str, object]
         closure_size = _closure_size(result.output)
         if closure_size is not None:
             extra["closure_size"] = closure_size
-    response = runner.envelope("ok", str(built["resolved_target"]), result, **extra)
+    response = runner.envelope("ok", resolved_target, result, **extra)
     # The parsed packages (or the raw diff) already carry the output.
     del response["output"]
+    response["raw_bytes"] = build_raw_bytes + diff_raw_bytes
     return runner.account(response)
 
 

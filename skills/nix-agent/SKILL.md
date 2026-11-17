@@ -128,10 +128,12 @@ Operational core:
   Repeated starts for the same running target reuse its job. Jobs survive
   MCP disconnects and server restarts. `interrupted` means the worker
   exited without a result, not proof that Nix daemon work was cancelled.
-- `diff(flake_uri?, mode?)`: what a switch would change (adds/removes/
-  version bumps), plus a structured `packages` object when it parses.
-  Include this in the reply and switch unless the user asked only to
-  preview or check.
+- `diff(flake_uri?, mode?, store_path?, against?)`: what a switch would
+  change (adds/removes/version bumps), reusing an existing `store_path`
+  from `build()` when passed and comparing against the running closure or
+  an explicit `against` closure, plus a structured `packages` object when
+  it parses. Include this in the reply and switch unless the user asked only
+  to preview or check.
 - `switch(flake_uri?, mode?, validate?, full_log?)`: activate. Records
   `rollback_generation`, returns a `summary` (units changed, derivations
   built, `packages` vs the rollback generation, `health`), and trims the
@@ -145,9 +147,10 @@ Operational core:
   activation are `status: "degraded"`; report `summary.health` and roll
   back unless the user asked to leave those units failed. Privileged
   argv uses `sudo -n`.
-- `generations(action="list"|"rollback", mode?, generation?)`: list or
-  roll back. NixOS list entries include `path` when the profile link
-  exists. After `switch`, call
+- `generations(action="list"|"rollback", mode?, generation?, limit?)`: list
+  (default `limit=20`, keeping `current`; `limit=None` for all) or roll back.
+  NixOS list entries include `path` when the profile link exists. After
+  `switch`, call
   `generations(action="rollback", generation=<rollback_generation or id>)`.
   Bare `generations(action="rollback")` is previous-generation only.
   Unknown ids return `unknown_generation` and run no command.

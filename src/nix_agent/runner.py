@@ -1,10 +1,12 @@
 import functools
 import json
 import os
+import pwd
 import shutil
 import signal
 import subprocess
 import tempfile
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -18,6 +20,7 @@ OUTPUT_CAP = 64_000
 TAIL_CAP = 2_000
 COMMAND_TIMEOUT = 30 * 60
 COMMAND_TIMEOUT_ENV = "NIX_AGENT_COMMAND_TIMEOUT"
+LOG_RETENTION_SECONDS = 7 * 24 * 60 * 60
 _LOG_DIR: ContextVar[Path | None] = ContextVar("build_log_dir", default=None)
 _PARAMS = ParamSpec("_PARAMS")
 
@@ -36,11 +39,39 @@ class RunResult:
         return "\n".join(parts)
 
 
+def _nix_bin_dirs() -> list[str]:
+    """Standard NixOS / Nix profile bin directories for MCP hosts that
+    launch unwrapped entrypoints with a minimal PATH."""
+    user = os.environ.get("USER")
+    if not user:
+        try:
+            user = pwd.getpwuid(os.getuid()).pw_name
+        except KeyError:
+            user = None
+    home = Path.home()
+    candidates: list[str] = []
+    if user:
+        candidates.append(f"/etc/profiles/per-user/{user}/bin")
+    candidates.extend(
+        [
+            str(home / ".nix-profile" / "bin"),
+            str(home / ".local" / "state" / "nix" / "profiles" / "profile" / "bin"),
+            "/nix/var/nix/profiles/default/bin",
+            "/run/current-system/sw/bin",
+        ]
+    )
+    return [d for d in candidates if os.path.isdir(d)]
+
+
 def resolve_binary(name: str) -> str | None:
-    """Realpath of a binary on PATH, or None. Sudo NOPASSWD rules match
-    the resolved store path, not the PATH name, so sudo'd commands must
-    use this."""
+    """Realpath of a binary on PATH (falling back to standard Nix profile
+    bin dirs), or None. Sudo NOPASSWD rules match the resolved store path,
+    not the PATH name, so sudo'd commands must use this."""
     found = shutil.which(name)
+    if found is None:
+        extra = _nix_bin_dirs()
+        if extra:
+            found = shutil.which(name, path=os.pathsep.join(extra))
     if found is None:
         return None
     return os.path.realpath(found)
@@ -97,12 +128,32 @@ def state_dir() -> Path:
     ).absolute()
 
 
+def prune_stale_logs(
+    root: Path, *, max_age_seconds: float = LOG_RETENTION_SECONDS
+) -> None:
+    """Best-effort cleanup of old operation-* log directories."""
+    cutoff = time.time() - max_age_seconds
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if not entry.name.startswith("operation-"):
+            continue
+        try:
+            if entry.is_dir() and entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry, ignore_errors=True)
+        except OSError:
+            continue
+
+
 @contextmanager
 def operation_logs() -> Iterator[Path]:
     directory = _LOG_DIR.get()
     if directory is None:
         root = state_dir() / "logs"
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        prune_stale_logs(root)
         directory = Path(tempfile.mkdtemp(prefix="operation-", dir=root))
         for name in ("stdout.log", "stderr.log"):
             (directory / name).touch(mode=0o600)
@@ -240,32 +291,42 @@ def run(
     )
 
 
+_ERROR_STARTS = ("error:", "error (", "error[")
+_IGNORED_ERROR_PREFIX = "error (ignored):"
+
+
+def _is_error_line(stripped: str) -> bool:
+    return stripped.startswith(_ERROR_STARTS) and not stripped.startswith(
+        _IGNORED_ERROR_PREFIX
+    )
+
+
 def extract_first_error(output: str) -> str | None:
     """First line of Nix stderr that looks like an error; the actionable
     signal in an otherwise verbose log.
 
-    If the error line is a bare 'error:' header with no inline message
-    (common in multiline Nix diagnostics and evaluation traces), this looks
-    for a subsequent concrete error line or formats the next non-empty line.
+    Skips non-fatal ``error (ignored):`` lines (such as SQLite eval-cache
+    busy warnings). If the error line is a bare 'error:' header with no
+    inline message (common in multiline Nix diagnostics and evaluation
+    traces), this looks for a subsequent concrete error line or formats the
+    next non-empty line.
     """
     if not output:
         return None
     lines = output.splitlines()
-    _ERROR_STARTS = ("error:", "error (", "error[")
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith(_ERROR_STARTS):
+        if _is_error_line(stripped):
             if stripped == "error:":
                 for next_line in lines[i + 1 :]:
                     next_stripped = next_line.strip()
-                    if (
-                        next_stripped.startswith(_ERROR_STARTS)
-                        and next_stripped != "error:"
-                    ):
+                    if _is_error_line(next_stripped) and next_stripped != "error:":
                         return next_stripped
                 for next_line in lines[i + 1 :]:
                     next_stripped = next_line.strip()
-                    if next_stripped:
+                    if next_stripped and not next_stripped.startswith(
+                        _IGNORED_ERROR_PREFIX
+                    ):
                         return f"error: {next_stripped}"
             return stripped
     return None

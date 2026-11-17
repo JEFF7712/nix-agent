@@ -152,7 +152,6 @@ def _lint(target: Target) -> dict[str, object]:
             "status": "ok",
             "resolved_target": target.flake_dir,
             "commands": commands,
-            "output": output,
             "findings": findings,
             "finding_count": len(findings),
             "raw_bytes": raw_total,

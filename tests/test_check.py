@@ -195,6 +195,8 @@ def test_check_lint_envelope_accounted(monkeypatch):
     monkeypatch.setattr(check_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
     out = check("lint", flake_uri="/x")
     assert out["status"] == "ok"
+    assert "output" not in out
+    assert "log_paths" not in out
     assert out["raw_bytes"] == len(STATIX_FIXTURE) + len(DEADNIX_FIXTURE)
     assert out["returned_bytes"] > 0
 

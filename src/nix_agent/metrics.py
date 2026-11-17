@@ -8,6 +8,8 @@ calling agent; otherwise the client is inferred from host env vars.
 
 from __future__ import annotations
 
+import functools
+import importlib.metadata
 import json
 import os
 import re
@@ -33,6 +35,9 @@ _KWARG_KEYS = (
     "level",
     "action",
     "generation",
+    "limit",
+    "store_path",
+    "against",
     "validate",
     "full_log",
 )
@@ -87,6 +92,27 @@ def _parent_comm() -> str | None:
         return None
 
 
+@functools.lru_cache(maxsize=1)
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("nix-agent")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _normalize_proc_client(comm: str) -> str:
+    lower = comm.lower()
+    if lower == "codex" or lower.startswith("codex-"):
+        return "codex"
+    if lower == "claude" or lower.startswith("claude-"):
+        return "claude-code"
+    if lower == "opencode" or lower.startswith("opencode-"):
+        return "opencode"
+    if lower == "cursor" or lower.startswith("cursor-"):
+        return "cursor"
+    return f"proc:{comm}"[:64]
+
+
 def detect_client() -> str:
     """Which agent host is calling. Explicit NIX_AGENT_CLIENT wins,
     otherwise infer from host env vars, falling back to the parent
@@ -103,14 +129,25 @@ def detect_client() -> str:
         return "codex"
     if any(k.startswith("CURSOR_") for k in env):
         return "cursor"
+    if any(k.startswith("ANTIGRAVITY_") for k in env):
+        return "antigravity"
     parent = _parent_comm()
     if parent:
-        return f"proc:{parent}"[:64]
+        return _normalize_proc_client(parent)
     return "unknown"
 
 
 def _session_id() -> str | None:
-    for key in (SESSION_ENV, "OPENCODE_PID", "CODEX_SESSION_ID", "TMUX"):
+    for key in (
+        SESSION_ENV,
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CODEX_SESSION_ID",
+        "CURSOR_TRACE_ID",
+        "OPENCODE_PID",
+        "TMUX",
+    ):
         value = os.environ.get(key)
         if value and value.strip():
             return value.strip()[:128]
@@ -181,6 +218,8 @@ def event_from_call(
         "tool": tool,
         "duration_ms": round(duration_ms, 1),
         "client": detect_client(),
+        "version": _package_version(),
+        "server_pid": os.getpid(),
     }
     try:
         event["host"] = socket.gethostname()
@@ -225,6 +264,10 @@ def event_from_call(
             summary = _attr_summary(kwargs["attr"])
             if summary is not None:
                 event["attr"] = summary
+        if "job_id" not in event and isinstance(kwargs.get("job_id"), str):
+            jid = kwargs["job_id"]
+            if jid:
+                event["job_id"] = jid
         if params:
             event["params"] = params
     return event
@@ -284,6 +327,7 @@ def load_events(path: Path | None = None) -> list[dict[str, Any]]:
 def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
     by_tool: dict[str, dict[str, Any]] = {}
     by_client: dict[str, int] = {}
+    job_bytes: dict[tuple[str, str], dict[str, Any]] = {}
     total_raw = 0
     total_returned = 0
     accounted = 0
@@ -346,7 +390,20 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
 
         raw = event.get("raw_bytes")
         returned = event.get("returned_bytes")
-        if isinstance(raw, int) and isinstance(returned, int):
+        params = event.get("params")
+        jid = event.get("job_id") or (
+            params.get("job_id") if isinstance(params, Mapping) else None
+        )
+        if isinstance(jid, str) and jid:
+            jentry = job_bytes.setdefault(
+                (tool, jid), {"raw": None, "returned": 0, "calls": 0}
+            )
+            if isinstance(raw, int) and jentry["raw"] is None:
+                jentry["raw"] = raw
+            if isinstance(returned, int):
+                jentry["returned"] += returned
+                jentry["calls"] += 1
+        elif isinstance(raw, int) and isinstance(returned, int):
             bucket["raw_bytes"] += raw
             bucket["returned_bytes"] += returned
             saved = event.get("bytes_saved")
@@ -357,6 +414,20 @@ def summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
             total_raw += raw
             total_returned += returned
             accounted += 1
+
+    for (tool, _jid), jentry in job_bytes.items():
+        jraw = jentry["raw"]
+        jret = jentry["returned"]
+        jcalls = jentry["calls"]
+        if isinstance(jraw, int) and jcalls > 0:
+            bucket = by_tool[tool]
+            bucket["raw_bytes"] += jraw
+            bucket["returned_bytes"] += jret
+            bucket["bytes_saved"] += jraw - jret
+            bucket["accounted_calls"] += jcalls
+            total_raw += jraw
+            total_returned += jret
+            accounted += jcalls
 
     tools_out: dict[str, Any] = {}
     for tool, bucket in sorted(by_tool.items()):

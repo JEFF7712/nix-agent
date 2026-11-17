@@ -954,3 +954,63 @@ def test_switch_dot_uses_pin(monkeypatch, tmp_path):
     assert out["status"] == "ok"
     sudo = [a for a in calls if a and a[0] == "sudo"][0]
     assert sudo[-1] == f"{pin.resolve()}#host"
+
+
+def test_generations_list_omits_duplicate_raw_output(monkeypatch):
+    monkeypatch.setattr(
+        switch_mod.runner,
+        "run",
+        lambda argv, cwd=None: _result(True, stdout=NIXOS_REBUILD_JSON, command=argv),
+    )
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+    out = generations()
+    assert out["status"] == "ok"
+    assert "output" not in out
+
+    monkeypatch.setattr(
+        switch_mod.runner,
+        "run",
+        lambda argv, cwd=None: _result(True, stdout=HM_LISTING, command=argv),
+    )
+    hm_out = generations(mode="home-manager")
+    assert hm_out["status"] == "ok"
+    assert "output" not in hm_out
+
+
+def test_generations_list_caps_at_default_limit_and_keeps_current(monkeypatch):
+    many = json.dumps(
+        [
+            {
+                "generation": i,
+                "date": f"2026-06-{i:02d} 10:00:00",
+                "current": i == 3,
+            }
+            for i in range(1, 31)
+        ]
+    )
+    monkeypatch.setattr(
+        switch_mod.runner,
+        "run",
+        lambda argv, cwd=None: _result(True, stdout=many, command=argv),
+    )
+    monkeypatch.setattr(switch_mod.runner, "resolve_binary", lambda n: f"/bin/{n}")
+
+    capped = generations()
+    assert capped["status"] == "ok"
+    assert len(capped["generations"]) == 20
+    assert capped["total_generations"] == 30
+    assert capped["generations_truncated"] is True
+    ids = [g["id"] for g in capped["generations"]]
+    # Must preserve ancient current generation (3) alongside the newest 19 (12..30)
+    assert 3 in ids
+    assert 30 in ids
+
+    uncapped = generations(limit=None)
+    assert len(uncapped["generations"]) == 30
+    assert "generations_truncated" not in uncapped
+
+
+def test_generations_list_invalid_limit():
+    assert generations(limit=0)["status"] == "invalid_limit"
+    assert generations(limit=-5)["status"] == "invalid_limit"
+    assert generations(limit=False)["status"] == "invalid_limit"

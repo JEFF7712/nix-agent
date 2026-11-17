@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.15.0 - 2026-11-17
+
+- `eval_config` evaluates multi-attribute batches in a single `nix eval --apply`
+  call (including integrated Home Manager attribute rewrites and missing-attr
+  checks), falling back per attribute only on evaluation errors or functions.
+- `extract_first_error` skips non-fatal `error (ignored):` diagnostics (such as
+  SQLite eval-cache lock warnings) so the underlying Nix error is surfaced.
+- `diff(flake_uri?, mode?, store_path?, against?)` can reuse an already-built
+  `store_path` from `build()` without re-evaluating the flake, compare against
+  an explicit `against` baseline closure, and credits suppressed `nix build`
+  output in usage-log `raw_bytes`.
+- `generations(action="list")` and `check("lint")` omit duplicate raw `output`
+  on clean parses; `generations(action="list")` defaults to `limit=20` newest
+  entries (always retaining `current`; pass `limit=None` for all).
+- `resolve_binary` falls back to standard NixOS/Nix user and system profile
+  `bin` directories when an MCP host spawns `nix-agent` with a stripped `PATH`.
+- Usage logging records `version` and `server_pid`, normalizes parent process
+  agent names (`codex`, `claude-code`, `opencode`, `cursor`), groups async
+  `build` byte accounting by `job_id` without double-counting repeated
+  completion polls, and prunes completed job/operation log directories older
+  than 7 days.
+
 ## v0.14.1 - 2026-11-09
 
 - Fix `nix run github:JEFF7712/nix-agent` failing in the package check

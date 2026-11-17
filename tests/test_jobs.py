@@ -285,3 +285,33 @@ def test_mcp_reconnect_retrieves_build_after_server_restart(fake_nix):
         assert "raw_bytes" not in completed
 
     anyio.run(reconnect)
+
+
+def test_prune_stale_jobs_removes_expired_completed_and_orphaned_index(tmp_path):
+    root = tmp_path / "jobs"
+    root.mkdir()
+    old_id = "1" * 32
+    old_dir = root / old_id
+    old_dir.mkdir()
+    (old_dir / "worker.lock").touch()
+    old_res = old_dir / "result.json"
+    old_res.write_text('{"status": "ok"}')
+    stale_ts = time.time() - (jobs.JOB_RETENTION_SECONDS + 3600)
+    os.utime(old_res, (stale_ts, stale_ts))
+
+    fresh_id = "2" * 32
+    fresh_dir = root / fresh_id
+    fresh_dir.mkdir()
+    (fresh_dir / "worker.lock").touch()
+    (fresh_dir / "result.json").write_text('{"status": "ok"}')
+
+    orphan_idx = root / "target-old.json"
+    orphan_idx.write_text(json.dumps({"job_id": old_id}))
+    valid_idx = root / "target-fresh.json"
+    valid_idx.write_text(json.dumps({"job_id": fresh_id}))
+
+    jobs.prune_stale_jobs(root)
+    assert not old_dir.exists()
+    assert not orphan_idx.exists()
+    assert fresh_dir.exists()
+    assert valid_idx.exists()

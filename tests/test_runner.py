@@ -327,3 +327,57 @@ def test_run_raw_bytes_counts_bytes_not_chars(monkeypatch):
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     result = runner.run(["x"])
     assert result.raw_bytes == 6
+
+
+def test_extract_first_error_skips_ignored_sqlite_busy():
+    stderr = (
+        "error (ignored): SQLite database '/home/u/.cache/nix/eval-cache-v6/db.sqlite' is busy\n"
+        "error: attribute 'nope' missing\n"
+    )
+    assert runner.extract_first_error(stderr) == "error: attribute 'nope' missing"
+    assert (
+        runner.extract_first_error(
+            "error (ignored): SQLite database '/tmp/db.sqlite' is busy\n"
+        )
+        is None
+    )
+    nested = (
+        "error:\n"
+        "       error (ignored): SQLite database '/tmp/db.sqlite' is busy\n"
+        "       error: real failure\n"
+    )
+    assert runner.extract_first_error(nested) == "error: real failure"
+
+
+def test_resolve_binary_falls_back_to_nix_profile_dirs(monkeypatch, tmp_path):
+    profile_bin = tmp_path / "per-user-bin"
+    profile_bin.mkdir()
+    fake_statix = profile_bin / "statix"
+    fake_statix.write_text("#!/bin/sh\nexit 0\n")
+    fake_statix.chmod(0o755)
+
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.setattr(runner, "_nix_bin_dirs", lambda: [str(profile_bin)])
+    assert runner.resolve_binary("statix") == str(fake_statix.resolve())
+    assert runner.resolve_binary("nonexistent-tool-xyz") is None
+
+
+def test_prune_stale_logs_removes_only_expired_operation_dirs(tmp_path):
+    import os
+    import time
+
+    old_dir = tmp_path / "operation-old"
+    old_dir.mkdir()
+    (old_dir / "stdout.log").write_text("old")
+    stale_ts = time.time() - (runner.LOG_RETENTION_SECONDS + 3600)
+    os.utime(old_dir, (stale_ts, stale_ts))
+
+    fresh_dir = tmp_path / "operation-fresh"
+    fresh_dir.mkdir()
+    keep_file = tmp_path / "keep.txt"
+    keep_file.write_text("keep")
+
+    runner.prune_stale_logs(tmp_path)
+    assert not old_dir.exists()
+    assert fresh_dir.exists()
+    assert keep_file.exists()

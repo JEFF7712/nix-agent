@@ -17,6 +17,7 @@ from nix_agent.tools.build import closure_diff
 from nix_agent.tools.check import check
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
+DEFAULT_GENERATIONS_LIMIT = 20
 
 _NIX_ENV_LINE = re.compile(
     r"^\s*(\d+)\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*(\(current\))?\s*$"
@@ -193,7 +194,9 @@ def _list_nixos() -> dict[str, object]:
                 )
                 for entry in entries
             ]
-            return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
+            response = runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
+            del response["output"]
+            return runner.account(response)
     return _list_nixos_nix_env()
 
 
@@ -216,7 +219,9 @@ def _list_nixos_nix_env() -> dict[str, object]:
                     }
                 )
             )
-    return runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
+    response = runner.envelope("ok", SYSTEM_PROFILE, result, generations=gens)
+    del response["output"]
+    return runner.account(response)
 
 
 def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -236,7 +241,8 @@ def _list_hm() -> tuple[dict[str, object], list[dict[str, object]]]:
                 }
             )
     envelope = runner.envelope("ok", "home-manager profile", result, generations=gens)
-    return envelope, gens
+    del envelope["output"]
+    return runner.account(envelope), gens
 
 
 def _generation_id(generation: object) -> int | None:
@@ -360,10 +366,34 @@ def _rollback_hm(
     )
 
 
+def _cap_generations(
+    gens: list[dict[str, object]], limit: int | None
+) -> tuple[list[dict[str, object]], bool]:
+    if limit is None or len(gens) <= limit:
+        return gens, False
+
+    def _sort_key(idx_entry: tuple[int, dict[str, object]]) -> tuple[int, int]:
+        idx, entry = idx_entry
+        gid = entry.get("id")
+        return (gid if isinstance(gid, int) else -1, idx)
+
+    ranked = sorted(enumerate(gens), key=_sort_key, reverse=True)
+    keep_indices = {idx for idx, _ in ranked[:limit]}
+    current_idx = next(
+        (idx for idx, entry in enumerate(gens) if entry.get("current")), None
+    )
+    if current_idx is not None and current_idx not in keep_indices:
+        oldest_kept = ranked[limit - 1][0]
+        keep_indices.discard(oldest_kept)
+        keep_indices.add(current_idx)
+    return [entry for idx, entry in enumerate(gens) if idx in keep_indices], True
+
+
 def generations(
     action: str = "list",
     mode: str = "nixos",
     generation: int | str | None = None,
+    limit: int | None = DEFAULT_GENERATIONS_LIMIT,
 ) -> dict[str, object]:
     if action not in ("list", "rollback"):
         return {
@@ -377,9 +407,26 @@ def generations(
         }
 
     if action == "list":
+        if limit is not None and (
+            isinstance(limit, bool) or not isinstance(limit, int) or limit < 1
+        ):
+            return {
+                "status": "invalid_limit",
+                "error": f"limit must be a positive integer or None, got {limit!r}",
+            }
         if mode == "nixos":
-            return _list_nixos()
-        envelope, _ = _list_hm()
+            envelope = _list_nixos()
+        else:
+            envelope, _ = _list_hm()
+        if envelope.get("status") != "ok":
+            return envelope
+        all_gens = list(cast(list[dict[str, object]], envelope.get("generations") or []))
+        capped, truncated = _cap_generations(all_gens, limit)
+        if truncated:
+            envelope["generations"] = capped
+            envelope["total_generations"] = len(all_gens)
+            envelope["generations_truncated"] = True
+            runner.account(envelope)
         return envelope
 
     if mode == "nixos":

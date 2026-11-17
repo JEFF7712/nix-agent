@@ -323,6 +323,12 @@ def test_eval_batched_unknown_host_early_exit(monkeypatch):
 
 def test_eval_batched_locks_winning_host(monkeypatch):
     calls = []
+    batch_out = json.dumps(
+        {
+            "0": {"ok": True, "value": "val"},
+            "1": {"ok": False, "retry": True},
+        }
+    )
 
     def fake_run(argv, cwd=None):
         calls.append(argv)
@@ -338,20 +344,22 @@ def test_eval_batched_locks_winning_host(monkeypatch):
                 stderr="error: flake does not provide attribute 'nixosConfigurations.\"guess\"'",
                 command=argv,
             )
-        return _result(True, stdout='"val"\n', command=argv)
+        if "--apply" in argv:
+            return _result(True, stdout=batch_out, command=argv)
+        return _result(True, stdout='"fallback-val"\n', command=argv)
 
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["guess"])
     out = eval_config(["attr1", "attr2"], flake_uri="/x")
     assert out["status"] == "ok"
-    assert len(out["results"]) == 2
-    # First attr tried guess, failed, queried show, then tried host-b.
-    # Second attr must directly query host-b without re-trying guess or show!
+    assert [r["value"] for r in out["results"]] == ["val", "fallback-val"]
+    # Batch probe tried guess, failed, queried show, then ran batch on host-b;
+    # retry fallback for attr2 must directly query host-b without re-trying guess.
     eval_calls = [c for c in calls if "eval" in c]
     assert len(eval_calls) == 3
-    assert 'nixosConfigurations."guess"' in eval_calls[0][2]
-    assert 'nixosConfigurations."host-b"' in eval_calls[1][2]
-    assert 'nixosConfigurations."host-b"' in eval_calls[2][2]
+    assert eval_calls[0][2] == '/x#nixosConfigurations."guess".config'
+    assert eval_calls[1][2] == '/x#nixosConfigurations."host-b".config'
+    assert eval_calls[2][2] == '/x#nixosConfigurations."host-b".config.attr2'
 
 
 def test_eval_unique_host_fallback(monkeypatch):
@@ -447,10 +455,16 @@ def test_eval_strips_leading_config(monkeypatch):
 
 def test_eval_batched_uses_embedded_host(monkeypatch):
     calls = []
+    batch_out = json.dumps(
+        {
+            "0": {"ok": True, "value": "v1"},
+            "1": {"ok": True, "value": "v2"},
+        }
+    )
 
     def fake_run(argv, cwd=None):
         calls.append(argv)
-        return _result(True, stdout='"v"\n', command=argv)
+        return _result(True, stdout=batch_out, command=argv)
 
     monkeypatch.setattr(eval_mod.runner, "run", fake_run)
     monkeypatch.setattr(eval_mod, "attr_candidates", lambda t: ["guess"])
@@ -463,7 +477,119 @@ def test_eval_batched_uses_embedded_host(monkeypatch):
     )
     assert out["status"] == "ok"
     assert out["results"][0]["evaluated_attr"] == "a.b"
+    assert out["results"][0]["value"] == "v1"
+    assert out["results"][1]["value"] == "v2"
     assert [c[2] for c in calls] == [
-        '/x#nixosConfigurations."homelab-04".config.a.b',
-        '/x#nixosConfigurations."homelab-04".config.c',
+        '/x#nixosConfigurations."homelab-04".config',
     ]
+
+
+def test_parse_attrpath_handles_quotes_slashes_and_rejects_invalid():
+    assert eval_mod.parse_attrpath("services.openssh.enable") == [
+        "services",
+        "openssh",
+        "enable",
+    ]
+    assert eval_mod.parse_attrpath(
+        'systemd.services."kiosk-rotate".serviceConfig.ExecStart'
+    ) == ["systemd", "services", "kiosk-rotate", "serviceConfig", "ExecStart"]
+    assert eval_mod.parse_attrpath("environment.etc.omarchy-vm/firmware-code.source") == [
+        "environment",
+        "etc",
+        "omarchy-vm/firmware-code",
+        "source",
+    ]
+    assert eval_mod.parse_attrpath('a."b\\"c".d') == ["a", 'b"c', "d"]
+    assert eval_mod.parse_attrpath("") is None
+    assert eval_mod.parse_attrpath(".a") is None
+    assert eval_mod.parse_attrpath("a.") is None
+    assert eval_mod.parse_attrpath("a..b") is None
+    assert eval_mod.parse_attrpath('a."unclosed') is None
+    assert eval_mod.parse_attrpath("a.${foo}.b") is None
+
+
+def test_eval_batched_single_call_mixed_ok_missing_hm_and_retry(monkeypatch):
+    calls = []
+    batch_out = json.dumps(
+        {
+            "0": {"ok": True, "value": "laptop"},
+            "1": {"ok": False, "missing": "nope"},
+            "2": {"ok": True, "value": True, "hm_rewritten": True},
+            "3": {"ok": False, "retry": True},
+        }
+    )
+
+    def fake_run(argv, cwd=None):
+        calls.append(argv)
+        if "--apply" in argv:
+            return _result(True, stdout=batch_out, command=argv)
+        if "--json" in argv:
+            return _result(
+                False,
+                stderr="error: cannot convert a function to JSON",
+                command=argv,
+            )
+        return _result(True, stdout="<LAMBDA>", command=argv)
+
+    monkeypatch.setenv("USER", "rupan")
+    monkeypatch.setattr(eval_mod.runner, "run", fake_run)
+    out = eval_config(
+        [
+            "networking.hostName",
+            "services.nope",
+            "programs.git.enable",
+            "lib.mkIf",
+        ],
+        flake_uri="/x#h",
+    )
+    assert out["status"] == "partial"
+    assert out["succeeded_count"] == 3
+    assert out["failed_count"] == 1
+    assert out["first_error"] == "error: attribute 'nope' missing"
+    assert out["results"][0] == {
+        "attr": "networking.hostName",
+        "status": "ok",
+        "value": "laptop",
+    }
+    assert out["results"][1] == {
+        "attr": "services.nope",
+        "status": "failed",
+        "first_error": "error: attribute 'nope' missing",
+    }
+    assert out["results"][2] == {
+        "attr": "programs.git.enable",
+        "status": "ok",
+        "value": True,
+        "hm_rewritten": True,
+        "requested_attr": "programs.git.enable",
+    }
+    assert out["results"][3]["status"] == "ok"
+    assert out["results"][3]["json_fallback"] is True
+    assert out["results"][3]["value"] == "<LAMBDA>"
+    # Only 1 batch call + 2 calls for the single lambda fallback; missing & HM
+    # rewrite needed zero extra subprocesses!
+    assert len(calls) == 3
+
+
+def test_eval_batched_real_nix_eval_against_tiny_flake():
+    from pathlib import Path
+    import shutil
+    import pytest
+
+    if shutil.which("nix") is None:
+        pytest.skip("nix not on PATH")
+    fixture = Path(__file__).parent / "fixtures" / "tiny-flake"
+    out = eval_config(
+        ["networking.hostName", "networking.doesNotExist"],
+        flake_uri=f"path:{fixture}#fixture",
+    )
+    assert out["status"] == "partial"
+    assert out["succeeded_count"] == 1
+    assert out["failed_count"] == 1
+    assert out["results"][0] == {
+        "attr": "networking.hostName",
+        "status": "ok",
+        "value": "fixture",
+    }
+    assert out["results"][1]["status"] == "failed"
+    assert "doesNotExist" in out["results"][1]["first_error"]

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -18,8 +19,48 @@ from nix_agent import runner
 from nix_agent.target import Target
 
 
+JOB_RETENTION_SECONDS = 7 * 24 * 60 * 60
+_JOB_ID_RE = re.compile(r"[0-9a-f]{32}")
+
+
 def jobs_dir() -> Path:
     return runner.state_dir() / "jobs"
+
+
+def prune_stale_jobs(
+    root: Path, *, max_age_seconds: float = JOB_RETENTION_SECONDS
+) -> None:
+    """Best-effort cleanup of completed job directories older than
+    ``max_age_seconds`` and orphaned target index pointers. Never removes
+    running jobs."""
+    cutoff = time.time() - max_age_seconds
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if not _JOB_ID_RE.fullmatch(entry.name):
+            continue
+        result_path = entry / "result.json"
+        try:
+            if (
+                entry.is_dir()
+                and result_path.is_file()
+                and result_path.stat().st_mtime < cutoff
+                and not _active(entry)
+            ):
+                shutil.rmtree(entry, ignore_errors=True)
+        except OSError:
+            continue
+    for entry in entries:
+        if not (entry.name.startswith("target-") and entry.suffix == ".json"):
+            continue
+        try:
+            job_id = json.loads(entry.read_text()).get("job_id")
+            if isinstance(job_id, str) and not (root / job_id).is_dir():
+                entry.unlink(missing_ok=True)
+        except (OSError, json.JSONDecodeError, AttributeError):
+            continue
 
 
 def _write_json(path: Path, value: dict[str, object]) -> None:
@@ -116,6 +157,7 @@ def start(target: Target) -> dict[str, object]:
     with (root / "start.lock").open("a+b") as start_lock:
         os.chmod(root / "start.lock", 0o600)
         fcntl.flock(start_lock, fcntl.LOCK_EX)
+        prune_stale_jobs(root)
         index = root / f"target-{key}.json"
         if index.exists():
             previous = json.loads(index.read_text())["job_id"]
